@@ -28,6 +28,14 @@ header{background:#fff;padding:14px 22px;display:flex;align-items:center;justify
 .notif-dot{position:absolute;top:0;right:0;width:9px;height:9px;background:#e74c3c;border-radius:50%;display:none;}
 .notif-dot.show{display:block;}
 .user-badge{font-size:0.78rem;font-weight:700;padding:5px 13px;border-radius:20px;color:#fff;}
+.fz-hamburger{display:none;background:none;border:1.5px solid #ddd;border-radius:10px;width:36px;height:36px;align-items:center;justify-content:center;cursor:pointer;color:#555;flex-shrink:0;}
+.fz-hamburger:hover{border-color:#2ecc40;color:#1b4d2e;}
+.fz-menu-drop{display:none;position:absolute;top:54px;right:14px;background:#fff;border-radius:var(--fz-radius-md);box-shadow:0 12px 32px rgba(15,46,28,0.18);padding:10px;flex-direction:column;gap:6px;z-index:150;min-width:190px;}
+.fz-menu-drop.show{display:flex;}
+.fz-menu-drop .hbtn{width:100%;justify-content:center;}
+@media(max-width:919px){
+  .fz-hamburger{display:flex;}
+}
 .screen{display:none;padding:20px;max-width:600px;margin:0 auto;}
 .screen.active{display:block;}
 /* SIDEBAR (desktop only) */
@@ -4125,19 +4133,33 @@ function updateHeader(){
   hdr.innerHTML =
     '<button class="notif-btn" id="notifBtn"><span>🔔</span><span class="notif-dot" id="notifDot"></span></button>'+
     '<span class="user-badge" style="background:'+ROLE_COLORS[currentUser.role]+';">'+currentUser.name+'</span>'+
-    (canAccess('qa')?'<button class="hbtn" style="background:#27ae60;" id="qaBtn">🔬 QA</button>':'')+
-    (canAccess('qa')?'<button class="hbtn" style="background:#9b59b6;" id="supBtn">🔍 Supervisor</button>':'')+
-    (canAccess('manager')?'<button class="hbtn" style="background:#0074d9;" id="mgrBtn">📊 Manager</button>':'')+
-    (canAccess('labelprinter')?'<button class="hbtn" style="background:#8e44ad;" id="labelPrintBtn">🏷️ Labels</button>':'')+
-    (canAccess('supervisor')?'<button class="hbtn" style="background:#e74c3c;" id="newShiftBtn">🌅 New Shift</button>':'')+
-    '<button class="hbtn" style="background:#888;" id="logoutBtn">Log Out</button>';
+    '<button class="fz-hamburger" id="fzHamburger" aria-label="Menu">'+fzIcon('menu',18)+'</button>'+
+    '<div class="fz-menu-drop" id="fzMenuDrop">'+
+      (canAccess('qa')?'<button class="hbtn" style="background:#27ae60;" id="qaBtn">🔬 QA</button>':'')+
+      (canAccess('qa')?'<button class="hbtn" style="background:#9b59b6;" id="supBtn">🔍 Supervisor</button>':'')+
+      (canAccess('manager')?'<button class="hbtn" style="background:#0074d9;" id="mgrBtn">📊 Manager</button>':'')+
+      (canAccess('labelprinter')?'<button class="hbtn" style="background:#8e44ad;" id="labelPrintBtn">🏷️ Labels</button>':'')+
+      (canAccess('supervisor')?'<button class="hbtn" style="background:#e74c3c;" id="newShiftBtn">🌅 New Shift</button>':'')+
+      '<button class="hbtn" style="background:#888;" id="logoutBtn">Log Out</button>'+
+    '</div>';
+  var menuDrop=document.getElementById('fzMenuDrop');
+  function closeMenu(){menuDrop.classList.remove('show');}
   var nb=document.getElementById('notifBtn'); if(nb) nb.onclick=openNotifications;
-  var qb=document.getElementById('qaBtn'); if(qb) qb.onclick=openQaDash;
-  var sb=document.getElementById('supBtn'); if(sb) sb.onclick=openSupervisorDash;
-  var mb=document.getElementById('mgrBtn'); if(mb) mb.onclick=openManager;
-  var lb=document.getElementById('labelPrintBtn'); if(lb) lb.onclick=function(){renderLabelStation();showPanel('labelPanel');};
-  var nsb=document.getElementById('newShiftBtn'); if(nsb) nsb.onclick=openNewShiftConfirm;
-  var lo=document.getElementById('logoutBtn'); if(lo) lo.onclick=doLogout;
+  var hb=document.getElementById('fzHamburger'); if(hb) hb.onclick=function(e){e.stopPropagation();menuDrop.classList.toggle('show');};
+  var qb=document.getElementById('qaBtn'); if(qb) qb.onclick=function(){closeMenu();openQaDash();};
+  var sb=document.getElementById('supBtn'); if(sb) sb.onclick=function(){closeMenu();openSupervisorDash();};
+  var mb=document.getElementById('mgrBtn'); if(mb) mb.onclick=function(){closeMenu();openManager();};
+  var lb=document.getElementById('labelPrintBtn'); if(lb) lb.onclick=function(){closeMenu();renderLabelStation();showPanel('labelPanel');};
+  var nsb=document.getElementById('newShiftBtn'); if(nsb) nsb.onclick=function(){closeMenu();openNewShiftConfirm();};
+  var lo=document.getElementById('logoutBtn'); if(lo) lo.onclick=function(){closeMenu();doLogout();};
+  if(!window._fzMenuOutsideClickBound){
+    window._fzMenuOutsideClickBound=true;
+    document.addEventListener('click',function(e){
+      var drop=document.getElementById('fzMenuDrop'); if(!drop) return;
+      var ham=document.getElementById('fzHamburger');
+      if(drop.classList.contains('show')&&!drop.contains(e.target)&&e.target!==ham) drop.classList.remove('show');
+    });
+  }
 }
 
 function doLogout(){
@@ -4166,7 +4188,8 @@ var FZ_ICONS={
   sunrise:'<path d="M12 2v5M4.2 10.2l1.4 1.4M19.8 10.2l-1.4 1.4M2 18h20M6 18a6 6 0 0 1 12 0"/>',
   logout:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
   folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/>',
-  link:'<path d="M9 15 15 9"/><path d="M11 6l1.5-1.5a3.5 3.5 0 1 1 5 5L16 11"/><path d="M13 18l-1.5 1.5a3.5 3.5 0 1 1-5-5L8 13"/>'
+  link:'<path d="M9 15 15 9"/><path d="M11 6l1.5-1.5a3.5 3.5 0 1 1 5 5L16 11"/><path d="M13 18l-1.5 1.5a3.5 3.5 0 1 1-5-5L8 13"/>',
+  menu:'<path d="M4 6h16M4 12h16M4 18h16"/>'
 };
 function fzIcon(name,size){
   return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:'+(size||18)+'px;height:'+(size||18)+'px;display:block;">'+(FZ_ICONS[name]||'')+'</svg>';
