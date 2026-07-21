@@ -4207,7 +4207,7 @@ function updateSidebar(){
   if(!currentUser){sb.innerHTML='';return;}
   var html='<div class="fz-logo"><span class="g">FRENZ</span><span class="b">EE</span></div>';
   html+='<div class="fz-navlabel">Menu</div>';
-  html+=fzNavBtn('grid','Dashboard','sb-mgr');
+  if(canAccess('manager')) html+=fzNavBtn('grid','Dashboard','sb-mgr');
   html+=fzNavBtn('layers','Production Lines','sb-lines');
   html+=fzNavBtn('flask','Prep Room','sb-prep');
   if(canAccess('manager')){
