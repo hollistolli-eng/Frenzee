@@ -7,22 +7,53 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
 <style>
+:root{
+  --fz-green:#2ecc40; --fz-green-dark:#1b4d2e; --fz-green-deep:#0f2e1c; --fz-green-soft:#eafbee;
+  --fz-blue:#0074d9; --fz-blue-soft:#e8f4fd;
+  --fz-bg:#f4f6f5; --fz-card:#ffffff; --fz-border:#edf1ee;
+  --fz-text:#1a1f1c; --fz-text-soft:#6b7570; --fz-text-faint:#9aa39d;
+  --fz-radius-lg:20px; --fz-radius-md:16px; --fz-radius-sm:11px;
+  --fz-shadow:0 4px 18px rgba(15,46,28,0.07); --fz-shadow-sm:0 2px 10px rgba(15,46,28,0.06);
+  --fz-sidebar-w:248px;
+}
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Segoe UI',Arial,sans-serif;background:#f5f7f5;min-height:100vh;}
-header{background:#fff;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 8px rgba(0,0,0,0.08);position:sticky;top:0;z-index:100;}
+body{font-family:'Segoe UI',Arial,sans-serif;background:var(--fz-bg);min-height:100vh;color:var(--fz-text);}
+header{background:#fff;padding:14px 22px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--fz-shadow-sm);position:sticky;top:0;z-index:100;}
 .logo{font-size:1.8rem;font-weight:900;letter-spacing:-1px;}
 .logo .g{color:#2ecc40;}.logo .b{color:#0074d9;}
 .hdr-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
-.hbtn{color:#fff;border:none;border-radius:20px;padding:5px 14px;font-size:0.78rem;font-weight:700;cursor:pointer;}
+.hbtn{color:#fff;border:none;border-radius:20px;padding:6px 15px;font-size:0.78rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
+.hbtn svg{width:14px;height:14px;flex-shrink:0;}
 .notif-btn{background:none;border:none;cursor:pointer;font-size:1.3rem;position:relative;}
 .notif-dot{position:absolute;top:0;right:0;width:9px;height:9px;background:#e74c3c;border-radius:50%;display:none;}
 .notif-dot.show{display:block;}
-.user-badge{font-size:0.78rem;font-weight:700;padding:4px 12px;border-radius:20px;color:#fff;}
+.user-badge{font-size:0.78rem;font-weight:700;padding:5px 13px;border-radius:20px;color:#fff;}
 .screen{display:none;padding:20px;max-width:600px;margin:0 auto;}
 .screen.active{display:block;}
+/* SIDEBAR (desktop only) */
+#fzSidebar{display:none;position:fixed;top:0;left:0;bottom:0;width:var(--fz-sidebar-w);background:linear-gradient(180deg,var(--fz-green-dark) 0%,var(--fz-green-deep) 100%);color:#fff;padding:22px 14px;z-index:150;overflow-y:auto;flex-direction:column;}
+#fzSidebar .fz-logo{font-size:1.4rem;font-weight:900;letter-spacing:-1px;margin:2px 10px 26px;}
+#fzSidebar .fz-logo .g{color:#5fe37a;}#fzSidebar .fz-logo .b{color:#6cb3ff;}
+#fzSidebar .fz-navlabel{font-size:0.65rem;font-weight:700;color:rgba(255,255,255,0.38);text-transform:uppercase;letter-spacing:1.2px;margin:16px 12px 8px;}
+#fzSidebar .fz-navlabel:first-of-type{margin-top:0;}
+.fz-navbtn{display:flex;align-items:center;gap:11px;width:100%;background:none;border:none;color:rgba(255,255,255,0.82);padding:10px 12px;border-radius:var(--fz-radius-sm);font-size:0.84rem;font-weight:600;cursor:pointer;text-align:left;margin-bottom:2px;font-family:inherit;}
+.fz-navbtn:hover{background:rgba(255,255,255,0.08);color:#fff;}
+.fz-navbtn.active{background:var(--fz-green);color:#fff;}
+.fz-navbtn svg{width:17px;height:17px;flex-shrink:0;opacity:0.95;}
+#fzSidebar .fz-foot{margin-top:auto;padding-top:14px;}
+/* Desktop shift for sidebar */
+@media(min-width:920px){
+  body.fz-logged-in{padding-left:var(--fz-sidebar-w);}
+  body.fz-logged-in #fzSidebar{display:flex;}
+  body.fz-logged-in .mgr-panel{left:var(--fz-sidebar-w);}
+  /* Nav lives in the sidebar on desktop — header keeps just notifications + user */
+  body.fz-logged-in header .hbtn{display:none;}
+  body.fz-logged-in header .logo{display:none;}
+  body.fz-logged-in header{justify-content:flex-end;}
+}
 /* LOGIN */
 .login-wrap{display:flex;justify-content:center;align-items:flex-start;padding-top:40px;}
-.login-box{background:#fff;padding:28px;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,0.1);width:100%;max-width:360px;}
+.login-box{background:#fff;padding:28px;border-radius:var(--fz-radius-lg);box-shadow:var(--fz-shadow);width:100%;max-width:360px;}
 .login-box h2{font-size:1.1rem;margin-bottom:18px;color:#222;}
 .login-box label{display:block;font-size:0.75rem;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px;}
 .login-box select,.login-box input{width:100%;padding:11px;border:1.5px solid #ddd;border-radius:8px;font-size:0.95rem;margin-bottom:14px;font-family:inherit;}
@@ -30,8 +61,8 @@ header{background:#fff;padding:12px 20px;display:flex;align-items:center;justify
 .login-box button:hover{background:#27ae36;}
 /* LINES */
 .lines-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:10px;}
-.line-card{background:#fff;border-radius:14px;padding:20px 16px;text-align:center;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.07);border:2.5px solid transparent;transition:all 0.18s;}
-.line-card:hover{border-color:#2ecc40;transform:translateY(-2px);}
+.line-card{background:#fff;border-radius:var(--fz-radius-md);padding:20px 16px;text-align:center;cursor:pointer;box-shadow:var(--fz-shadow-sm);border:2.5px solid transparent;transition:all 0.18s;}
+.line-card:hover{border-color:#2ecc40;transform:translateY(-2px);box-shadow:var(--fz-shadow);}
 .stat-card{border:2.5px solid #e74c3c!important;background:#fff8f8;}
 .stat-card .lp-fill{background:#e74c3c;}
 .line-num{font-size:2rem;font-weight:900;color:#2ecc40;}
@@ -48,9 +79,9 @@ header{background:#fff;padding:12px 20px;display:flex;align-items:center;justify
 .msg-item:last-child{border-bottom:none;}
 /* SCHEDULE */
 .back-btn{display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer;color:#0074d9;font-size:0.95rem;font-weight:600;margin-bottom:14px;padding:0;}
-.sched-hdr{background:#fff;border-radius:14px;padding:16px 18px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:16px;}
+.sched-hdr{background:#fff;border-radius:var(--fz-radius-md);padding:16px 18px;display:flex;justify-content:space-between;align-items:center;box-shadow:var(--fz-shadow-sm);margin-bottom:16px;}
 .sched-hdr h2{font-size:1.15rem;color:#222;font-weight:800;}
-.job-card{background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #ddd;display:flex;align-items:center;gap:12px;transition:all 0.15s;}
+.job-card{background:#fff;border-radius:var(--fz-radius-md);padding:14px 16px;margin-bottom:10px;box-shadow:var(--fz-shadow-sm);border-left:5px solid #ddd;display:flex;align-items:center;gap:12px;transition:all 0.15s;}
 .job-card.pending{border-left-color:#f1c40f;}
 .job-card.complete{border-left-color:#2ecc40;opacity:0.75;}
 .job-card.in-progress{border-left-color:#0074d9;}
@@ -72,7 +103,7 @@ header{background:#fff;padding:12px 20px;display:flex;align-items:center;justify
 .pill-removed{background:#f5f5f5;color:#888;}
 .tx-btn{background:none;border:1.5px solid #ccc;border-radius:8px;padding:5px 9px;font-size:0.9rem;cursor:pointer;color:#888;flex-shrink:0;}
 /* TRACEABILITY */
-.trace-hdr{background:#fff;border-radius:14px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:14px;}
+.trace-hdr{background:#fff;border-radius:var(--fz-radius-md);padding:16px;box-shadow:var(--fz-shadow-sm);margin-bottom:14px;}
 .trace-hdr h2{font-size:1rem;font-weight:800;color:#222;}
 .trace-hdr .meta{font-size:0.8rem;color:#888;margin-top:3px;}
 .trace-status-bar{display:flex;align-items:center;gap:10px;background:#f9f9f9;border-radius:10px;padding:9px 12px;margin-top:10px;}
@@ -80,7 +111,7 @@ header{background:#fff;padding:12px 20px;display:flex;align-items:center;justify
 .badge-ok{background:#2ecc40;color:#fff;font-size:0.75rem;font-weight:700;padding:3px 10px;border-radius:20px;}
 .badge-pend{background:#f39c12;color:#fff;font-size:0.75rem;font-weight:700;padding:3px 10px;border-radius:20px;}
 .badge-ov{background:#e67e22;color:#fff;font-size:0.75rem;font-weight:700;padding:3px 10px;border-radius:20px;}
-.ing-card{background:#fff;border-radius:12px;padding:14px 16px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #ddd;}
+.ing-card{background:#fff;border-radius:var(--fz-radius-md);padding:14px 16px;margin-bottom:10px;box-shadow:var(--fz-shadow-sm);border-left:5px solid #ddd;}
 .ing-card.verified{border-left-color:#2ecc40;}
 .ing-card.failed{border-left-color:#e74c3c;}
 .ing-card.overridden{border-left-color:#e67e22;background:#fffbf5;}
@@ -99,17 +130,17 @@ header{background:#fff;padding:12px 20px;display:flex;align-items:center;justify
 .scan-result.success{background:#f0fdf4;color:#1a7a2a;border:1.5px solid #2ecc40;}
 .scan-result.fail{background:#fff0f0;color:#c0392b;border:1.5px solid #e74c3c;}
 .scan-result.warning{background:#fff8f0;color:#b85c00;border:1.5px solid #e67e22;}
-.complete-btn{background:#2ecc40;color:#fff;border:none;border-radius:12px;padding:14px;font-size:1rem;font-weight:700;width:100%;cursor:pointer;margin-top:8px;}
+.complete-btn{background:#2ecc40;color:#fff;border:none;border-radius:16px;padding:14px;font-size:1rem;font-weight:700;width:100%;cursor:pointer;margin-top:8px;}
 .complete-btn:disabled{background:#ccc;cursor:default;}
 /* OVERLAYS */
 .overlay{display:none;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,0.55);align-items:center;justify-content:center;}
 .overlay.show{display:flex;}
-.ov-box{background:#fff;border-radius:20px;padding:28px 22px;max-width:340px;width:92%;animation:popIn 0.2s ease;max-height:90vh;overflow-y:auto;}
+.ov-box{background:#fff;border-radius:var(--fz-radius-lg);padding:28px 22px;max-width:340px;width:92%;animation:popIn 0.2s ease;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(15,46,28,0.25);}
 @keyframes popIn{from{transform:scale(0.85);opacity:0;}to{transform:scale(1);opacity:1;}}
 .ov-icon{font-size:2.8rem;text-align:center;margin-bottom:8px;}
 .ov-title{font-size:1.1rem;font-weight:900;text-align:center;margin-bottom:4px;}
 .ov-sub{font-size:0.83rem;color:#666;text-align:center;margin-bottom:16px;}
-.ov-btn{background:#2ecc40;color:#fff;border:none;border-radius:10px;padding:11px;font-size:0.95rem;font-weight:700;cursor:pointer;width:100%;margin-top:6px;}
+.ov-btn{background:#2ecc40;color:#fff;border:none;border-radius:var(--fz-radius-sm);padding:11px;font-size:0.95rem;font-weight:700;cursor:pointer;width:100%;margin-top:6px;}
 .ov-btn.red{background:#e74c3c;}.ov-btn.grey{background:#aaa;}.ov-btn.purple{background:#9b59b6;}.ov-btn.orange{background:#e67e22;}.ov-btn.blue{background:#007dc6;}
 .ov-field{display:flex;flex-direction:column;gap:4px;margin-bottom:10px;}
 .ov-field label{font-size:0.72rem;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:0.5px;}
@@ -119,19 +150,23 @@ header{background:#fff;padding:12px 20px;display:flex;align-items:center;justify
 .info-box.orange{background:#fff8f0;border-color:#e67e22;color:#7d4c00;}
 .legal-footer{background:#222;color:#fff;border-radius:8px;padding:7px 11px;display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px;font-size:0.62rem;margin-top:10px;}
 /* MANAGER PANELS */
-.mgr-panel{display:none;position:fixed;inset:0;z-index:200;background:#f5f7f5;overflow-y:auto;}
+.mgr-panel{display:none;position:fixed;inset:0;z-index:200;background:var(--fz-bg);overflow-y:auto;}
 .mgr-panel.show{display:block;}
-.mgr-hdr{background:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 8px rgba(0,0,0,0.08);position:sticky;top:0;z-index:10;}
+.mgr-hdr{background:#fff;padding:16px 22px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--fz-shadow-sm);position:sticky;top:0;z-index:10;}
 .mgr-hdr-title{font-size:1rem;font-weight:900;}
-.mgr-close{background:none;border:1.5px solid #ccc;border-radius:20px;padding:5px 14px;font-size:0.8rem;font-weight:600;cursor:pointer;color:#555;}
-.mgr-body{padding:16px;max-width:600px;margin:0 auto;}
-.sum-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;}
-.sum-tile{background:#fff;border-radius:12px;padding:12px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.06);}
-.sum-val{font-size:1.6rem;font-weight:900;}
-.sum-lbl{font-size:0.7rem;color:#888;font-weight:600;margin-top:2px;}
-.mgr-lc{background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);cursor:pointer;transition:transform 0.15s;border-left:5px solid #ddd;}
-.mgr-lc:hover{transform:translateY(-2px);}
-.msg-compose{background:#fff;border-radius:14px;padding:14px;margin-top:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);}
+.mgr-close{background:none;border:1.5px solid #ddd;border-radius:20px;padding:6px 15px;font-size:0.8rem;font-weight:600;cursor:pointer;color:#555;}
+.mgr-close:hover{border-color:#2ecc40;color:#1b4d2e;}
+.mgr-body{padding:20px;max-width:680px;margin:0 auto;}
+.sum-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:16px;}
+.sum-tile{background:#fff;border-radius:var(--fz-radius-md);padding:16px 14px;text-align:left;box-shadow:var(--fz-shadow-sm);}
+.sum-tile.featured{background:linear-gradient(135deg,var(--fz-green-dark),var(--fz-green-deep));color:#fff;}
+.sum-tile.featured .sum-lbl{color:rgba(255,255,255,0.75);}
+.sum-val{font-size:1.7rem;font-weight:900;}
+.sum-lbl{font-size:0.72rem;color:var(--fz-text-soft);font-weight:600;margin-top:3px;}
+@media(min-width:920px){.sum-grid{grid-template-columns:repeat(4,1fr);}}
+.mgr-lc{background:#fff;border-radius:var(--fz-radius-md);padding:14px 16px;margin-bottom:10px;box-shadow:var(--fz-shadow-sm);cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;border-left:5px solid #ddd;}
+.mgr-lc:hover{transform:translateY(-2px);box-shadow:var(--fz-shadow);}
+.msg-compose{background:#fff;border-radius:var(--fz-radius-md);padding:14px;margin-top:10px;box-shadow:var(--fz-shadow-sm);}
 .mtype-btn{border:1.5px solid #ddd;background:#fafafa;border-radius:8px;padding:5px 10px;font-size:0.78rem;font-weight:600;cursor:pointer;}
 .mtype-btn.active{border-color:#0074d9;background:#e8f4fd;color:#0074d9;}
 .send-btn{background:#0074d9;color:#fff;border:none;border-radius:10px;padding:10px;font-size:0.88rem;font-weight:700;cursor:pointer;width:100%;margin-top:8px;}
@@ -139,7 +174,7 @@ header{background:#fff;padding:12px 20px;display:flex;align-items:center;justify
 .sent-msg.urgent{background:#fff0f0;border-left:3px solid #e74c3c;}
 .sent-msg.halt{background:#fff8f0;border-left:3px solid #e67e22;}
 /* SCHEDULE MANAGEMENT */
-.sched-mgmt-card{background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #2ecc40;}
+.sched-mgmt-card{background:#fff;border-radius:var(--fz-radius-md);padding:14px 16px;margin-bottom:10px;box-shadow:var(--fz-shadow-sm);border-left:5px solid #2ecc40;}
 .sm-job-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f5f5f5;}
 .sm-job-row:last-child{border-bottom:none;}
 .sm-job-name{font-size:0.85rem;font-weight:700;flex:1;}
@@ -149,7 +184,7 @@ header{background:#fff;padding:12px 20px;display:flex;align-items:center;justify
 .audit-row.add{border-left-color:#2ecc40;}
 .audit-row.remove{border-left-color:#e74c3c;}
 .audit-row.move{border-left-color:#9b59b6;}
-.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:11px 22px;border-radius:12px;font-size:0.88rem;font-weight:600;opacity:0;pointer-events:none;transition:opacity 0.3s;z-index:999;white-space:nowrap;}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:11px 22px;border-radius:16px;font-size:0.88rem;font-weight:600;opacity:0;pointer-events:none;transition:opacity 0.3s;z-index:999;white-space:nowrap;}
 .toast.show{opacity:1;}
 @keyframes allergenPulse{0%,100%{box-shadow:0 0 0 0 rgba(155,89,182,0.5);border-color:#9b59b6;}50%{box-shadow:0 0 0 8px rgba(155,89,182,0);border-color:#6c3483;}}
 .allergen-blink{animation:allergenPulse 1.8s ease-in-out infinite;border:2.5px solid #9b59b6!important;}
@@ -193,6 +228,7 @@ if(sessionStorage.getItem(PW_KEY)==='1'){
   document.getElementById('pwGate').style.display='none';
 }
 </script>
+<aside id="fzSidebar"></aside>
 <header>
   <div class="logo"><span class="g">FRENZ</span><span class="b">EE</span></div>
   <div class="hdr-right" id="hdrRight">
@@ -335,7 +371,7 @@ if(sessionStorage.getItem(PW_KEY)==='1'){
 <div class="mgr-panel" id="qaPanel"><div class="mgr-hdr"><div class="mgr-hdr-title"><span style="color:#2ecc40;">FRENZ</span><span style="color:#0074d9;">EE</span> <span style="font-size:0.8rem;color:#888;">QA Dashboard</span></div><button class="mgr-close" id="qaCloseBtn">✕ Close</button></div><div class="mgr-body" id="qaBody"></div></div>
 <div class="mgr-panel" id="mgrPanel"><div class="mgr-hdr"><div class="mgr-hdr-title"><span style="color:#2ecc40;">FRENZ</span><span style="color:#0074d9;">EE</span> <span style="font-size:0.8rem;color:#888;">Manager Dashboard</span></div><button class="mgr-close" id="mgrCloseBtn">✕ Close</button></div><div class="mgr-body"><div class="sum-grid" id="mgrSummary"></div><div style="font-size:0.7rem;color:#aaa;text-align:right;margin-bottom:10px;" id="mgrUpdated"></div><div id="mgrLines"></div><div id="mgrDrilldown" style="display:none;"><button class="back-btn" id="mgrBackBtn">← All Lines</button><div id="mgrDrillContent"></div></div></div></div>
 <div class="mgr-panel" id="form093Panel"><div class="mgr-hdr"><div class="mgr-hdr-title"><span style="color:#2ecc40;">FRENZ</span><span style="color:#0074d9;">EE</span> <span style="font-size:0.8rem;color:#888;">FORM093.0 – Labels Issued Log</span></div><button class="mgr-close" id="f093CloseBtn">✕ Close</button></div><div class="mgr-body" id="form093Body"></div></div>
-<div class="mgr-panel" id="damagesPanel"><div class="mgr-hdr"><div class="mgr-hdr-title"><span style="color:#2ecc40;">FRENZ</span><span style="color:#0074d9;">EE</span> <span style="font-size:0.8rem;color:#888;">Wastage Log</span></div><button class="mgr-close" id="dmgCloseBtn">✕ Close</button></div><div class="mgr-body"><div style="background:#fff;border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div class="sec-title" style="margin-top:0;">Fresh To Go Foods QLD — Wastage Log</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;"><div class="field-row"><div class="field-label">Date Recorded</div><input class="field-input" type="date" id="dmgDate"/></div><div class="field-row"><div class="field-label">Storage Type</div><select class="field-input" id="dmgStorage"><option value="">Select…</option><option>DRY</option><option>FRZ</option><option>CHILL</option><option>FRESH</option></select></div></div><div class="field-row"><div class="field-label">Department</div><select class="field-input" id="dmgDept"><option value="">Select…</option><option>QA</option><option>PRODUCTION</option><option>WAREHOUSE</option><option>DRIVERS</option><option>LOGISTICS</option></select></div></div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div class="sec-title" style="margin:0;">Wastage Entries</div><button id="addDmgBtn" style="background:#2ecc40;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:0.82rem;font-weight:700;cursor:pointer;">+ Add Item</button></div><div id="dmgRows"></div><div style="background:#fff;border-radius:14px;padding:14px;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:14px;"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"><div class="field-row"><div class="field-label">Name (Print)</div><input class="field-input" type="text" id="dmgName"/></div><div class="field-row"><div class="field-label">Signature</div><input class="field-input" type="text" id="dmgSig"/></div></div></div><button id="submitDmgBtn" style="background:#2ecc40;color:#fff;border:none;border-radius:12px;padding:14px;font-size:1rem;font-weight:700;width:100%;cursor:pointer;margin-bottom:20px;">✅ Submit Wastage Log</button><div id="dmgSubmitted"></div></div></div>
+<div class="mgr-panel" id="damagesPanel"><div class="mgr-hdr"><div class="mgr-hdr-title"><span style="color:#2ecc40;">FRENZ</span><span style="color:#0074d9;">EE</span> <span style="font-size:0.8rem;color:#888;">Wastage Log</span></div><button class="mgr-close" id="dmgCloseBtn">✕ Close</button></div><div class="mgr-body"><div style="background:#fff;border-radius:18px;padding:16px;margin-bottom:14px;box-shadow:0 4px 18px rgba(15,46,28,0.07);"><div class="sec-title" style="margin-top:0;">Fresh To Go Foods QLD — Wastage Log</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;"><div class="field-row"><div class="field-label">Date Recorded</div><input class="field-input" type="date" id="dmgDate"/></div><div class="field-row"><div class="field-label">Storage Type</div><select class="field-input" id="dmgStorage"><option value="">Select…</option><option>DRY</option><option>FRZ</option><option>CHILL</option><option>FRESH</option></select></div></div><div class="field-row"><div class="field-label">Department</div><select class="field-input" id="dmgDept"><option value="">Select…</option><option>QA</option><option>PRODUCTION</option><option>WAREHOUSE</option><option>DRIVERS</option><option>LOGISTICS</option></select></div></div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div class="sec-title" style="margin:0;">Wastage Entries</div><button id="addDmgBtn" style="background:#2ecc40;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:0.82rem;font-weight:700;cursor:pointer;">+ Add Item</button></div><div id="dmgRows"></div><div style="background:#fff;border-radius:18px;padding:14px;box-shadow:0 4px 18px rgba(15,46,28,0.07);margin-bottom:14px;"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"><div class="field-row"><div class="field-label">Name (Print)</div><input class="field-input" type="text" id="dmgName"/></div><div class="field-row"><div class="field-label">Signature</div><input class="field-input" type="text" id="dmgSig"/></div></div></div><button id="submitDmgBtn" style="background:#2ecc40;color:#fff;border:none;border-radius:16px;padding:14px;font-size:1rem;font-weight:700;width:100%;cursor:pointer;margin-bottom:20px;">✅ Submit Wastage Log</button><div id="dmgSubmitted"></div></div></div>
 <div class="mgr-panel" id="labelPanel"><div class="mgr-hdr"><div class="mgr-hdr-title"><span style="color:#2ecc40;">FRENZ</span><span style="color:#0074d9;">EE</span> <span style="font-size:0.8rem;color:#888;">🏷️ Mix Label Print Station</span></div><button class="mgr-close" id="labelCloseBtn">✕ Close</button></div><div class="mgr-body" id="labelBody"></div></div>
 <div class="overlay" id="labelPreviewOverlay" style="align-items:flex-start;overflow-y:auto;padding:20px;"><div style="background:#fff;border-radius:16px;padding:22px;max-width:640px;width:100%;margin:auto;"><div style="font-size:1rem;font-weight:800;margin-bottom:4px;">🖨️ Print Preview</div><div style="font-size:0.8rem;color:#888;margin-bottom:14px;" id="labelPreviewSub"></div><div id="labelPreviewGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;"></div><div style="display:flex;gap:10px;"><button class="ov-btn blue" onclick="window.print()">🖨️ Print All Labels</button><button class="ov-btn grey" id="labelPreviewClose">✕ Close</button></div></div></div>
 
@@ -710,11 +746,11 @@ if(sessionStorage.getItem(PW_KEY)==='1'){
   <button class="back-btn" id="traceBackBtn">← Back to Line</button>
   <div class="trace-hdr"><h2 id="traceTitle"></h2><div class="meta" id="traceMeta"></div><div class="trace-status-bar"><span class="tsbl">Traceability Status</span><span id="traceStatusBadge" class="badge-pend">Pending Verification</span></div></div>
   <div id="ingredientList"></div>
-  <div id="lineClearanceSection" style="display:none;"><div style="background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #007dc6;"><div style="text-align:center;margin-bottom:8px;"><div style="font-size:0.65rem;color:#555;font-weight:600;">QUALITY ASSURANCE MANUAL</div><div style="font-size:0.9rem;font-weight:900;">FORM053.0 – LINE CLEARANCE CHECK SHEET</div></div><div style="background:#e8f4fd;border-radius:8px;padding:9px 11px;font-size:0.73rem;color:#003d7a;margin-bottom:10px;line-height:1.5;">Line clearance checks must be conducted prior to the commencement of each production run by the Team Leader.</div><div id="lcChecks"></div><div class="field-row" style="margin-top:8px;"><div class="field-label">Team Leader Initials</div><input class="field-input" type="text" id="lcTLInitials" maxlength="4"/></div><div class="field-row" style="margin-top:8px;"><div class="field-label">Non-conformances</div><textarea class="field-input" id="lcNonConformance" rows="2" style="resize:none;"></textarea></div><div class="scan-result" id="lcResult" style="margin-top:8px;"></div><button id="lcSubmitBtn" style="background:#007dc6;color:#fff;border:none;border-radius:10px;padding:11px;font-size:0.92rem;font-weight:700;cursor:pointer;width:100%;margin-top:8px;">✅ Submit Line Clearance</button><div class="legal-footer"><span>QA-971-F-053.0</span><span>Page 1 of 1</span><span>Version No: 008</span><span>Issue Date: 14/03/25</span><span>Authorised By: National Technical Manager</span></div></div></div>
-  <div id="breadVerifySection" style="display:none;"><div style="background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #27ae60;"><div style="font-size:0.75rem;font-weight:700;color:#27ae60;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">🍞 Bread / Tortilla Verification</div><div style="background:#f0fdf4;border:1.5px solid #27ae60;border-radius:8px;padding:9px 11px;margin-bottom:10px;"><div style="font-size:0.82rem;font-weight:700;color:#1a7a2a;">Required:</div><div style="font-size:0.95rem;font-weight:900;color:#222;" id="requiredBreadLabel">—</div></div><input type="file" id="breadPhoto" accept="image/*" capture="environment" style="display:none;"/><button id="breadPhotoBtn" style="background:#27ae60;color:#fff;border:none;border-radius:10px;padding:11px;font-size:0.92rem;font-weight:700;cursor:pointer;width:100%;margin-bottom:7px;">📸 Take Photo of Bread / Tortilla</button><div id="breadPreview" style="display:none;margin-bottom:7px;"><img id="breadImg" style="width:100%;border-radius:8px;border:2px solid #27ae60;"/></div><div class="scan-result" id="breadResult"></div><div id="breadProcessing" style="display:none;text-align:center;padding:10px;color:#888;font-size:0.82rem;">🔍 Analysing bread packaging…</div></div></div>
-  <div id="labelScanSection" style="display:none;"><div style="background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #0074d9;"><div style="font-size:0.75rem;font-weight:700;color:#0074d9;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">🏷️ FORM093.0 — Start of Run</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;"><div class="field-row"><div class="field-label">Team Leader Initials</div><input class="field-input" type="text" id="tlInitials" maxlength="4"/></div><div class="field-row"><div class="field-label">Line Labeller Initials</div><input class="field-input" type="text" id="llInitials" maxlength="4"/></div></div><div class="field-label" style="margin-bottom:5px;">Scan First Label Barcode</div><div class="scan-row"><input class="field-input scan-input" type="text" id="firstLabelInput"/><button class="scan-btn" id="firstLabelScanBtn">📷</button></div><div class="scan-result" id="firstLabelResult"></div><div id="lidCheckSection" style="display:none;margin-top:10px;"><div style="background:#fff8f0;border:1.5px solid #e67e22;border-radius:8px;padding:9px 11px;margin-bottom:8px;"><div style="font-size:0.82rem;font-weight:700;color:#b85c00;">🔍 Lid Verification Required</div></div><input type="file" id="firstLidPhoto" accept="image/*" capture="environment" style="display:none;"/><button id="firstLidBtn" style="background:#e67e22;color:#fff;border:none;border-radius:10px;padding:11px;font-size:0.92rem;font-weight:700;cursor:pointer;width:100%;margin-bottom:7px;">📸 Take Photo of Lid</button><div id="firstLidPreview" style="display:none;margin-bottom:7px;"><img id="firstLidImg" style="width:100%;border-radius:8px;border:2px solid #e67e22;"/></div><div class="scan-result" id="firstLidResult"></div><div id="firstLidProcessing" style="display:none;text-align:center;padding:10px;color:#888;font-size:0.82rem;">🔍 Analysing lid…</div></div></div></div>
+  <div id="lineClearanceSection" style="display:none;"><div style="background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:10px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #007dc6;"><div style="text-align:center;margin-bottom:8px;"><div style="font-size:0.65rem;color:#555;font-weight:600;">QUALITY ASSURANCE MANUAL</div><div style="font-size:0.9rem;font-weight:900;">FORM053.0 – LINE CLEARANCE CHECK SHEET</div></div><div style="background:#e8f4fd;border-radius:8px;padding:9px 11px;font-size:0.73rem;color:#003d7a;margin-bottom:10px;line-height:1.5;">Line clearance checks must be conducted prior to the commencement of each production run by the Team Leader.</div><div id="lcChecks"></div><div class="field-row" style="margin-top:8px;"><div class="field-label">Team Leader Initials</div><input class="field-input" type="text" id="lcTLInitials" maxlength="4"/></div><div class="field-row" style="margin-top:8px;"><div class="field-label">Non-conformances</div><textarea class="field-input" id="lcNonConformance" rows="2" style="resize:none;"></textarea></div><div class="scan-result" id="lcResult" style="margin-top:8px;"></div><button id="lcSubmitBtn" style="background:#007dc6;color:#fff;border:none;border-radius:10px;padding:11px;font-size:0.92rem;font-weight:700;cursor:pointer;width:100%;margin-top:8px;">✅ Submit Line Clearance</button><div class="legal-footer"><span>QA-971-F-053.0</span><span>Page 1 of 1</span><span>Version No: 008</span><span>Issue Date: 14/03/25</span><span>Authorised By: National Technical Manager</span></div></div></div>
+  <div id="breadVerifySection" style="display:none;"><div style="background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:10px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #27ae60;"><div style="font-size:0.75rem;font-weight:700;color:#27ae60;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">🍞 Bread / Tortilla Verification</div><div style="background:#f0fdf4;border:1.5px solid #27ae60;border-radius:8px;padding:9px 11px;margin-bottom:10px;"><div style="font-size:0.82rem;font-weight:700;color:#1a7a2a;">Required:</div><div style="font-size:0.95rem;font-weight:900;color:#222;" id="requiredBreadLabel">—</div></div><input type="file" id="breadPhoto" accept="image/*" capture="environment" style="display:none;"/><button id="breadPhotoBtn" style="background:#27ae60;color:#fff;border:none;border-radius:10px;padding:11px;font-size:0.92rem;font-weight:700;cursor:pointer;width:100%;margin-bottom:7px;">📸 Take Photo of Bread / Tortilla</button><div id="breadPreview" style="display:none;margin-bottom:7px;"><img id="breadImg" style="width:100%;border-radius:8px;border:2px solid #27ae60;"/></div><div class="scan-result" id="breadResult"></div><div id="breadProcessing" style="display:none;text-align:center;padding:10px;color:#888;font-size:0.82rem;">🔍 Analysing bread packaging…</div></div></div>
+  <div id="labelScanSection" style="display:none;"><div style="background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:10px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #0074d9;"><div style="font-size:0.75rem;font-weight:700;color:#0074d9;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">🏷️ FORM093.0 — Start of Run</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;"><div class="field-row"><div class="field-label">Team Leader Initials</div><input class="field-input" type="text" id="tlInitials" maxlength="4"/></div><div class="field-row"><div class="field-label">Line Labeller Initials</div><input class="field-input" type="text" id="llInitials" maxlength="4"/></div></div><div class="field-label" style="margin-bottom:5px;">Scan First Label Barcode</div><div class="scan-row"><input class="field-input scan-input" type="text" id="firstLabelInput"/><button class="scan-btn" id="firstLabelScanBtn">📷</button></div><div class="scan-result" id="firstLabelResult"></div><div id="lidCheckSection" style="display:none;margin-top:10px;"><div style="background:#fff8f0;border:1.5px solid #e67e22;border-radius:8px;padding:9px 11px;margin-bottom:8px;"><div style="font-size:0.82rem;font-weight:700;color:#b85c00;">🔍 Lid Verification Required</div></div><input type="file" id="firstLidPhoto" accept="image/*" capture="environment" style="display:none;"/><button id="firstLidBtn" style="background:#e67e22;color:#fff;border:none;border-radius:10px;padding:11px;font-size:0.92rem;font-weight:700;cursor:pointer;width:100%;margin-bottom:7px;">📸 Take Photo of Lid</button><div id="firstLidPreview" style="display:none;margin-bottom:7px;"><img id="firstLidImg" style="width:100%;border-radius:8px;border:2px solid #e67e22;"/></div><div class="scan-result" id="firstLidResult"></div><div id="firstLidProcessing" style="display:none;text-align:center;padding:10px;color:#888;font-size:0.82rem;">🔍 Analysing lid…</div></div></div></div>
   <button class="complete-btn" id="completeJobBtn" disabled>▶️ Start Run</button>
-  <div id="endLabelSection" style="display:none;"><div style="background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #e74c3c;"><div style="font-size:0.75rem;font-weight:700;color:#e74c3c;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">🏷️ FORM093.0 — End of Run</div><div class="field-label" style="margin-bottom:5px;">Scan Last Label Barcode</div><div class="scan-row"><input class="field-input scan-input" type="text" id="lastLabelInput"/><button class="scan-btn" style="background:#e74c3c;" id="lastLabelScanBtn">📷</button></div><div class="scan-result" id="lastLabelResult"></div><div id="lastLidCheckSection" style="display:none;margin-top:10px;"><input type="file" id="lastLidPhoto" accept="image/*" capture="environment" style="display:none;"/><button id="lastLidBtn" style="background:#e74c3c;color:#fff;border:none;border-radius:10px;padding:11px;font-size:0.92rem;font-weight:700;cursor:pointer;width:100%;margin-bottom:7px;">📸 Take Photo of Last Lid</button><div id="lastLidPreview" style="display:none;margin-bottom:7px;"><img id="lastLidImg" style="width:100%;border-radius:8px;border:2px solid #e74c3c;"/></div><div class="scan-result" id="lastLidResult"></div><div id="lastLidProcessing" style="display:none;text-align:center;padding:10px;color:#888;font-size:0.82rem;">🔍 Analysing lid…</div></div></div></div>
+  <div id="endLabelSection" style="display:none;"><div style="background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:10px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #e74c3c;"><div style="font-size:0.75rem;font-weight:700;color:#e74c3c;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">🏷️ FORM093.0 — End of Run</div><div class="field-label" style="margin-bottom:5px;">Scan Last Label Barcode</div><div class="scan-row"><input class="field-input scan-input" type="text" id="lastLabelInput"/><button class="scan-btn" style="background:#e74c3c;" id="lastLabelScanBtn">📷</button></div><div class="scan-result" id="lastLabelResult"></div><div id="lastLidCheckSection" style="display:none;margin-top:10px;"><input type="file" id="lastLidPhoto" accept="image/*" capture="environment" style="display:none;"/><button id="lastLidBtn" style="background:#e74c3c;color:#fff;border:none;border-radius:10px;padding:11px;font-size:0.92rem;font-weight:700;cursor:pointer;width:100%;margin-bottom:7px;">📸 Take Photo of Last Lid</button><div id="lastLidPreview" style="display:none;margin-bottom:7px;"><img id="lastLidImg" style="width:100%;border-radius:8px;border:2px solid #e74c3c;"/></div><div class="scan-result" id="lastLidResult"></div><div id="lastLidProcessing" style="display:none;text-align:center;padding:10px;color:#888;font-size:0.82rem;">🔍 Analysing lid…</div></div></div></div>
   <button class="complete-btn" id="endRunBtn" style="display:none;background:#e74c3c;" disabled>⏹ End Run</button>
 </div>
 
@@ -865,7 +901,7 @@ function renderStartupSafety(){
 
   // ── Form header ──────────────────────────────────────────────────
   var hdrCard=document.createElement('div');
-  hdrCard.style.cssText='background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border:1.5px solid #222;';
+  hdrCard.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border:1.5px solid #222;';
   hdrCard.innerHTML=
     '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">'+
     '<div style="background:#222;color:#fff;border-radius:8px;padding:6px 10px;font-size:0.65rem;font-weight:700;text-align:center;line-height:1.4;">Fresh<br>To Go<br>Foods</div>'+
@@ -882,7 +918,7 @@ function renderStartupSafety(){
 
   // ── Progress summary ─────────────────────────────────────────────
   var sumCard=document.createElement('div');
-  sumCard.style.cssText='background:#fff;border-radius:14px;padding:14px;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:12px;';
+  sumCard.style.cssText='background:#fff;border-radius:18px;padding:14px;box-shadow:0 4px 18px rgba(15,46,28,0.07);margin-bottom:12px;';
   var pct=totalItems?Math.round((checkedCount/totalItems)*100):0;
   sumCard.innerHTML=
     '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:10px;">'+
@@ -903,7 +939,7 @@ function renderStartupSafety(){
     var items=STARTUP_CHECKS[area];
     var color=areaColors[area]||'#555';
     var areaCard=document.createElement('div');
-    areaCard.style.cssText='background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:10px;border-left:5px solid '+color+';';
+    areaCard.style.cssText='background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 4px 18px rgba(15,46,28,0.07);margin-bottom:10px;border-left:5px solid '+color+';';
 
     // Area header
     var aHdr=document.createElement('div');
@@ -971,7 +1007,7 @@ function renderStartupSafety(){
 
   // ── Inspector sign ───────────────────────────────────────────────
   var inspCard=document.createElement('div');
-  inspCard.style.cssText='background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);';
+  inspCard.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);';
   inspCard.innerHTML=
     '<div style="font-size:0.75rem;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">👷 Safety Inspection Conducted By</div>'+
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'+
@@ -989,7 +1025,7 @@ function renderStartupSafety(){
 
   // ── Non-conformance table ────────────────────────────────────────
   var ncCard=document.createElement('div');
-  ncCard.style.cssText='background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:12px;';
+  ncCard.style.cssText='background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 4px 18px rgba(15,46,28,0.07);margin-bottom:12px;';
   var ncHdr=document.createElement('div');
   ncHdr.style.cssText='display:grid;grid-template-columns:1fr 1fr;background:#fff0f0;padding:8px 12px;border-bottom:1.5px solid #fdd;';
   ncHdr.innerHTML='<div style="font-size:0.7rem;font-weight:700;color:#e74c3c;text-transform:uppercase;">Safety Check Non-Conformance</div>'+
@@ -1015,7 +1051,7 @@ function renderStartupSafety(){
 
   // ── Sign-off ──────────────────────────────────────────────────────
   var signCard=document.createElement('div');
-  signCard.style.cssText='background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #9b59b6;';
+  signCard.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:10px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #9b59b6;';
 
   if(isSigned){
     signCard.innerHTML=
@@ -1198,7 +1234,7 @@ function renderLooseItems(line){
 
   // ── Header ───────────────────────────────────────────────────────
   var hdrCard=document.createElement('div');
-  hdrCard.style.cssText='background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border:1.5px solid #222;';
+  hdrCard.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border:1.5px solid #222;';
   hdrCard.innerHTML=
     '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">'+
     '<div style="background:#222;color:#fff;border-radius:8px;padding:6px 10px;font-size:0.65rem;font-weight:700;text-align:center;line-height:1.4;">Fresh<br>To Go<br>Foods</div>'+
@@ -1234,7 +1270,7 @@ function renderLooseItems(line){
   var endFails=items.filter(function(it){return d.items[it.id]&&d.items[it.id].endPF==='F';}).length;
 
   var sumCard=document.createElement('div');
-  sumCard.style.cssText='background:#fff;border-radius:14px;padding:12px 14px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);';
+  sumCard.style.cssText='background:#fff;border-radius:18px;padding:12px 14px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);';
   sumCard.innerHTML=
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'+
       '<div style="background:#f0fdf4;border-radius:10px;padding:10px 12px;border-left:4px solid #2ecc40;">'+
@@ -1252,7 +1288,7 @@ function renderLooseItems(line){
 
   // ── Items table ──────────────────────────────────────────────────
   var tableCard=document.createElement('div');
-  tableCard.style.cssText='background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:12px;';
+  tableCard.style.cssText='background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 4px 18px rgba(15,46,28,0.07);margin-bottom:12px;';
 
   // Col headers
   var thead=document.createElement('div');
@@ -1335,7 +1371,7 @@ function renderLooseItems(line){
 
   // ── End of Day Sign-off ──────────────────────────────────────────
   var signCard=document.createElement('div');
-  signCard.style.cssText='background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #9b59b6;';
+  signCard.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:10px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #9b59b6;';
 
   if(isSigned){
     signCard.innerHTML=
@@ -1484,7 +1520,7 @@ function renderEggCount(){
 
   // ── Header ───────────────────────────────────────────────────────
   var hdr=document.createElement('div');
-  hdr.style.cssText='background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #f39c12;';
+  hdr.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #f39c12;';
   hdr.innerHTML=
     '<div style="font-size:0.8rem;font-weight:700;color:#b8860b;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">🥚 Daily Egg Stock Count</div>'+
     '<div style="font-size:0.82rem;color:#555;margin-bottom:10px;">Production stock to be counted daily after REQ push through.</div>'+
@@ -1498,7 +1534,7 @@ function renderEggCount(){
 
   // ── Table ────────────────────────────────────────────────────────
   var tableCard=document.createElement('div');
-  tableCard.style.cssText='background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:12px;';
+  tableCard.style.cssText='background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 4px 18px rgba(15,46,28,0.07);margin-bottom:12px;';
 
   // Column header
   var thead=document.createElement('div');
@@ -1567,7 +1603,7 @@ function renderEggCount(){
   });
 
   var emailCard=document.createElement('div');
-  emailCard.style.cssText='background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #f39c12;';
+  emailCard.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:16px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #f39c12;';
   emailCard.innerHTML=
     '<div style="font-size:0.8rem;font-weight:700;color:#b8860b;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">📧 Send Egg Count to Procurement</div>'+
     (!hasAnyData?'<div style="font-size:0.82rem;color:#aaa;text-align:center;padding:8px 0;">No data entered yet — fill in the counts above before sending.</div>':
@@ -1908,7 +1944,7 @@ function renderPrepRoom(){
 
   // Header
   var hdr=document.createElement('div');
-  hdr.style.cssText='background:#f0fdf4;border-radius:14px;padding:14px 16px;margin-bottom:16px;border-left:5px solid #27ae60;';
+  hdr.style.cssText='background:#f0fdf4;border-radius:18px;padding:14px 16px;margin-bottom:16px;border-left:5px solid #27ae60;';
   hdr.innerHTML=
     '<div style="font-size:0.8rem;font-weight:700;color:#27ae60;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">🧪 Prep Room — '+today+'</div>'+
     '<div style="font-size:0.82rem;color:#555;">Select your position to see your work for today.</div>';
@@ -1916,7 +1952,7 @@ function renderPrepRoom(){
 
   // Schedule upload card
   var uploadCard=document.createElement('div');
-  uploadCard.style.cssText='background:#fff;border-radius:14px;padding:13px 15px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:4px solid #f39c12;';
+  uploadCard.style.cssText='background:#fff;border-radius:18px;padding:13px 15px;margin-bottom:16px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:4px solid #f39c12;';
   uploadCard.innerHTML=
     '<div style="font-size:0.78rem;font-weight:700;color:#b8860b;margin-bottom:8px;">📅 Prep Room Schedule</div>'+
     '<div style="font-size:0.75rem;color:#555;margin-bottom:10px;">'+(prepSchedule.length?prepSchedule.length+' mixes loaded for today.':'No schedule loaded yet. Upload CSV to assign mixes to positions.')+'</div>'+
@@ -1963,7 +1999,7 @@ function renderPrepRoom(){
     var doneCount=prepRecords.filter(function(r){return r.position===pos&&r.status==='complete';}).length;
     var color=posColors[pos-1];
     var card=document.createElement('div');
-    card.style.cssText='background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid '+color+';cursor:pointer;';
+    card.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:10px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid '+color+';cursor:pointer;';
     card.innerHTML=
       '<div style="display:flex;align-items:center;gap:12px;">'+
         '<div style="font-size:2rem;">'+posIcons[pos-1]+'</div>'+
@@ -2001,7 +2037,7 @@ function renderPrepWork(position){
 
   // Form header matching FORM062.0
   var frmHdr=document.createElement('div');
-  frmHdr.style.cssText='background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border:1.5px solid #222;';
+  frmHdr.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border:1.5px solid #222;';
   frmHdr.innerHTML=
     '<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">'+
     '<div style="background:#222;color:#fff;border-radius:8px;padding:6px 10px;font-size:0.65rem;font-weight:700;text-align:center;line-height:1.4;">Fresh<br>To Go<br>Foods</div>'+
@@ -2030,7 +2066,7 @@ function renderPrepWork(position){
   // Supervisor reassign section
   if(canAccess('supervisor')){
     var reassignCard=document.createElement('div');
-    reassignCard.style.cssText='background:#fff;border-radius:14px;padding:13px 15px;margin-top:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:4px solid #9b59b6;cursor:pointer;';
+    reassignCard.style.cssText='background:#fff;border-radius:18px;padding:13px 15px;margin-top:10px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:4px solid #9b59b6;cursor:pointer;';
     reassignCard.innerHTML=
       '<div style="display:flex;align-items:center;gap:10px;">'+
         '<div style="font-size:1.3rem;">🔀</div>'+
@@ -2064,7 +2100,7 @@ function renderPrepMixCard(body,job,position,color){
 
   // ── Collapsed header card ─────────────────────────────────────────
   var card=document.createElement('div');
-  card.style.cssText='background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:10px;border-left:5px solid '+(isDone?'#27ae60':isStarted?color:'#ccc')+';cursor:pointer;user-select:none;';
+  card.style.cssText='background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 4px 18px rgba(15,46,28,0.07);margin-bottom:10px;border-left:5px solid '+(isDone?'#27ae60':isStarted?color:'#ccc')+';cursor:pointer;user-select:none;';
 
   var hdr=document.createElement('div');
   hdr.style.cssText='display:flex;align-items:center;gap:10px;padding:12px 14px;';
@@ -2577,7 +2613,7 @@ function renderMixLib(){
 
   // Info card
   var infoCard=document.createElement('div');
-  infoCard.style.cssText='background:#f5eeff;border-radius:12px;padding:12px 14px;margin-bottom:14px;border-left:5px solid #9b59b6;';
+  infoCard.style.cssText='background:#f5eeff;border-radius:16px;padding:12px 14px;margin-bottom:14px;border-left:5px solid #9b59b6;';
   infoCard.innerHTML=
     '<div style="font-size:0.8rem;font-weight:700;color:#9b59b6;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">🧪 Mix Instructions Library</div>'+
     '<div style="font-size:0.82rem;color:#555;line-height:1.5;">'+mixLibrary.length+' mix instruction'+(mixLibrary.length!==1?'s':'')+' stored. Mixes auto-link to prep room jobs by mix code. Shelf life rules enforce ingredient expiry tracking. Manager or QA PIN required to add or edit.</div>';
@@ -2585,7 +2621,7 @@ function renderMixLib(){
 
   // CSV Template download
   var mlTemplateCard=document.createElement('div');
-  mlTemplateCard.style.cssText='background:#fff;border-radius:12px;padding:12px 14px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:4px solid #f39c12;';
+  mlTemplateCard.style.cssText='background:#fff;border-radius:16px;padding:12px 14px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:4px solid #f39c12;';
   mlTemplateCard.innerHTML=
     '<div style="font-size:0.78rem;font-weight:700;color:#b8860b;margin-bottom:6px;">📥 CSV Upload Format</div>'+
     '<div style="font-size:0.75rem;color:#555;margin-bottom:8px;">Your CSV must have these columns: <code style="background:#f5f5f5;padding:1px 5px;border-radius:4px;">MixCode, MixName, ShelfLifeDays, ScoopSize, TubYield, Method, IngredientName, IngredientCode, Weight, Unit, PctInMix, Allergens, Supplier, Notes</code><br>'+
@@ -2596,7 +2632,7 @@ function renderMixLib(){
 
   // Upload section
   var mlUploadCard=document.createElement('div');
-  mlUploadCard.style.cssText='background:#fff;border-radius:12px;padding:14px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,0.06);';
+  mlUploadCard.style.cssText='background:#fff;border-radius:16px;padding:14px;margin-bottom:14px;box-shadow:0 4px 18px rgba(15,46,28,0.07);';
   mlUploadCard.innerHTML=
     '<div style="font-size:0.78rem;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">⬆️ Bulk Upload Mixes</div>'+
     '<div class="field-row" style="margin-bottom:10px;"><div class="field-label">Manager / QA PIN</div><input class="field-input" type="password" id="ml-pin" placeholder="Required to upload"/><div style="color:#e74c3c;font-size:0.75rem;font-weight:700;display:none;margin-top:3px;" id="ml-pinErr">❌ Incorrect PIN — Manager or QA access only.</div></div>'+
@@ -2678,7 +2714,7 @@ function renderMixLib(){
       var allergenList=[...new Set(mix.ingredients.flatMap(function(i){return (i.allergens||'').split(',').map(function(a){return a.trim();}).filter(Boolean);}))];
       var shelfColor=mix.shelfLifeDays<=1?'#e74c3c':mix.shelfLifeDays<=2?'#e67e22':'#27ae60';
       var card=document.createElement('div');
-      card.style.cssText='background:#fff;border-radius:12px;padding:13px 15px;margin-bottom:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #9b59b6;';
+      card.style.cssText='background:#fff;border-radius:16px;padding:13px 15px;margin-bottom:8px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #9b59b6;';
       card.innerHTML=
         '<div style="display:flex;align-items:flex-start;gap:10px;">'+
           '<div style="font-size:1.3rem;">🧪</div>'+
@@ -3102,7 +3138,7 @@ function getAllTraceRecords(){
 // ── SCENARIO 1: Recall Search ──────────────────────────────────────────
 function renderRecallSearch(body){
   var searchCard=document.createElement('div');
-  searchCard.style.cssText='background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #e74c3c;';
+  searchCard.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #e74c3c;';
   searchCard.innerHTML=
     '<div style="font-size:0.8rem;font-weight:700;color:#e74c3c;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">🔍 Recall Search</div>'+
     '<div style="font-size:0.78rem;color:#555;margin-bottom:12px;">Search across all shifts to find every product affected by a specific batch, supplier, ingredient, date or SKU.</div>'+
@@ -3155,7 +3191,7 @@ function renderRecallResults(container, results, query){
   container.innerHTML='';
 
   var summCard=document.createElement('div');
-  summCard.style.cssText='background:'+(results.length>0?'#fff0f0':'#f0fdf4')+';border-radius:12px;padding:12px 14px;margin-bottom:12px;border-left:5px solid '+(results.length>0?'#e74c3c':'#27ae60')+';';
+  summCard.style.cssText='background:'+(results.length>0?'#fff0f0':'#f0fdf4')+';border-radius:16px;padding:12px 14px;margin-bottom:12px;border-left:5px solid '+(results.length>0?'#e74c3c':'#27ae60')+';';
   summCard.innerHTML=results.length>0?
     '<div style="font-size:0.9rem;font-weight:800;color:#e74c3c;">⚠️ '+results.length+' record'+(results.length>1?'s':'')+' found — potential recall scope</div>'+
     '<div style="font-size:0.78rem;color:#555;margin-top:4px;">Products and lines affected are listed below. Export for your recall team.</div>':
@@ -3175,7 +3211,7 @@ function renderRecallResults(container, results, query){
 
   Object.values(byProduct).forEach(function(prod){
     var card=document.createElement('div');
-    card.style.cssText='background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:10px;border-left:5px solid #e74c3c;';
+    card.style.cssText='background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 18px rgba(15,46,28,0.07);margin-bottom:10px;border-left:5px solid #e74c3c;';
     var hdr=document.createElement('div');
     hdr.style.cssText='background:#fff0f0;padding:10px 14px;';
     hdr.innerHTML='<div style="font-weight:800;font-size:0.9rem;color:#c0392b;">'+prod.jobName+'</div>'+
@@ -3234,7 +3270,7 @@ function buildRecallPDF(results,query){
 // ── SCENARIO 2: Daily Usage Report ────────────────────────────────────
 function renderUsageReport(body){
   var hdr=document.createElement('div');
-  hdr.style.cssText='background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #27ae60;';
+  hdr.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #27ae60;';
   hdr.innerHTML=
     '<div style="font-size:0.8rem;font-weight:700;color:#27ae60;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">📦 Daily Ingredient Usage Report</div>'+
     '<div class="field-row" style="margin-bottom:10px;"><div class="field-label">Date</div>'+
@@ -3270,13 +3306,13 @@ function renderUsageReport(body){
     }
 
     var summCard=document.createElement('div');
-    summCard.style.cssText='background:#f0fdf4;border-radius:12px;padding:12px 14px;margin-bottom:12px;border-left:5px solid #27ae60;';
+    summCard.style.cssText='background:#f0fdf4;border-radius:16px;padding:12px 14px;margin-bottom:12px;border-left:5px solid #27ae60;';
     summCard.innerHTML='<div style="font-weight:800;color:#27ae60;">📦 Usage Report — '+dateStr+'</div>'+
       '<div style="font-size:0.78rem;color:#555;margin-top:4px;">'+Object.keys(byIng).length+' ingredients used across '+[...new Set(allRecords.map(function(r){return r.line;}))].length+' lines</div>';
     resultsEl.appendChild(summCard);
 
     var tableCard=document.createElement('div');
-    tableCard.style.cssText='background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:12px;';
+    tableCard.style.cssText='background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 4px 18px rgba(15,46,28,0.07);margin-bottom:12px;';
     var thead=document.createElement('div');
     thead.style.cssText='display:grid;grid-template-columns:1fr 1fr 1fr 1fr;background:#f0fdf4;padding:8px 12px;border-bottom:1.5px solid #d4edda;';
     thead.innerHTML='<div style="font-size:0.62rem;font-weight:700;color:#27ae60;text-transform:uppercase;">Ingredient</div>'+
@@ -3316,7 +3352,7 @@ function renderUsageReport(body){
 // ── SCENARIO 3: Full Audit Trail ───────────────────────────────────────
 function renderAuditTrail(body){
   var hdr=document.createElement('div');
-  hdr.style.cssText='background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #0074d9;';
+  hdr.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #0074d9;';
   hdr.innerHTML=
     '<div style="font-size:0.8rem;font-weight:700;color:#0074d9;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">📋 Full Audit Trail</div>'+
     '<div style="font-size:0.78rem;color:#555;margin-bottom:12px;">Pull a complete record of everything that happened in a shift — forms signed, ingredients traced, issues logged, allergen checks verified.</div>'+
@@ -3362,7 +3398,7 @@ function renderAuditTrail(body){
     ];
 
     var summCard=document.createElement('div');
-    summCard.style.cssText='background:#f0f4ff;border-radius:12px;padding:12px 14px;margin-bottom:12px;border-left:5px solid #0074d9;';
+    summCard.style.cssText='background:#f0f4ff;border-radius:16px;padding:12px 14px;margin-bottom:12px;border-left:5px solid #0074d9;';
     summCard.innerHTML='<div style="font-weight:800;color:#0074d9;">📋 Audit Trail — '+dateStr+'</div>'+
       '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-top:8px;">'+
       sections.map(function(s){return '<div class="sum-tile"><div class="sum-val" style="color:'+s.color+';font-size:1.1rem;">'+s.count+'</div><div class="sum-lbl" style="font-size:0.62rem;">'+s.title.replace(/^[^ ]+ /,'')+'</div></div>';}).join('')+'</div>';
@@ -3371,7 +3407,7 @@ function renderAuditTrail(body){
     sections.forEach(function(sec){
       if(!sec.rows.length) return;
       var card=document.createElement('div');
-      card.style.cssText='background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:10px;';
+      card.style.cssText='background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 18px rgba(15,46,28,0.07);margin-bottom:10px;';
       var sHdr=document.createElement('div');
       sHdr.style.cssText='background:#f9f9f9;padding:9px 13px;font-size:0.82rem;font-weight:800;color:'+sec.color+';border-bottom:1.5px solid #f0f0f0;';
       sHdr.textContent=sec.title+' ('+sec.count+')';
@@ -3404,7 +3440,7 @@ function renderAuditTrail(body){
 // ── Export helper ──────────────────────────────────────────────────────
 function buildExportButtons(container, filename, records, fields, pdfHTML){
   var exportCard=document.createElement('div');
-  exportCard.style.cssText='background:#fff;border-radius:12px;padding:12px 14px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.06);';
+  exportCard.style.cssText='background:#fff;border-radius:16px;padding:12px 14px;margin-bottom:16px;box-shadow:0 4px 18px rgba(15,46,28,0.07);';
   exportCard.innerHTML=
     '<div style="font-size:0.78rem;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">📥 Export Report</div>'+
     '<div style="display:flex;gap:8px;">'+
@@ -3462,7 +3498,7 @@ function renderRecipeLib(){
 
   // Header
   var infoCard=document.createElement('div');
-  infoCard.style.cssText='background:#f0fff4;border-radius:12px;padding:12px 14px;margin-bottom:14px;border-left:5px solid #27ae60;';
+  infoCard.style.cssText='background:#f0fff4;border-radius:16px;padding:12px 14px;margin-bottom:14px;border-left:5px solid #27ae60;';
   infoCard.innerHTML=
     '<div style="font-size:0.8rem;font-weight:700;color:#27ae60;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">📋 Recipe Library</div>'+
     '<div style="font-size:0.82rem;color:#555;line-height:1.5;">'+recipeLibrary.length+' recipe'+(recipeLibrary.length!==1?'s':'')+' loaded. Recipes auto-match to jobs on the line by SKU. Manager PIN required to upload or edit.</div>';
@@ -3470,7 +3506,7 @@ function renderRecipeLib(){
 
   // CSV Template download
   var templateCard=document.createElement('div');
-  templateCard.style.cssText='background:#fff;border-radius:12px;padding:12px 14px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:4px solid #f39c12;';
+  templateCard.style.cssText='background:#fff;border-radius:16px;padding:12px 14px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:4px solid #f39c12;';
   templateCard.innerHTML=
     '<div style="font-size:0.78rem;font-weight:700;color:#b8860b;margin-bottom:6px;">📥 CSV Upload Format</div>'+
     '<div style="font-size:0.75rem;color:#555;margin-bottom:8px;">Your CSV must have these columns: <code style="background:#f5f5f5;padding:1px 5px;border-radius:4px;">SKU, ProductName, Brand, IngredientName, Qty, Unit, Allergens, Supplier</code><br>'+
@@ -3481,7 +3517,7 @@ function renderRecipeLib(){
 
   // Upload section
   var uploadCard=document.createElement('div');
-  uploadCard.style.cssText='background:#fff;border-radius:12px;padding:14px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,0.06);';
+  uploadCard.style.cssText='background:#fff;border-radius:16px;padding:14px;margin-bottom:14px;box-shadow:0 4px 18px rgba(15,46,28,0.07);';
   uploadCard.innerHTML=
     '<div style="font-size:0.78rem;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">⬆️ Upload Recipes</div>'+
     '<div class="field-row" style="margin-bottom:10px;"><div class="field-label">Manager PIN</div><input class="field-input" type="password" id="rl-pin" placeholder="Required to upload"/><div style="color:#e74c3c;font-size:0.75rem;font-weight:700;display:none;margin-top:3px;" id="rl-pinErr">❌ Incorrect PIN — Manager access only.</div></div>'+
@@ -3560,7 +3596,7 @@ function renderRecipeLib(){
     filtered.forEach(function(recipe){
       var allergenList=[...new Set(recipe.ingredients.flatMap(function(i){return (i.allergens||'').split(',').map(function(a){return a.trim();}).filter(Boolean);}))];
       var card=document.createElement('div');
-      card.style.cssText='background:#fff;border-radius:12px;padding:13px 15px;margin-bottom:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #27ae60;cursor:pointer;';
+      card.style.cssText='background:#fff;border-radius:16px;padding:13px 15px;margin-bottom:8px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #27ae60;cursor:pointer;';
       card.innerHTML=
         '<div style="display:flex;align-items:flex-start;gap:10px;">'+
           '<div style="font-size:1.3rem;">🥪</div>'+
@@ -4083,6 +4119,8 @@ function onLoginSuccess(){
 }
 
 function updateHeader(){
+  document.body.classList.add('fz-logged-in');
+  updateSidebar();
   var hdr = document.getElementById('hdrRight');
   hdr.innerHTML =
     '<button class="notif-btn" id="notifBtn"><span>🔔</span><span class="notif-dot" id="notifDot"></span></button>'+
@@ -4109,7 +4147,83 @@ function doLogout(){
   document.getElementById('staffDropdown').value='';
   document.getElementById('pinInput').value='';
   document.getElementById('loginMsg').textContent='';
+  document.body.classList.remove('fz-logged-in');
+  document.getElementById('fzSidebar').innerHTML='';
   showScreen('loginScreen');
+}
+
+// ── Minimal icon set (sidebar / section headers) ────────────────────────
+var FZ_ICONS={
+  grid:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+  layers:'<path d="M12 3 2 8l10 5 10-5-10-5Z"/><path d="M2 14l10 5 10-5"/>',
+  flask:'<path d="M9 3h6M10 3v6l-6 10a1 1 0 0 0 .9 1.5h14.2a1 1 0 0 0 .9-1.5L14 9V3"/>',
+  clipboard:'<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1M9 11h6M9 15h6"/>',
+  filetext:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M9 13h6M9 17h6"/>',
+  search:'<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>',
+  tag:'<path d="M12 2 2 12l9 9 11-11V2h-9Z"/><circle cx="16.5" cy="7.5" r="1" fill="currentColor"/>',
+  shield:'<path d="M12 2 4 5v6c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V5l-8-3Z"/>',
+  eye:'<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+  sunrise:'<path d="M12 2v5M4.2 10.2l1.4 1.4M19.8 10.2l-1.4 1.4M2 18h20M6 18a6 6 0 0 1 12 0"/>',
+  logout:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
+  folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/>',
+  link:'<path d="M9 15 15 9"/><path d="M11 6l1.5-1.5a3.5 3.5 0 1 1 5 5L16 11"/><path d="M13 18l-1.5 1.5a3.5 3.5 0 1 1-5-5L8 13"/>'
+};
+function fzIcon(name,size){
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:'+(size||18)+'px;height:'+(size||18)+'px;display:block;">'+(FZ_ICONS[name]||'')+'</svg>';
+}
+function fzIconBadge(name,color){
+  return '<div style="width:38px;height:38px;border-radius:11px;background:'+color+'1f;color:'+color+';display:flex;align-items:center;justify-content:center;flex-shrink:0;">'+fzIcon(name,19)+'</div>';
+}
+
+// ── Sidebar navigation (desktop) ─────────────────────────────────────────
+function fzNavBtn(icon,label,id){
+  return '<button class="fz-navbtn" id="'+id+'">'+fzIcon(icon)+'<span>'+label+'</span></button>';
+}
+function updateSidebar(){
+  var sb=document.getElementById('fzSidebar');
+  if(!currentUser){sb.innerHTML='';return;}
+  var html='<div class="fz-logo"><span class="g">FRENZ</span><span class="b">EE</span></div>';
+  html+='<div class="fz-navlabel">Menu</div>';
+  html+=fzNavBtn('grid','Dashboard','sb-mgr');
+  html+=fzNavBtn('layers','Production Lines','sb-lines');
+  html+=fzNavBtn('flask','Prep Room','sb-prep');
+  if(canAccess('manager')){
+    html+='<div class="fz-navlabel">Library</div>';
+    html+=fzNavBtn('clipboard','Recipe Library','sb-recipes');
+    html+=fzNavBtn('flask','Mix Instructions','sb-mixes');
+    html+=fzNavBtn('filetext','Form Management','sb-forms');
+    html+='<div class="fz-navlabel">Insights</div>';
+    html+=fzNavBtn('search','Traceability &amp; Analytics','sb-trace');
+  }
+  if(canAccess('qa')){
+    html+='<div class="fz-navlabel">Team</div>';
+    html+=fzNavBtn('shield','QA Dashboard','sb-qa');
+    html+=fzNavBtn('eye','Supervisor Dashboard','sb-sup');
+  }
+  if(canAccess('labelprinter')) html+=fzNavBtn('tag','Label Printing','sb-labels');
+  html+='<div class="fz-foot">';
+  if(canAccess('supervisor')) html+=fzNavBtn('sunrise','New Shift','sb-newshift');
+  html+=fzNavBtn('logout','Log Out','sb-logout');
+  html+='</div>';
+  sb.innerHTML=html;
+
+  function wire(id,fn){var el=document.getElementById(id);if(el) el.onclick=function(){
+    sb.querySelectorAll('.fz-navbtn').forEach(function(b){b.classList.remove('active');});
+    el.classList.add('active');
+    fn();
+  };}
+  wire('sb-mgr',openManager);
+  wire('sb-lines',showLines);
+  wire('sb-prep',openPrepRoom);
+  wire('sb-recipes',openRecipeLib);
+  wire('sb-mixes',openMixLib);
+  wire('sb-forms',openFormMgmt);
+  wire('sb-trace',openTraceAnalytics);
+  wire('sb-qa',openQaDash);
+  wire('sb-sup',openSupervisorDash);
+  wire('sb-labels',function(){renderLabelStation();showPanel('labelPanel');});
+  wire('sb-newshift',openNewShiftConfirm);
+  wire('sb-logout',doLogout);
 }
 
 // ── File Upload ────────────────────────────────────────────────────────
@@ -4144,7 +4258,7 @@ function renderLines(){
   var showImport = !Object.keys(scheduleData).length;
   if(showImport){
     var imp=document.createElement('div');
-    imp.style.cssText='grid-column:1/-1;background:#fff;border-radius:14px;padding:24px;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,0.07);margin-bottom:4px;';
+    imp.style.cssText='grid-column:1/-1;background:#fff;border-radius:18px;padding:24px;text-align:center;box-shadow:0 4px 18px rgba(15,46,28,0.08);margin-bottom:4px;';
     imp.innerHTML='<div style="font-size:2.5rem;margin-bottom:8px;">📂</div>'+
       '<div style="font-size:0.9rem;font-weight:700;color:#555;margin-bottom:14px;">No schedule loaded yet</div>'+
       '<input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none;"/>'+
@@ -4675,10 +4789,10 @@ function openForm093(recId){var rec=form093Records.find(function(r){return r.id=
 function renderForm093Body(rec){
   var isPending=!rec.prodMgrInitials&&rec.endTime;
   document.getElementById('form093Body').innerHTML=
-    '<div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border:1.5px solid #222;"><div style="text-align:center;margin-bottom:6px;"><div style="font-size:0.65rem;color:#555;">QUALITY ASSURANCE MANUAL</div><div style="font-size:0.95rem;font-weight:900;">FORM093.0 – LABELS ISSUED LOG</div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"><div><div class="field-label">Date</div><div style="font-weight:700;">'+rec.date+'</div></div><div><div class="field-label">Line</div><div style="font-weight:700;">'+rec.line+'</div></div><div style="grid-column:1/-1;"><div class="field-label">Product</div><div style="font-weight:700;">'+rec.product+'</div></div></div></div>'+
-    '<div style="background:#f0f8ff;border-radius:14px;padding:14px;margin-bottom:10px;border-left:5px solid #0074d9;"><div style="font-size:0.75rem;font-weight:700;color:#0074d9;margin-bottom:8px;">Start of Run</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;"><div><div class="field-label">Start</div><div style="font-weight:700;">'+rec.startTime+'</div></div><div><div class="field-label">TL</div><div style="font-weight:700;">'+(rec.tlInitials||'—')+'</div></div></div><div style="background:#fff;border:2px dashed #0074d9;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:0.68rem;color:#888;">First Label</div><div style="font-family:monospace;font-weight:700;color:#0074d9;">'+(rec.firstLabelCode||'—')+'</div></div></div>'+
-    '<div style="background:#fff8f8;border-radius:14px;padding:14px;margin-bottom:10px;border-left:5px solid #e74c3c;"><div style="font-size:0.75rem;font-weight:700;color:#e74c3c;margin-bottom:8px;">End of Run</div><div style="background:#fff;border:2px dashed #e74c3c;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:0.68rem;color:#888;">Last Label</div><div style="font-family:monospace;font-weight:700;color:#e74c3c;">'+(rec.lastLabelCode||'—')+'</div></div></div>'+
-    '<div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;" id="f093signoff"></div>'+
+    '<div style="background:#fff;border-radius:18px;padding:14px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border:1.5px solid #222;"><div style="text-align:center;margin-bottom:6px;"><div style="font-size:0.65rem;color:#555;">QUALITY ASSURANCE MANUAL</div><div style="font-size:0.95rem;font-weight:900;">FORM093.0 – LABELS ISSUED LOG</div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"><div><div class="field-label">Date</div><div style="font-weight:700;">'+rec.date+'</div></div><div><div class="field-label">Line</div><div style="font-weight:700;">'+rec.line+'</div></div><div style="grid-column:1/-1;"><div class="field-label">Product</div><div style="font-weight:700;">'+rec.product+'</div></div></div></div>'+
+    '<div style="background:#f0f8ff;border-radius:18px;padding:14px;margin-bottom:10px;border-left:5px solid #0074d9;"><div style="font-size:0.75rem;font-weight:700;color:#0074d9;margin-bottom:8px;">Start of Run</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;"><div><div class="field-label">Start</div><div style="font-weight:700;">'+rec.startTime+'</div></div><div><div class="field-label">TL</div><div style="font-weight:700;">'+(rec.tlInitials||'—')+'</div></div></div><div style="background:#fff;border:2px dashed #0074d9;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:0.68rem;color:#888;">First Label</div><div style="font-family:monospace;font-weight:700;color:#0074d9;">'+(rec.firstLabelCode||'—')+'</div></div></div>'+
+    '<div style="background:#fff8f8;border-radius:18px;padding:14px;margin-bottom:10px;border-left:5px solid #e74c3c;"><div style="font-size:0.75rem;font-weight:700;color:#e74c3c;margin-bottom:8px;">End of Run</div><div style="background:#fff;border:2px dashed #e74c3c;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:0.68rem;color:#888;">Last Label</div><div style="font-family:monospace;font-weight:700;color:#e74c3c;">'+(rec.lastLabelCode||'—')+'</div></div></div>'+
+    '<div style="background:#fff;border-radius:18px;padding:14px;margin-bottom:10px;" id="f093signoff"></div>'+
     '<div class="legal-footer" style="margin-bottom:20px;"><span>QA-971-F-093.0-10</span><span>Page 2 of 2</span><span>Version No: 007</span><span>Issue Date: 01/08/25</span><span>Authorised By: National QA Manager</span></div>';
   var sd=document.getElementById('f093signoff');
   if(rec.status==='complete'){
@@ -4744,7 +4858,7 @@ function renderDmgRows(){
   var c=document.getElementById('dmgRows');c.innerHTML='';
   if(!dmgRows.length){c.innerHTML='<div style="text-align:center;color:#bbb;padding:16px;">No items. Tap + Add Item.</div>';return;}
   dmgRows.forEach(function(row){
-    var card=document.createElement('div');card.style.cssText='background:#fff;border-radius:12px;padding:14px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #e74c3c;';
+    var card=document.createElement('div');card.style.cssText='background:#fff;border-radius:16px;padding:14px;margin-bottom:10px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #e74c3c;';
     card.innerHTML='<div style="display:flex;justify-content:space-between;margin-bottom:8px;"><div style="font-weight:700;color:#e74c3c;">Item #'+row.id+'</div><button data-rmid="'+row.id+'" style="background:none;border:1.5px solid #eee;border-radius:6px;padding:2px 9px;font-size:0.78rem;color:#aaa;cursor:pointer;">Remove</button></div>'+
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;"><div class="field-row"><div class="field-label">Code</div><input class="field-input" type="text" value="'+row.code+'" data-rid="'+row.id+'" data-rf="code"/></div><div class="field-row"><div class="field-label">Brand / Run #</div><input class="field-input" type="text" value="'+row.brand+'" data-rid="'+row.id+'" data-rf="brand"/></div></div>'+
       '<div class="field-row" style="margin-bottom:8px;"><div class="field-label">Description</div><input class="field-input" type="text" value="'+row.description+'" data-rid="'+row.id+'" data-rf="description"/></div>'+
@@ -4888,14 +5002,14 @@ function renderSchedMgmt(container, defaultLine){
   var wrap=document.createElement('div');
   // ── Section header ─────────────────────────────────────────────────
   var hdr=document.createElement('div');
-  hdr.style.cssText='background:#f0fff4;border-radius:12px;padding:12px 14px;margin-bottom:12px;border-left:5px solid #2ecc40;';
+  hdr.style.cssText='background:#f0fff4;border-radius:16px;padding:12px 14px;margin-bottom:12px;border-left:5px solid #2ecc40;';
   hdr.innerHTML='<div style="font-size:0.8rem;font-weight:700;color:#27ae60;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">📋 Schedule Management</div>'+
     '<div style="font-size:0.82rem;color:#555;line-height:1.6;">Add, remove, or move jobs between lines. All changes are PIN-protected and logged for auditing.</div>';
   wrap.appendChild(hdr);
 
   if(!hasSchedule){
     var noSched=document.createElement('div');
-    noSched.style.cssText='background:#fff;border-radius:12px;padding:14px;text-align:center;color:#bbb;font-size:0.85rem;margin-bottom:12px;';
+    noSched.style.cssText='background:#fff;border-radius:16px;padding:14px;text-align:center;color:#bbb;font-size:0.85rem;margin-bottom:12px;';
     noSched.textContent='No schedule loaded — load a schedule first.';
     wrap.appendChild(noSched);
     container.appendChild(wrap);
@@ -4923,7 +5037,7 @@ function renderSchedMgmt(container, defaultLine){
     var isCollapsible=!defaultLine; // only collapsible in manager all-lines view
 
     var lcard=document.createElement('div');
-    lcard.style.cssText='background:#fff;border-radius:14px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);overflow:hidden;';
+    lcard.style.cssText='background:#fff;border-radius:18px;margin-bottom:10px;box-shadow:0 4px 18px rgba(15,46,28,0.07);overflow:hidden;';
 
     // Header — always visible
     var lhdr=document.createElement('div');
@@ -5048,12 +5162,12 @@ function renderLabelStation(){
   var body=document.getElementById('labelBody');
   var tomorrow=new Date();tomorrow.setDate(tomorrow.getDate()+1);
   body.innerHTML=
-    '<div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);">'+
+    '<div style="background:#fff;border-radius:18px;padding:14px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);">'+
     '<div class="sec-title" style="margin-top:0;">Production Date</div>'+
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'+
     '<div class="field-row"><div class="field-label">Labels Are For</div><input class="field-input" type="date" id="lblProdDate" value="'+tomorrow.toISOString().split('T')[0]+'"/></div>'+
     '<div class="field-row"><div class="field-label">Printed By</div><input class="field-input" type="text" id="lblPrintedBy" placeholder="Your name"/></div></div></div>'+
-    '<div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);">'+
+    '<div style="background:#fff;border-radius:18px;padding:14px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);">'+
     '<div class="sec-title" style="margin-top:0;">Add Mix to Queue</div>'+
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">'+
     '<div class="field-row"><div class="field-label">Mix</div><select class="field-input" id="lblMixSelect"><option value="">Select…</option>'+
@@ -5066,10 +5180,10 @@ function renderLabelStation(){
     '<div class="field-row"><div class="field-label">No. of Tubs</div><input class="field-input" type="number" id="lblQty" placeholder="e.g. 5" min="1"/></div>'+
     '<div class="field-row"><div class="field-label">Made By</div><input class="field-input" type="text" id="lblMadeBy" placeholder="Initials" maxlength="4"/></div></div>'+
     '<button id="lblAddBtn" style="background:#2ecc40;color:#fff;border:none;border-radius:10px;padding:11px;font-size:0.9rem;font-weight:700;cursor:pointer;width:100%;">+ Add to Queue</button></div>'+
-    '<div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);">'+
+    '<div style="background:#fff;border-radius:18px;padding:14px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);">'+
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div class="sec-title" style="margin:0;">Print Queue</div><button id="lblPrintAllBtn" style="background:#0074d9;color:#fff;border:none;border-radius:8px;padding:6px 13px;font-size:0.8rem;font-weight:700;cursor:pointer;">🖨️ Print All</button></div>'+
     '<div id="lblQueueList"></div></div>'+
-    '<div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div class="sec-title" style="margin-top:0;">Printed Today</div><div id="lblHistory"></div></div>';
+    '<div style="background:#fff;border-radius:18px;padding:14px;margin-bottom:20px;box-shadow:0 4px 18px rgba(15,46,28,0.07);"><div class="sec-title" style="margin-top:0;">Printed Today</div><div id="lblHistory"></div></div>';
   document.getElementById('lblAddBtn').onclick=addLabelToQueue;
   document.getElementById('lblPrintAllBtn').onclick=labelPreviewAll;
   renderLabelQueue();renderLabelHistory();
@@ -5153,7 +5267,7 @@ function renderQaDash(){
   sum.innerHTML='<div class="sum-tile"><div class="sum-val" style="color:#e74c3c;">'+pending093+'</div><div class="sum-lbl">Labels Awaiting</div></div><div class="sum-tile"><div class="sum-val" style="color:#e67e22;">'+pendingLC+'</div><div class="sum-lbl">Clearances Pending</div></div><div class="sum-tile"><div class="sum-val" style="color:#2ecc40;">'+signed093+'</div><div class="sum-lbl">Forms Signed Off</div></div>';
   body.appendChild(sum);
   var sharedHdr=document.createElement('div');
-  sharedHdr.style.cssText='background:#f0f4ff;border-radius:12px;padding:12px 14px;margin-bottom:12px;border-left:5px solid #0074d9;';
+  sharedHdr.style.cssText='background:#f0f4ff;border-radius:16px;padding:12px 14px;margin-bottom:12px;border-left:5px solid #0074d9;';
   sharedHdr.innerHTML='<div style="font-size:0.8rem;font-weight:700;color:#0074d9;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">🤝 Shared — Supervisor & QA Sign-Off Required</div><div style="font-size:0.82rem;color:#555;line-height:1.6;">The following forms require sign-off from both a Supervisor and QA/QC officer.</div>';
   body.appendChild(sharedHdr);
   var sharedForms=[
@@ -5165,7 +5279,7 @@ function renderQaDash(){
     {icon:'🧪',title:'Mix Records — Prep Room',desc:'Traceability records for all mixes produced by prep team',count:0,countLabel:'coming soon',color:'#e67e22',action:null,comingSoon:true},
   ];
   sharedForms.forEach(function(form){
-    var card=document.createElement('div');card.style.cssText='background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid '+form.color+';'+(form.action?'cursor:pointer;':'opacity:0.7;');
+    var card=document.createElement('div');card.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:10px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid '+form.color+';'+(form.action?'cursor:pointer;':'opacity:0.7;');
     card.innerHTML='<div style="display:flex;align-items:center;gap:12px;"><div style="font-size:1.5rem;">'+form.icon+'</div><div style="flex:1;"><div style="font-weight:800;font-size:0.92rem;">'+form.title+'</div><div style="font-size:0.76rem;color:#888;margin-top:2px;">'+form.desc+'</div>'+(form.count>0?'<div style="font-size:0.72rem;color:#e74c3c;font-weight:700;margin-top:3px;">⏳ '+form.count+' '+form.countLabel+'</div>':form.comingSoon?'<div style="font-size:0.72rem;color:#aaa;margin-top:3px;">🔜 Form coming soon</div>':'<div style="font-size:0.72rem;color:#2ecc40;font-weight:700;margin-top:3px;">✅ All up to date</div>')+'</div>'+(form.action?'<div style="color:#0074d9;font-size:0.78rem;font-weight:600;">View →</div>':'<div style="color:#aaa;font-size:0.78rem;">Coming soon</div>')+'</div>';
     if(form.action)card.onclick=form.action;
     body.appendChild(card);
@@ -5179,14 +5293,14 @@ function renderQaForm093List(container){
   [{label:'⏳ Awaiting Sign-off',color:'#e74c3c',recs:form093Records.filter(function(r){return r.status==='awaiting-signoff';})},{label:'✅ Signed Off',color:'#2ecc40',recs:form093Records.filter(function(r){return r.status==='complete';})},{label:'🔵 In Progress',color:'#0074d9',recs:form093Records.filter(function(r){return r.status==='in-progress';})}].forEach(function(grp){
     if(!grp.recs.length)return;
     var lbl=document.createElement('div');lbl.style.cssText='font-size:0.78rem;font-weight:700;color:'+grp.color+';text-transform:uppercase;letter-spacing:1px;margin:12px 0 7px;';lbl.textContent=grp.label;container.appendChild(lbl);
-    grp.recs.slice().reverse().forEach(function(rec){var isPend=rec.status==='awaiting-signoff';var c=document.createElement('div');c.style.cssText='background:#fff;border-radius:12px;padding:12px 14px;margin-bottom:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid '+grp.color+';';c.innerHTML='<div style="display:flex;align-items:center;gap:10px;"><div style="flex:1;"><div style="font-weight:800;font-size:0.9rem;">'+rec.product+'</div><div style="font-size:0.75rem;color:#888;margin-top:2px;">'+rec.line+' · '+rec.date+' · '+rec.startTime+(rec.endTime?' – '+rec.endTime:'')+'</div>'+(rec.status==='complete'?'<div style="font-size:0.72rem;color:#1a7a2a;font-weight:600;margin-top:3px;">✅ '+rec.prodMgrInitials+' (Mgr) & '+rec.qaQcInitials+' (QA)</div>':'')+'</div>'+(isPend?'<button data-qaf093="'+rec.id+'" style="background:#9b59b6;color:#fff;border:none;border-radius:9px;padding:7px 11px;font-size:0.8rem;font-weight:700;cursor:pointer;">Sign Off</button>':'')+'</div>';var rb=c.querySelector('[data-qaf093]');if(rb)rb.onclick=function(){openForm093(rb.dataset.qaf093);};container.appendChild(c);});
+    grp.recs.slice().reverse().forEach(function(rec){var isPend=rec.status==='awaiting-signoff';var c=document.createElement('div');c.style.cssText='background:#fff;border-radius:16px;padding:12px 14px;margin-bottom:8px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid '+grp.color+';';c.innerHTML='<div style="display:flex;align-items:center;gap:10px;"><div style="flex:1;"><div style="font-weight:800;font-size:0.9rem;">'+rec.product+'</div><div style="font-size:0.75rem;color:#888;margin-top:2px;">'+rec.line+' · '+rec.date+' · '+rec.startTime+(rec.endTime?' – '+rec.endTime:'')+'</div>'+(rec.status==='complete'?'<div style="font-size:0.72rem;color:#1a7a2a;font-weight:600;margin-top:3px;">✅ '+rec.prodMgrInitials+' (Mgr) & '+rec.qaQcInitials+' (QA)</div>':'')+'</div>'+(isPend?'<button data-qaf093="'+rec.id+'" style="background:#9b59b6;color:#fff;border:none;border-radius:9px;padding:7px 11px;font-size:0.8rem;font-weight:700;cursor:pointer;">Sign Off</button>':'')+'</div>';var rb=c.querySelector('[data-qaf093]');if(rb)rb.onclick=function(){openForm093(rb.dataset.qaf093);};container.appendChild(c);});
   });
 }
 function renderQaLCList(container){
   container.innerHTML='';var back=document.createElement('button');back.className='back-btn';back.textContent='← QA Dashboard';back.onclick=renderQaDash;container.appendChild(back);
   var title=document.createElement('div');title.style.cssText='font-size:1rem;font-weight:800;margin-bottom:12px;';title.textContent='📋 FORM053.0 — Line Clearance Records';container.appendChild(title);
   if(!lcRecords.length){container.innerHTML+='<div style="text-align:center;color:#bbb;padding:30px;">No line clearance records yet.</div>';return;}
-  lcRecords.slice().reverse().forEach(function(rec){var isSigned=!!rec.prodMgrName;var c=document.createElement('div');c.style.cssText='background:#fff;border-radius:12px;padding:12px 14px;margin-bottom:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid '+(isSigned?'#2ecc40':rec.hasN?'#e67e22':'#007dc6')+';';c.innerHTML='<div style="display:flex;align-items:center;gap:10px;"><div style="flex:1;"><div style="font-weight:800;font-size:0.9rem;">'+rec.product+'</div><div style="font-size:0.75rem;color:#888;margin-top:2px;">'+rec.line+' · '+rec.date+' · TL: '+rec.initials+'</div>'+(rec.hasN?'<div style="font-size:0.72rem;color:#b85c00;font-weight:600;margin-top:2px;">⚠️ '+rec.nonConf+'</div>':'')+(isSigned?'<div style="font-size:0.72rem;color:#1a7a2a;font-weight:600;margin-top:2px;">✅ '+rec.prodMgrName+' & '+rec.qaName+'</div>':'<div style="font-size:0.72rem;color:#e74c3c;font-weight:600;margin-top:2px;">⏳ Awaiting sign-off</div>')+'</div>'+(!isSigned?'<button data-qalc="'+rec.id+'" style="background:#007dc6;color:#fff;border:none;border-radius:9px;padding:7px 11px;font-size:0.8rem;font-weight:700;cursor:pointer;">Sign Off</button>':'')+'</div>';var rb=c.querySelector('[data-qalc]');if(rb)rb.onclick=function(){openLcSignOff(rb.dataset.qalc);};container.appendChild(c);});
+  lcRecords.slice().reverse().forEach(function(rec){var isSigned=!!rec.prodMgrName;var c=document.createElement('div');c.style.cssText='background:#fff;border-radius:16px;padding:12px 14px;margin-bottom:8px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid '+(isSigned?'#2ecc40':rec.hasN?'#e67e22':'#007dc6')+';';c.innerHTML='<div style="display:flex;align-items:center;gap:10px;"><div style="flex:1;"><div style="font-weight:800;font-size:0.9rem;">'+rec.product+'</div><div style="font-size:0.75rem;color:#888;margin-top:2px;">'+rec.line+' · '+rec.date+' · TL: '+rec.initials+'</div>'+(rec.hasN?'<div style="font-size:0.72rem;color:#b85c00;font-weight:600;margin-top:2px;">⚠️ '+rec.nonConf+'</div>':'')+(isSigned?'<div style="font-size:0.72rem;color:#1a7a2a;font-weight:600;margin-top:2px;">✅ '+rec.prodMgrName+' & '+rec.qaName+'</div>':'<div style="font-size:0.72rem;color:#e74c3c;font-weight:600;margin-top:2px;">⏳ Awaiting sign-off</div>')+'</div>'+(!isSigned?'<button data-qalc="'+rec.id+'" style="background:#007dc6;color:#fff;border:none;border-radius:9px;padding:7px 11px;font-size:0.8rem;font-weight:700;cursor:pointer;">Sign Off</button>':'')+'</div>';var rb=c.querySelector('[data-qalc]');if(rb)rb.onclick=function(){openLcSignOff(rb.dataset.qalc);};container.appendChild(c);});
 }
 
 // ── Manager Dashboard ──────────────────────────────────────────────────
@@ -5200,7 +5314,12 @@ function renderMgr(){
     LINES.forEach(function(l){var j=(scheduleData[l]||[]).filter(function(x){return x.status!=='transferred'&&x.status!=='removed';});total+=j.length;done+=j.filter(function(x){return x.status==='complete';}).length;inProg+=j.filter(function(x){return x.status==='in-progress';}).length;});
   }
   var pct=total?Math.round((done/total)*100):0;
-  document.getElementById('mgrSummary').innerHTML=noSchedule?'':'<div class="sum-tile"><div class="sum-val" style="color:#2ecc40;">'+pct+'%</div><div class="sum-lbl">Overall Progress</div></div><div class="sum-tile"><div class="sum-val" style="color:#0074d9;">'+inProg+'</div><div class="sum-lbl">Active Runs</div></div><div class="sum-tile"><div class="sum-val">'+done+'<span style="font-size:0.95rem;color:#aaa;">/'+total+'</span></div><div class="sum-lbl">Jobs Done</div></div>';
+  var openIssCount=issueLog.filter(function(i){return !i.resolved;}).length;
+  document.getElementById('mgrSummary').innerHTML=noSchedule?'':
+    '<div class="sum-tile featured"><div class="sum-val">'+pct+'%</div><div class="sum-lbl">Overall Progress</div></div>'+
+    '<div class="sum-tile"><div class="sum-val" style="color:#0074d9;">'+inProg+'</div><div class="sum-lbl">Active Runs</div></div>'+
+    '<div class="sum-tile"><div class="sum-val">'+done+'<span style="font-size:0.95rem;color:#aaa;">/'+total+'</span></div><div class="sum-lbl">Jobs Done</div></div>'+
+    '<div class="sum-tile"><div class="sum-val" style="color:'+(openIssCount?'#e74c3c':'#2ecc40')+';">'+openIssCount+'</div><div class="sum-lbl">Open Issues</div></div>';
   document.getElementById('mgrUpdated').textContent=noSchedule?'':'Auto-refreshes every 8s · '+new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
   var linesEl=document.getElementById('mgrLines');linesEl.innerHTML='';
 
@@ -5315,7 +5434,7 @@ function renderMgr(){
     var resolvedToday=issueLog.filter(function(i){return i.resolved;});
     // ── Open Issues — persistent cards ────────────────────────────
     var issCard=document.createElement('div');
-    issCard.style.cssText='background:#fff;border-radius:14px;padding:13px 15px;margin-top:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid '+(openIssues.length>0?'#e74c3c':'#2ecc40')+';';
+    issCard.style.cssText='background:#fff;border-radius:18px;padding:13px 15px;margin-top:8px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid '+(openIssues.length>0?'#e74c3c':'#2ecc40')+';';
     var issHdr=document.createElement('div');
     issHdr.style.cssText='display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;';
     issHdr.innerHTML=
@@ -5421,12 +5540,12 @@ function renderMgr(){
 
   // ── Archive card ──────────────────────────────────────────────────
   var archCard=document.createElement('div');
-  archCard.style.cssText='background:#fff;border-radius:14px;padding:14px 16px;margin-top:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #0074d9;cursor:pointer;';
+  archCard.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-top:8px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #0074d9;cursor:pointer;';
   var archCount=0;
   for(var ai=0;ai<localStorage.length;ai++){var ak=localStorage.key(ai);if(ak&&ak.indexOf('frenzee_archive_')===0)archCount++;}
   archCard.innerHTML=
     '<div style="display:flex;align-items:center;gap:12px;">'+
-    '<div style="font-size:1.5rem;">📁</div>'+
+    fzIconBadge('folder','#0074d9')+
     '<div style="flex:1;">'+
       '<div style="font-weight:800;font-size:0.92rem;">Shift Archive</div>'+
       '<div style="font-size:0.76rem;color:#888;margin-top:2px;">'+archCount+' shift'+(archCount!==1?'s':'')+' stored on this device — export for audits & complaints</div>'+
@@ -5438,11 +5557,11 @@ function renderMgr(){
 
   // ── Form Management card ──────────────────────────────────────────
   var fmCard=document.createElement('div');
-  fmCard.style.cssText='background:#fff;border-radius:14px;padding:14px 16px;margin-top:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #e67e22;cursor:pointer;';
+  fmCard.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-top:8px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #e67e22;cursor:pointer;';
   var recentEdit=formChangesLog.length?formChangesLog[formChangesLog.length-1]:null;
   fmCard.innerHTML=
     '<div style="display:flex;align-items:center;gap:12px;">'+
-    '<div style="font-size:1.5rem;">📝</div>'+
+    fzIconBadge('filetext','#e67e22')+
     '<div style="flex:1;">'+
       '<div style="font-weight:800;font-size:0.92rem;">Form Management</div>'+
       '<div style="font-size:0.76rem;color:#888;margin-top:2px;">Update form numbers, names & versions — '+FORM_REGISTRY.length+' forms registered</div>'+
@@ -5456,10 +5575,10 @@ function renderMgr(){
 
   // ── SharePoint Traceability Links card ────────────────────────────
   var spCard=document.createElement('div');
-  spCard.style.cssText='background:#fff;border-radius:14px;padding:14px 16px;margin-top:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #0074d9;cursor:pointer;';
+  spCard.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-top:8px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #0074d9;cursor:pointer;';
   spCard.innerHTML=
     '<div style="display:flex;align-items:center;gap:12px;">'+
-    '<div style="font-size:1.5rem;">🔗</div>'+
+    fzIconBadge('link','#0074d9')+
     '<div style="flex:1;">'+
       '<div style="font-weight:800;font-size:0.92rem;">SharePoint Traceability Links</div>'+
       '<div style="font-size:0.76rem;color:#888;margin-top:2px;">'+sharepointLinks.length+' product'+(sharepointLinks.length!==1?'s':'')+' linked to SharePoint files</div>'+
@@ -5471,10 +5590,10 @@ function renderMgr(){
 
   // ── Recipe Library card ───────────────────────────────────────────
   var rlCard=document.createElement('div');
-  rlCard.style.cssText='background:#fff;border-radius:14px;padding:14px 16px;margin-top:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #27ae60;cursor:pointer;';
+  rlCard.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-top:8px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #27ae60;cursor:pointer;';
   rlCard.innerHTML=
     '<div style="display:flex;align-items:center;gap:12px;">'+
-    '<div style="font-size:1.5rem;">📋</div>'+
+    fzIconBadge('clipboard','#27ae60')+
     '<div style="flex:1;">'+
       '<div style="font-weight:800;font-size:0.92rem;">Recipe Library</div>'+
       '<div style="font-size:0.76rem;color:#888;margin-top:2px;">'+recipeLibrary.length+' recipe'+(recipeLibrary.length!==1?'s':'')+' — auto-matched to jobs by SKU</div>'+
@@ -5486,10 +5605,10 @@ function renderMgr(){
 
   // ── Mix Instructions Library card ─────────────────────────────────
   var mlCard=document.createElement('div');
-  mlCard.style.cssText='background:#fff;border-radius:14px;padding:14px 16px;margin-top:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #9b59b6;cursor:pointer;';
+  mlCard.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-top:8px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #9b59b6;cursor:pointer;';
   mlCard.innerHTML=
     '<div style="display:flex;align-items:center;gap:12px;">'+
-    '<div style="font-size:1.5rem;">🧪</div>'+
+    fzIconBadge('flask','#9b59b6')+
     '<div style="flex:1;">'+
       '<div style="font-weight:800;font-size:0.92rem;">Mix Instructions Library</div>'+
       '<div style="font-size:0.76rem;color:#888;margin-top:2px;">'+mixLibrary.length+' mix instruction'+(mixLibrary.length!==1?'s':'')+' — shelf life rules + full ingredient traceability</div>'+
@@ -5501,10 +5620,10 @@ function renderMgr(){
 
   // ── Traceability Analytics card ───────────────────────────────────
   var taCard=document.createElement('div');
-  taCard.style.cssText='background:#fff;border-radius:14px;padding:14px 16px;margin-top:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #e74c3c;cursor:pointer;';
+  taCard.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-top:8px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #e74c3c;cursor:pointer;';
   taCard.innerHTML=
     '<div style="display:flex;align-items:center;gap:12px;">'+
-    '<div style="font-size:1.5rem;">🔍</div>'+
+    fzIconBadge('search','#e74c3c')+
     '<div style="flex:1;">'+
       '<div style="font-weight:800;font-size:0.92rem;">Traceability & Analytics</div>'+
       '<div style="font-size:0.76rem;color:#888;margin-top:2px;">Recall search · Ingredient usage · Full audit trail</div>'+
@@ -5560,7 +5679,7 @@ function renderToolUsage(){
 
   // ── Form header ──────────────────────────────────────────────────
   var hdrCard=document.createElement('div');
-  hdrCard.style.cssText='background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border:1.5px solid #222;';
+  hdrCard.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border:1.5px solid #222;';
   hdrCard.innerHTML=
     '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">'+
     '<div style="background:#222;color:#fff;border-radius:8px;padding:6px 10px;font-size:0.65rem;font-weight:700;text-align:center;line-height:1.4;">Fresh<br>To Go<br>Foods</div>'+
@@ -5578,7 +5697,7 @@ function renderToolUsage(){
 
   // ── Start of Day Tool Count ──────────────────────────────────────
   var startCard=document.createElement('div');
-  startCard.style.cssText='background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #2ecc40;';
+  startCard.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #2ecc40;';
   startCard.innerHTML=
     '<div style="font-size:0.75rem;font-weight:700;color:#27ae60;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">🌅 Start of Day Tool Count</div>'+
     '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">'+
@@ -5593,7 +5712,7 @@ function renderToolUsage(){
 
   // ── Tool Entries Table ───────────────────────────────────────────
   var tableCard=document.createElement('div');
-  tableCard.style.cssText='background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:12px;';
+  tableCard.style.cssText='background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 4px 18px rgba(15,46,28,0.07);margin-bottom:12px;';
   var thead=document.createElement('div');
   thead.style.cssText='display:grid;grid-template-columns:80px 1fr 1fr 80px 70px;background:#f5f5f5;padding:7px 12px;border-bottom:1.5px solid #ddd;';
   thead.innerHTML=
@@ -5637,7 +5756,7 @@ function renderToolUsage(){
 
   // ── End of Day Tool Count ────────────────────────────────────────
   var endCard=document.createElement('div');
-  endCard.style.cssText='background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #e74c3c;';
+  endCard.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #e74c3c;';
   endCard.innerHTML=
     '<div style="font-size:0.75rem;font-weight:700;color:#e74c3c;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">🌙 End of Day Tool Count</div>'+
     '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;">'+
@@ -5690,7 +5809,7 @@ function renderToolUsage(){
 
   // ── Sign-off section ─────────────────────────────────────────────
   var signCard=document.createElement('div');
-  signCard.style.cssText='background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #9b59b6;';
+  signCard.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:10px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #9b59b6;';
 
   if(isSigned){
     signCard.innerHTML=
@@ -5825,7 +5944,7 @@ function renderToolboxReg(){
 
   // ── Header ───────────────────────────────────────────────────────
   var hdrCard=document.createElement('div');
-  hdrCard.style.cssText='background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border:1.5px solid #222;';
+  hdrCard.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border:1.5px solid #222;';
   hdrCard.innerHTML=
     '<div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">'+
     '<div style="background:#222;color:#fff;border-radius:8px;padding:6px 10px;font-size:0.65rem;font-weight:700;text-align:center;line-height:1.4;">Fresh<br>To Go<br>Foods</div>'+
@@ -5838,7 +5957,7 @@ function renderToolboxReg(){
 
   // ── Progress summary ─────────────────────────────────────────────
   var sumCard=document.createElement('div');
-  sumCard.style.cssText='background:#fff;border-radius:14px;padding:14px;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:12px;';
+  sumCard.style.cssText='background:#fff;border-radius:18px;padding:14px;box-shadow:0 4px 18px rgba(15,46,28,0.07);margin-bottom:12px;';
   var pct=Math.round((checkedCount/TOOLBOX_REGISTER_ITEMS.length)*100);
   sumCard.innerHTML=
     '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">'+
@@ -5853,7 +5972,7 @@ function renderToolboxReg(){
 
   // ── Toolbox contents table ───────────────────────────────────────
   var tableCard=document.createElement('div');
-  tableCard.style.cssText='background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:12px;';
+  tableCard.style.cssText='background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 4px 18px rgba(15,46,28,0.07);margin-bottom:12px;';
   var thead=document.createElement('div');
   thead.style.cssText='display:grid;grid-template-columns:1fr 1fr 44px 50px 30px;background:#f5f5f5;padding:7px 12px;border-bottom:1.5px solid #ddd;';
   thead.innerHTML=
@@ -5942,7 +6061,7 @@ function renderToolboxReg(){
 
   // ── Comments ──────────────────────────────────────────────────────
   var commentsCard=document.createElement('div');
-  commentsCard.style.cssText='background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);';
+  commentsCard.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);';
   commentsCard.innerHTML=
     '<div class="field-row"><div class="field-label">Comments</div>'+
     '<textarea class="field-input" id="tb-comments" rows="3" style="resize:none;" '+(isSigned?'disabled':'')+'>'+f.comments+'</textarea></div>';
@@ -5954,7 +6073,7 @@ function renderToolboxReg(){
 
   // ── Sign-off ──────────────────────────────────────────────────────
   var signCard=document.createElement('div');
-  signCard.style.cssText='background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #9b59b6;';
+  signCard.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:10px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #9b59b6;';
 
   if(isSigned){
     signCard.innerHTML=
@@ -6195,7 +6314,7 @@ function renderSharepoint(){
 
   // Header info
   var infoCard=document.createElement('div');
-  infoCard.style.cssText='background:#f0f4ff;border-radius:12px;padding:12px 14px;margin-bottom:14px;border-left:5px solid #0074d9;';
+  infoCard.style.cssText='background:#f0f4ff;border-radius:16px;padding:12px 14px;margin-bottom:14px;border-left:5px solid #0074d9;';
   infoCard.innerHTML=
     '<div style="font-size:0.8rem;font-weight:700;color:#0074d9;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">🔗 SharePoint Traceability Links</div>'+
     '<div style="font-size:0.82rem;color:#555;line-height:1.5;">Link each product to its SharePoint traceability file. Manager PIN required to add, edit or remove links.</div>';
@@ -6241,7 +6360,7 @@ function renderSharepoint(){
 
     filtered.forEach(function(link){
       var card=document.createElement('div');
-      card.style.cssText='background:#fff;border-radius:12px;padding:13px 15px;margin-bottom:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #0074d9;display:flex;align-items:center;gap:12px;';
+      card.style.cssText='background:#fff;border-radius:16px;padding:13px 15px;margin-bottom:8px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #0074d9;display:flex;align-items:center;gap:12px;';
       card.innerHTML=
         '<div style="font-size:1.5rem;">📄</div>'+
         '<div style="flex:1;">'+
@@ -6344,7 +6463,7 @@ function renderFormMgmt(){
 
   // Header info card
   var infoCard=document.createElement('div');
-  infoCard.style.cssText='background:#f0f4ff;border-radius:12px;padding:12px 14px;margin-bottom:14px;border-left:5px solid #0074d9;';
+  infoCard.style.cssText='background:#f0f4ff;border-radius:16px;padding:12px 14px;margin-bottom:14px;border-left:5px solid #0074d9;';
   infoCard.innerHTML=
     '<div style="font-size:0.8rem;font-weight:700;color:#0074d9;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">📝 Form Registry Management</div>'+
     '<div style="font-size:0.82rem;color:#555;line-height:1.5;">Update form numbers, names and versions when the QA manual is revised. All changes require Manager PIN and are audit logged.</div>';
@@ -6373,7 +6492,7 @@ function renderFormMgmt(){
     body.appendChild(secHdr);
 
     var card=document.createElement('div');
-    card.style.cssText='background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:4px;';
+    card.style.cssText='background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 4px 18px rgba(15,46,28,0.07);margin-bottom:4px;';
 
     sections[sec].forEach(function(form,fi){
       var hasEdit=formChangesLog.some(function(c){return c.key===form.key;});
@@ -6558,7 +6677,7 @@ function renderForm067(){
 
   // Build the form header
   var hdrDiv=document.createElement('div');
-  hdrDiv.style.cssText='background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border:1.5px solid #222;';
+  hdrDiv.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border:1.5px solid #222;';
   hdrDiv.innerHTML=
     '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">'+
     '<div style="background:#222;color:#fff;border-radius:8px;padding:6px 10px;font-size:0.65rem;font-weight:700;text-align:center;line-height:1.4;">Fresh<br>To Go<br>Foods</div>'+
@@ -6667,7 +6786,7 @@ function renderForm067(){
   // ── PAGE 1 ─────────────────────────────────────────────────────────
   // PREP ROOM
   var prepCard=document.createElement('div');
-  prepCard.style.cssText='background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:10px;';
+  prepCard.style.cssText='background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 4px 18px rgba(15,46,28,0.07);margin-bottom:10px;';
   prepCard.appendChild(sectionRow('PREP ROOM','Team Leader'));
   prepCard.innerHTML+=colHeader();
   var prepRows=[
@@ -6683,7 +6802,7 @@ function renderForm067(){
 
   // GENERAL PAPERWORK
   var genCard=document.createElement('div');
-  genCard.style.cssText='background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:10px;';
+  genCard.style.cssText='background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 4px 18px rgba(15,46,28,0.07);margin-bottom:10px;';
   genCard.appendChild(sectionRow('GENERAL PAPERWORK',''));
   genCard.innerHTML+=colHeader();
   var genRows=[
@@ -6714,7 +6833,7 @@ function renderForm067(){
   lineMap.forEach(function(lm){
     var tl=getTL(lm.line);
     var lineCard=document.createElement('div');
-    lineCard.style.cssText='background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:10px;';
+    lineCard.style.cssText='background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 4px 18px rgba(15,46,28,0.07);margin-bottom:10px;';
     var secLabel=lm.key==='lineStat'?'STATIC LINE':('LINE '+lm.letter+' ('+lm.letter+')');
     lineCard.appendChild(sectionRow(secLabel,'Team Leader: '+tl));
     lineCard.innerHTML+=colHeader();
@@ -6738,7 +6857,7 @@ function renderForm067(){
 
   // METAL DETECTOR
   var metCard=document.createElement('div');
-  metCard.style.cssText='background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:10px;';
+  metCard.style.cssText='background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 4px 18px rgba(15,46,28,0.07);margin-bottom:10px;';
   metCard.appendChild(sectionRow('METAL DETECTOR',''));
   metCard.innerHTML+=colHeader();
   [['met-detect','METAL DETECTION RECORD','FORM005.0'],['met-loose','LOOSE ITEMS REGISTER','FORM014.1']].forEach(function(r){metCard.appendChild(buildRow(r[0],r[1],r[2],null));});
@@ -6746,7 +6865,7 @@ function renderForm067(){
 
   // QA / QC OFFICER section
   var qaCard=document.createElement('div');
-  qaCard.style.cssText='background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:10px;';
+  qaCard.style.cssText='background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 4px 18px rgba(15,46,28,0.07);margin-bottom:10px;';
   qaCard.appendChild(sectionRow('QA / QC OFFICER',''));
   // QA section has a different layout — 2-column grid of forms
   var qaGrid=document.createElement('div');
@@ -6784,7 +6903,7 @@ function renderForm067(){
   // ── Progress summary ───────────────────────────────────────────────
   var pct=totalRows?Math.round((completedRows/totalRows)*100):0;
   var sumCard=document.createElement('div');
-  sumCard.style.cssText='background:#fff;border-radius:14px;padding:14px;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:10px;';
+  sumCard.style.cssText='background:#fff;border-radius:18px;padding:14px;box-shadow:0 4px 18px rgba(15,46,28,0.07);margin-bottom:10px;';
   sumCard.innerHTML=
     '<div style="font-size:0.8rem;font-weight:700;color:#555;margin-bottom:8px;">📊 Completion Progress</div>'+
     '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">'+
@@ -6911,7 +7030,7 @@ function renderMixCount(container){
 
   // Section header
   var hdr=document.createElement('div');
-  hdr.style.cssText='background:#fff8f0;border-radius:12px;padding:12px 14px;margin-bottom:12px;border-left:5px solid #e67e22;';
+  hdr.style.cssText='background:#fff8f0;border-radius:16px;padding:12px 14px;margin-bottom:12px;border-left:5px solid #e67e22;';
   hdr.innerHTML=
     '<div style="font-size:0.8rem;font-weight:700;color:#e67e22;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">⚖️ Mix Count — End of Shift Leftover Report</div>'+
     '<div style="font-size:0.82rem;color:#555;line-height:1.5;">Record the weight remaining (kg) in each tub for mixes that have stock left over at end of shift.</div>';
@@ -6919,7 +7038,7 @@ function renderMixCount(container){
 
   if(!hasSchedule){
     var ns=document.createElement('div');
-    ns.style.cssText='background:#fff;border-radius:12px;padding:14px;text-align:center;color:#bbb;font-size:0.85rem;margin-bottom:12px;';
+    ns.style.cssText='background:#fff;border-radius:16px;padding:14px;text-align:center;color:#bbb;font-size:0.85rem;margin-bottom:12px;';
     ns.textContent='No schedule loaded — load a schedule to see today\'s mixes.';
     container.appendChild(ns);
     return;
@@ -6976,7 +7095,7 @@ function renderMixCount(container){
 
   // ── Email / Export section ─────────────────────────────────────────
   var emailCard=document.createElement('div');
-  emailCard.style.cssText='background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #0074d9;';
+  emailCard.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:16px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #0074d9;';
 
   var allWithData=MIX_COUNT_MASTER.filter(function(m){
     var w=mixCountWeights[m.code]||[];
@@ -7121,7 +7240,7 @@ function renderMixCount(container){
 
 function renderMixCountTable(container, mixes){
   var wrap=document.createElement('div');
-  wrap.style.cssText='background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:12px;';
+  wrap.style.cssText='background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 4px 18px rgba(15,46,28,0.07);margin-bottom:12px;';
 
   // Column header
   var thead=document.createElement('div');
@@ -7270,7 +7389,7 @@ function renderStockCount(container){
 
   // Header
   var hdr=document.createElement('div');
-  hdr.style.cssText='background:#f0fdf4;border-radius:12px;padding:12px 14px;margin-bottom:12px;border-left:5px solid #27ae60;';
+  hdr.style.cssText='background:#f0fdf4;border-radius:16px;padding:12px 14px;margin-bottom:12px;border-left:5px solid #27ae60;';
   hdr.innerHTML='<div style="font-size:0.8rem;font-weight:700;color:#27ae60;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">📦 Daily Closing Stock Count</div>'+
     '<div style="font-size:0.82rem;color:#555;line-height:1.5;">To be handed to procurement / stock control daily. Count all salads at completion of all production.</div>'+
     '<div style="font-size:0.75rem;color:#27ae60;font-weight:600;margin-top:4px;">'+todayStr+'</div>';
@@ -7383,7 +7502,7 @@ function buildColHeader(color,bgColor,borderColor,labels){
 // Collapsible section: tap header to expand/collapse. Multiple can be open at once.
 function buildCollapsibleSection(container, icon, title, color, bgColor, borderColor, itemCount, bodyBuilderFn){
   var section=document.createElement('div');
-  section.style.cssText='background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:10px;';
+  section.style.cssText='background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 4px 18px rgba(15,46,28,0.07);margin-bottom:10px;';
 
   var header=document.createElement('div');
   header.style.cssText='display:flex;align-items:center;gap:10px;padding:13px 14px;cursor:pointer;background:'+bgColor+';border-left:5px solid '+color+';user-select:none;';
@@ -7455,7 +7574,7 @@ function buildBakeryRow(wrap,item){
 
 function buildStockCountEmail(container, todayStr){
   var emailCard=document.createElement('div');
-  emailCard.style.cssText='background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #27ae60;';
+  emailCard.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:16px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #27ae60;';
 
   // Check if any data has been entered
   var hasData=Object.keys(stockCountData).some(function(k){
@@ -7619,7 +7738,7 @@ function renderSupervisorDash(){
 
   // ── FORM067 card ──────────────────────────────────────────────────
   var f67card=document.createElement('div');
-  f67card.style.cssText='background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #555;cursor:pointer;';
+  f67card.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:10px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #555;cursor:pointer;';
   // Count outstanding rows for the badge
   var f67total=0,f67done=0;
   function quickF67Check(rowKey,formCode,lineKey){
@@ -7664,7 +7783,7 @@ function renderSupervisorDash(){
 
   // ── FORM014.2 Daily Tool Usage card ──────────────────────────────
   var tuCard=document.createElement('div');
-  tuCard.style.cssText='background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #0074d9;cursor:pointer;';
+  tuCard.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:10px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #0074d9;cursor:pointer;';
   var tuSigned=toolUsageForm.status==='complete';
   var tuHasData=toolUsageForm.entries.some(function(e){return e.tool;});
   tuCard.innerHTML=
@@ -7684,7 +7803,7 @@ function renderSupervisorDash(){
 
   // ── REG003.0 Toolbox Register card ───────────────────────────────
   var tbCard=document.createElement('div');
-  tbCard.style.cssText='background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #555;cursor:pointer;';
+  tbCard.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:10px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #555;cursor:pointer;';
   var tbSigned=toolboxRegisterForm.status==='complete';
   var tbCheckedCount=Object.values(toolboxRegisterForm.checked).filter(Boolean).length;
   tbCard.innerHTML=
@@ -7704,7 +7823,7 @@ function renderSupervisorDash(){
 
   // ── FORM040.0 Start-Up Safety Checks card ────────────────────────
   var ssCard=document.createElement('div');
-  ssCard.style.cssText='background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #e74c3c;cursor:pointer;';
+  ssCard.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:10px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #e74c3c;cursor:pointer;';
   var ssSigned=startupSafetyForm.status==='complete';
   var ssTotal=Object.values(STARTUP_CHECKS).reduce(function(a,items){return a+items.length;},0);
   var ssChecked=Object.keys(startupSafetyForm.results).length;
@@ -7728,7 +7847,7 @@ function renderSupervisorDash(){
 
   // ── Egg Stock Count card ──────────────────────────────────────────
   var ecCard=document.createElement('div');
-  ecCard.style.cssText='background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid #f39c12;cursor:pointer;';
+  ecCard.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:10px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #f39c12;cursor:pointer;';
   var ecHasData=EGG_PRODUCTS.some(function(p){var e=eggCountForm.entries[p.code]||{};return e.cartons||e.units||e.kgs;});
   ecCard.innerHTML=
     '<div style="display:flex;align-items:center;gap:12px;">'+
@@ -7753,14 +7872,14 @@ function renderSupervisorDash(){
       var lbl=document.createElement('div');lbl.style.cssText='font-size:0.78rem;font-weight:700;color:'+grp.color+';text-transform:uppercase;letter-spacing:1px;margin:12px 0 7px;';lbl.textContent='📋 FORM093.0 — '+grp.label;body.appendChild(lbl);
       grp.recs.slice().reverse().forEach(function(rec){
         var isPend=rec.status==='awaiting-signoff',isSigned=rec.status==='complete';
-        var c=document.createElement('div');c.style.cssText='background:#fff;border-radius:12px;padding:13px 15px;margin-bottom:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:5px solid '+grp.color+';';
+        var c=document.createElement('div');c.style.cssText='background:#fff;border-radius:16px;padding:13px 15px;margin-bottom:8px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid '+grp.color+';';
         c.innerHTML='<div style="display:flex;align-items:flex-start;gap:9px;"><div style="flex:1;"><div style="font-weight:800;font-size:0.9rem;">'+rec.product+'</div><div style="font-size:0.75rem;color:#888;margin-top:2px;">'+rec.line+' · '+rec.date+' · '+rec.startTime+(rec.endTime?' – '+rec.endTime:'')+'</div>'+(isSigned?'<div style="font-size:0.72rem;color:#1a7a2a;font-weight:600;margin-top:3px;">✅ '+rec.prodMgrInitials+' (Mgr) & '+rec.qaQcInitials+' (QA) · '+rec.signOffTime+'</div>':'')+'</div>'+(isPend?'<button data-suprev="'+rec.id+'" style="background:#9b59b6;color:#fff;border:none;border-radius:9px;padding:7px 11px;font-size:0.8rem;font-weight:700;cursor:pointer;">Review →</button>':'')+
           (isSigned?'<div style="color:#2ecc40;font-size:0.75rem;font-weight:700;">✅ '+rec.signOffTime+'</div>':'')+'</div>';
         var rb=c.querySelector('[data-suprev]');if(rb)rb.onclick=(function(id){return function(){renderSupReview(id);};})(rec.id);
         body.appendChild(c);
       });
     });
-    if(issueLog.length){var ih=document.createElement('div');ih.style.cssText='font-size:0.78rem;font-weight:700;color:#e67e22;text-transform:uppercase;letter-spacing:1px;margin:12px 0 7px;';ih.textContent='⚠️ Issues This Shift';body.appendChild(ih);issueLog.slice().reverse().forEach(function(iss){var c=document.createElement('div');c.style.cssText='background:#fff;border-radius:12px;padding:12px 14px;margin-bottom:7px;border-left:5px solid '+(iss.resolved?'#2ecc40':iss.severity==='high'?'#e74c3c':'#e67e22')+';box-shadow:0 2px 8px rgba(0,0,0,0.06);';c.innerHTML='<div style="display:flex;gap:7px;"><span>'+(iss.severity==='high'?'🔴':iss.severity==='medium'?'🟠':'🟡')+'</span><div><div style="font-weight:700;font-size:0.85rem;">'+iss.line+' · '+iss.category+'</div><div style="font-size:0.8rem;color:#555;margin-top:1px;">'+iss.description+'</div><div style="font-size:0.7rem;color:#aaa;margin-top:2px;">'+iss.reporter+' · '+iss.time+' · '+(iss.resolved?'<span style="color:#2ecc40;font-weight:700;">✅ Resolved</span>':'<span style="color:#e74c3c;font-weight:700;">🔴 Open</span>')+'</div></div></div>';body.appendChild(c);});}
+    if(issueLog.length){var ih=document.createElement('div');ih.style.cssText='font-size:0.78rem;font-weight:700;color:#e67e22;text-transform:uppercase;letter-spacing:1px;margin:12px 0 7px;';ih.textContent='⚠️ Issues This Shift';body.appendChild(ih);issueLog.slice().reverse().forEach(function(iss){var c=document.createElement('div');c.style.cssText='background:#fff;border-radius:16px;padding:12px 14px;margin-bottom:7px;border-left:5px solid '+(iss.resolved?'#2ecc40':iss.severity==='high'?'#e74c3c':'#e67e22')+';box-shadow:0 4px 18px rgba(15,46,28,0.07);';c.innerHTML='<div style="display:flex;gap:7px;"><span>'+(iss.severity==='high'?'🔴':iss.severity==='medium'?'🟠':'🟡')+'</span><div><div style="font-weight:700;font-size:0.85rem;">'+iss.line+' · '+iss.category+'</div><div style="font-size:0.8rem;color:#555;margin-top:1px;">'+iss.description+'</div><div style="font-size:0.7rem;color:#aaa;margin-top:2px;">'+iss.reporter+' · '+iss.time+' · '+(iss.resolved?'<span style="color:#2ecc40;font-weight:700;">✅ Resolved</span>':'<span style="color:#e74c3c;font-weight:700;">🔴 Open</span>')+'</div></div></div>';body.appendChild(c);});}
   }
   var note=document.createElement('div');note.style.cssText='font-size:0.7rem;color:#aaa;text-align:right;margin-bottom:20px;margin-top:8px;';note.textContent='Auto-refreshes every 10s · '+new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',second:'2-digit'});body.appendChild(note);
 }
@@ -7769,10 +7888,10 @@ function renderSupReview(recId){
   var body=document.getElementById('supervisorBody');body.innerHTML='';
   var back=document.createElement('button');back.className='back-btn';back.textContent='← All Runs';back.onclick=renderSupervisorDash;body.appendChild(back);
   var div=document.createElement('div');
-  div.innerHTML='<div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:12px;border:1.5px solid #222;"><div style="text-align:center;margin-bottom:6px;"><div style="font-size:0.65rem;color:#555;">QUALITY ASSURANCE MANUAL</div><div style="font-size:0.9rem;font-weight:900;">FORM093.0 – LABELS ISSUED LOG</div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"><div><div class="field-label">Date</div><div style="font-weight:700;">'+rec.date+'</div></div><div><div class="field-label">Line</div><div style="font-weight:700;">'+rec.line+'</div></div><div style="grid-column:1/-1;"><div class="field-label">Product</div><div style="font-weight:700;">'+rec.product+'</div></div></div></div>'+
-    '<div style="background:#f0f8ff;border-radius:14px;padding:14px;margin-bottom:10px;border-left:5px solid #0074d9;"><div style="font-size:0.75rem;font-weight:700;color:#0074d9;margin-bottom:8px;">Start of Run</div><div style="background:#fff;border:2px dashed #0074d9;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:0.68rem;color:#888;">First Label</div><div style="font-family:monospace;font-weight:700;color:#0074d9;">'+(rec.firstLabelCode||'—')+'</div></div></div>'+
-    '<div style="background:#fff8f8;border-radius:14px;padding:14px;margin-bottom:10px;border-left:5px solid #e74c3c;"><div style="font-size:0.75rem;font-weight:700;color:#e74c3c;margin-bottom:8px;">End of Run</div><div style="background:#fff;border:2px dashed #e74c3c;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:0.68rem;color:#888;">Last Label</div><div style="font-family:monospace;font-weight:700;color:#e74c3c;">'+(rec.lastLabelCode||'—')+'</div></div></div>'+
-    '<div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;" id="supSignoffDiv"></div>'+
+  div.innerHTML='<div style="background:#fff;border-radius:18px;padding:14px;margin-bottom:12px;border:1.5px solid #222;"><div style="text-align:center;margin-bottom:6px;"><div style="font-size:0.65rem;color:#555;">QUALITY ASSURANCE MANUAL</div><div style="font-size:0.9rem;font-weight:900;">FORM093.0 – LABELS ISSUED LOG</div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"><div><div class="field-label">Date</div><div style="font-weight:700;">'+rec.date+'</div></div><div><div class="field-label">Line</div><div style="font-weight:700;">'+rec.line+'</div></div><div style="grid-column:1/-1;"><div class="field-label">Product</div><div style="font-weight:700;">'+rec.product+'</div></div></div></div>'+
+    '<div style="background:#f0f8ff;border-radius:18px;padding:14px;margin-bottom:10px;border-left:5px solid #0074d9;"><div style="font-size:0.75rem;font-weight:700;color:#0074d9;margin-bottom:8px;">Start of Run</div><div style="background:#fff;border:2px dashed #0074d9;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:0.68rem;color:#888;">First Label</div><div style="font-family:monospace;font-weight:700;color:#0074d9;">'+(rec.firstLabelCode||'—')+'</div></div></div>'+
+    '<div style="background:#fff8f8;border-radius:18px;padding:14px;margin-bottom:10px;border-left:5px solid #e74c3c;"><div style="font-size:0.75rem;font-weight:700;color:#e74c3c;margin-bottom:8px;">End of Run</div><div style="background:#fff;border:2px dashed #e74c3c;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:0.68rem;color:#888;">Last Label</div><div style="font-family:monospace;font-weight:700;color:#e74c3c;">'+(rec.lastLabelCode||'—')+'</div></div></div>'+
+    '<div style="background:#fff;border-radius:18px;padding:14px;margin-bottom:10px;" id="supSignoffDiv"></div>'+
     '<div class="legal-footer" style="margin-bottom:20px;"><span>QA-971-F-093.0-10</span><span>Page 2 of 2</span><span>Version No: 007</span><span>Issue Date: 01/08/25</span><span>Authorised By: National QA Manager</span></div>';
   body.appendChild(div);
   var sd=document.getElementById('supSignoffDiv');
@@ -7847,12 +7966,12 @@ function renderEfficiency(){
     var sum=document.createElement('div');sum.className='sum-grid';
     sum.innerHTML='<div class="sum-tile"><div class="sum-val" style="color:'+scoreColor(avgScore)+';">'+avgScore+'</div><div class="sum-lbl">Avg Efficiency</div></div><div class="sum-tile"><div class="sum-val" style="color:#0074d9;">'+tu.toLocaleString()+'</div><div class="sum-lbl">Units Produced</div></div><div class="sum-tile"><div class="sum-val" style="color:#2ecc40;">'+allStats.filter(function(x){return x.stats.completed>0;}).length+'</div><div class="sum-lbl">Active Lines</div></div>';
     body.appendChild(sum);
-    var chartCard=document.createElement('div');chartCard.style.cssText='background:#fff;border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);';chartCard.innerHTML='<div style="font-size:0.78rem;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">Line Efficiency Comparison</div>';
+    var chartCard=document.createElement('div');chartCard.style.cssText='background:#fff;border-radius:18px;padding:14px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);';chartCard.innerHTML='<div style="font-size:0.78rem;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">Line Efficiency Comparison</div>';
     allStats.forEach(function(x){var score=effScore(x.stats);var col=scoreColor(score);var row=document.createElement('div');row.style.cssText='margin-bottom:11px;cursor:pointer;';row.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;"><div style="font-weight:700;font-size:0.85rem;">'+x.line+'</div><span style="font-size:0.8rem;font-weight:700;color:'+col+';">'+score+' — '+scoreLabel(score)+'</span></div><div style="height:9px;border-radius:5px;background:#eee;overflow:hidden;"><div style="height:100%;width:'+score+'%;background:'+col+';border-radius:5px;"></div></div>';row.onclick=(function(line){return function(){effSelectedLine=line;renderEfficiency();};})(x.line);chartCard.appendChild(row);});body.appendChild(chartCard);
   }
   lines.forEach(function(line){
     var stats=calcLineStats(line);var score=effScore(stats);var col=scoreColor(score);
-    var card=document.createElement('div');card.style.cssText='background:#fff;border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);';
+    var card=document.createElement('div');card.style.cssText='background:#fff;border-radius:18px;padding:14px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);';
     card.innerHTML='<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid #f5f5f5;">'+
       '<div style="width:58px;height:58px;border-radius:50%;background:conic-gradient('+col+' '+score*3.6+'deg,#eee 0deg);display:flex;align-items:center;justify-content:center;"><div style="width:44px;height:44px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;"><div style="font-size:0.95rem;font-weight:900;color:'+col+';">'+score+'</div></div></div>'+
       '<div><div style="font-size:1rem;font-weight:800;">'+line+'</div><div style="font-size:0.8rem;color:'+col+';font-weight:700;">'+scoreLabel(score)+' Efficiency</div><div style="font-size:0.72rem;color:#888;margin-top:1px;">'+stats.completed+'/'+stats.total+' runs · '+stats.totalUnits.toLocaleString()+' units</div></div></div>'+
