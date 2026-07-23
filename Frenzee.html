@@ -607,7 +607,9 @@ if(sessionStorage.getItem(PW_KEY)==='1'){
     </div>
     <div class="ov-field"><label>Scoop Size</label><input type="text" id="me-scoop" placeholder="e.g. Sky Blue #14"/></div>
     <div class="ov-field"><label>Tub Yield (how many tubs per batch)</label><input type="text" id="me-yield" placeholder="e.g. 12 tubs per batch"/></div>
-    <div class="ov-field"><label>Method / Instructions</label><textarea id="me-method" rows="3" placeholder="Step by step instructions for making this mix…"></textarea></div>
+    <div style="font-size:0.75rem;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Method / Instructions</div>
+    <div id="me-method-rows"></div>
+    <button id="me-addStepBtn" style="background:#f5eeff;color:#9b59b6;border:1.5px solid #9b59b6;border-radius:8px;padding:7px 14px;font-size:0.78rem;font-weight:700;cursor:pointer;width:100%;margin-bottom:12px;">+ Add Step</button>
     <div style="font-size:0.75rem;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Raw Ingredients</div>
     <div id="me-ingredients"></div>
     <button id="me-addIngBtn" style="background:#f0f4ff;color:#0074d9;border:1.5px solid #0074d9;border-radius:8px;padding:7px 14px;font-size:0.78rem;font-weight:700;cursor:pointer;width:100%;margin-bottom:12px;">+ Add Ingredient</button>
@@ -2609,6 +2611,25 @@ function submitSubstitution(){
 // ── Mix Instructions Library ──────────────────────────────────────────
 var _mixEditCode=null; // null=adding new, string=editing existing
 var _mixEditIngredients=[]; // [{name,weight,unit,allergens,supplier}]
+var _mixEditMethod=[]; // [{text,photo}] — photo is a compressed data URI or empty
+function normalizeMethodStep(s){return typeof s==='string'?{text:s,photo:''}:{text:s.text||'',photo:s.photo||''};}
+function compressImageFile(file,maxDim,quality,cb){
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var img=new Image();
+    img.onload=function(){
+      var scale=Math.min(1,maxDim/Math.max(img.width,img.height));
+      var canvas=document.createElement('canvas');
+      canvas.width=Math.round(img.width*scale);
+      canvas.height=Math.round(img.height*scale);
+      var ctx=canvas.getContext('2d');
+      ctx.drawImage(img,0,0,canvas.width,canvas.height);
+      cb(canvas.toDataURL('image/jpeg',quality));
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
 
 function openMixLib(){
   showPanel('mixLibPanel');
@@ -2822,10 +2843,13 @@ function viewMix(code){
     content.appendChild(methHdr);
     var methDiv=document.createElement('div');
     methDiv.style.cssText='background:#f0f4ff;border-radius:10px;padding:10px 12px;margin-bottom:10px;';
-    mix.method.forEach(function(step,i){
+    mix.method.map(normalizeMethodStep).forEach(function(step,i){
       var s=document.createElement('div');
-      s.style.cssText='display:flex;gap:8px;padding:4px 0;border-bottom:1px solid #e8f0ff;font-size:0.78rem;color:#333;';
-      s.innerHTML='<span style="font-weight:800;color:#0074d9;min-width:18px;">'+(i+1)+'.</span><span>'+step+'</span>';
+      s.style.cssText='padding:8px 0;border-bottom:1px solid #e8f0ff;';
+      s.innerHTML='<div style="display:flex;gap:8px;font-size:0.78rem;color:#333;">'+
+          '<span style="font-weight:800;color:#0074d9;min-width:18px;">'+(i+1)+'.</span><span>'+step.text+'</span>'+
+        '</div>'+
+        (step.photo?'<img src="'+step.photo+'" style="max-width:100%;border-radius:8px;margin-top:8px;display:block;border:1.5px solid #d5e5ff;"/>':'');
       methDiv.appendChild(s);
     });
     content.appendChild(methDiv);
@@ -2849,7 +2873,7 @@ function openMixEdit(code){
     document.getElementById('me-shelflife').value='';
     document.getElementById('me-scoop').value='';
     document.getElementById('me-yield').value='';
-    document.getElementById('me-method').value='';
+    _mixEditMethod=[{text:'',photo:''}];
     _mixEditIngredients=[{name:'',weight:'',unit:'g',allergens:'',supplier:''}];
   } else {
     var mix=mixLibrary.find(function(m){return m.mixCode===code;});
@@ -2859,11 +2883,52 @@ function openMixEdit(code){
     document.getElementById('me-shelflife').value=mix.shelfLifeDays||'';
     document.getElementById('me-scoop').value=mix.scoopSize||'';
     document.getElementById('me-yield').value=mix.tubYield||'';
-    document.getElementById('me-method').value=(mix.method||[]).join('\n');
+    _mixEditMethod=(mix.method||[]).map(normalizeMethodStep);
+    if(!_mixEditMethod.length) _mixEditMethod=[{text:'',photo:''}];
     _mixEditIngredients=mix.ingredients.map(function(i){return Object.assign({},i);});
   }
+  renderMixMethodRows();
   renderMixIngredientRows();
   showOverlay('mixEditOverlay');
+}
+
+function renderMixMethodRows(){
+  var container=document.getElementById('me-method-rows');
+  container.innerHTML='';
+  _mixEditMethod.forEach(function(step,i){
+    var row=document.createElement('div');
+    row.style.cssText='background:#f9f9f9;border-radius:10px;padding:10px;margin-bottom:8px;border-left:4px solid #9b59b6;';
+    row.innerHTML=
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'+
+        '<div style="font-size:0.72rem;font-weight:700;color:#9b59b6;">Step '+(i+1)+'</div>'+
+        '<button data-delstepidx="'+i+'" style="background:none;border:none;color:#e74c3c;font-size:0.8rem;cursor:pointer;">✕ Remove</button>'+
+      '</div>'+
+      '<textarea rows="2" placeholder="Describe this step…" data-stepidx="'+i+'" class="field-input" style="margin-bottom:8px;resize:vertical;">'+(step.text||'')+'</textarea>'+
+      (step.photo?
+        '<div style="position:relative;display:inline-block;margin-bottom:6px;">'+
+          '<img src="'+step.photo+'" style="max-width:140px;max-height:140px;border-radius:8px;display:block;border:1.5px solid #e8d5ff;"/>'+
+          '<button data-delphotoidx="'+i+'" style="position:absolute;top:-8px;right:-8px;background:#e74c3c;color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:0.75rem;cursor:pointer;">✕</button>'+
+        '</div><br/>'
+        :'')+
+      '<input type="file" accept="image/*" data-photoinput="'+i+'" style="display:none;"/>'+
+      '<button data-photobtn="'+i+'" style="background:#f5eeff;color:#9b59b6;border:1.5px solid #9b59b6;border-radius:8px;padding:6px 12px;font-size:0.75rem;font-weight:700;cursor:pointer;">'+(step.photo?'🔄 Replace Photo':'📷 Add Photo')+'</button>';
+    container.appendChild(row);
+
+    row.querySelector('[data-stepidx]').onchange=function(e){_mixEditMethod[i].text=e.target.value;};
+    row.querySelector('[data-delstepidx]').onclick=function(){_mixEditMethod.splice(i,1);renderMixMethodRows();};
+    var photoBtn=row.querySelector('[data-photobtn]');
+    var photoInput=row.querySelector('[data-photoinput]');
+    photoBtn.onclick=function(){photoInput.click();};
+    photoInput.onchange=function(){
+      var file=photoInput.files[0];if(!file)return;
+      compressImageFile(file,900,0.7,function(dataUri){
+        _mixEditMethod[i].photo=dataUri;
+        renderMixMethodRows();
+      });
+    };
+    var delPhotoBtn=row.querySelector('[data-delphotoidx]');
+    if(delPhotoBtn) delPhotoBtn.onclick=function(){_mixEditMethod[i].photo='';renderMixMethodRows();};
+  });
 }
 
 function renderMixIngredientRows(){
@@ -2904,7 +2969,6 @@ function submitMixSave(){
   var shelfLife=document.getElementById('me-shelflife').value;
   var scoop=document.getElementById('me-scoop').value.trim();
   var tubYield=document.getElementById('me-yield').value.trim();
-  var methodRaw=document.getElementById('me-method').value.trim();
   var pin=document.getElementById('me-pin').value;
   document.getElementById('me-err').style.display='none';
 
@@ -2916,7 +2980,7 @@ function submitMixSave(){
   if(!code||!name||!shelfLife){showToast('Please fill in mix code, name and shelf life.');return;}
   if(!_mixEditIngredients.length||!_mixEditIngredients[0].name){showToast('Please add at least one ingredient.');return;}
 
-  var method=methodRaw?methodRaw.split('\n').filter(Boolean):[];
+  var method=_mixEditMethod.filter(function(s){return s.text&&s.text.trim();}).map(function(s){return {text:s.text.trim(),photo:s.photo||''};});
   var mix={
     mixCode:code, mixName:name, shelfLifeDays:parseInt(shelfLife),
     scoopSize:scoop, tubYield:tubYield, method:method,
@@ -8053,8 +8117,15 @@ function lsSave(){
       msgIdCtr: msgIdCtr
     };
     localStorage.setItem(LS_KEY, JSON.stringify(snapshot));
-  } catch(e){ console.warn('Frenzee: localStorage save failed',e); }
+  } catch(e){
+    console.warn('Frenzee: localStorage save failed',e);
+    if(!_lsSaveFailedWarned){
+      _lsSaveFailedWarned=true;
+      _origShowToast('⚠️ Storage is full — recent changes may not be saved. Try removing some step photos.');
+    }
+  }
 }
+var _lsSaveFailedWarned=false;
 
 function lsLoad(){
   try{
@@ -8826,6 +8897,7 @@ document.getElementById('me-saveBtn').onclick=submitMixSave;
 document.getElementById('me-deleteBtn').onclick=submitMixDelete;
 document.getElementById('me-cancelBtn').onclick=function(){hideOverlay('mixEditOverlay');};
 document.getElementById('me-addIngBtn').onclick=function(){_mixEditIngredients.push({name:'',weight:'',unit:'g',allergens:'',supplier:''});renderMixIngredientRows();};
+document.getElementById('me-addStepBtn').onclick=function(){_mixEditMethod.push({text:'',photo:''});renderMixMethodRows();};
 document.getElementById('mixViewCloseBtn').onclick=function(){hideOverlay('mixViewOverlay');};
 document.getElementById('toolboxRegCloseBtn').onclick=function(){hidePanel('toolboxRegPanel');};
 document.getElementById('startupSafetyCloseBtn').onclick=function(){hidePanel('startupSafetyPanel');};
