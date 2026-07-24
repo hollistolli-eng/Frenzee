@@ -607,12 +607,22 @@ if(sessionStorage.getItem(PW_KEY)==='1'){
     </div>
     <div class="ov-field"><label>Scoop Size</label><input type="text" id="me-scoop" placeholder="e.g. Sky Blue #14"/></div>
     <div class="ov-field"><label>Tub Yield (how many tubs per batch)</label><input type="text" id="me-yield" placeholder="e.g. 12 tubs per batch"/></div>
+    <div class="ov-field"><label>Use By (overrides shelf life text, optional)</label><input type="text" id="me-useby" placeholder="e.g. P+2 or SSL"/></div>
+    <div class="ov-field"><label>Customer</label><input type="text" id="me-customer" placeholder="e.g. OTRG, Woolworths"/></div>
+    <div class="ov-field"><label>Mix Category</label><input type="text" id="me-category" placeholder="e.g. Chicken with Mayo"/></div>
     <div style="font-size:0.75rem;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Method / Instructions</div>
     <div id="me-method-rows"></div>
     <button id="me-addStepBtn" style="background:#f5eeff;color:#9b59b6;border:1.5px solid #9b59b6;border-radius:8px;padding:7px 14px;font-size:0.78rem;font-weight:700;cursor:pointer;width:100%;margin-bottom:12px;">+ Add Step</button>
     <div style="font-size:0.75rem;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Raw Ingredients</div>
     <div id="me-ingredients"></div>
     <button id="me-addIngBtn" style="background:#f0f4ff;color:#0074d9;border:1.5px solid #0074d9;border-radius:8px;padding:7px 14px;font-size:0.78rem;font-weight:700;cursor:pointer;width:100%;margin-bottom:12px;">+ Add Ingredient</button>
+    <div style="font-size:0.75rem;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Substitute Ingredients (optional)</div>
+    <div class="ov-field"><label>Substitute Note Heading</label><input type="text" id="me-sublabel" placeholder="e.g. Upon Site QA Approval Only – Substitute Mayonnaise"/></div>
+    <div id="me-substitutes"></div>
+    <button id="me-addSubBtn" style="background:#fff8e1;color:#b8860b;border:1.5px solid #f39c12;border-radius:8px;padding:7px 14px;font-size:0.78rem;font-weight:700;cursor:pointer;width:100%;margin-bottom:12px;">+ Add Substitute</button>
+    <div style="font-size:0.75rem;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Company Network (optional)</div>
+    <div class="ov-field"><label>Company Name</label><input type="text" id="me-coname" placeholder="e.g. On the Run Pty Ltd"/></div>
+    <div class="ov-field"><label>Company Address</label><input type="text" id="me-coaddr" placeholder="e.g. Level 16, 720 Bourke St, Docklands VIC 3008"/></div>
     <div class="ov-field"><label>Manager or QA PIN</label><input type="password" id="me-pin"/><div class="ov-err" id="me-err">❌ Incorrect PIN — Manager or QA access only.</div></div>
     <button class="ov-btn blue" id="me-saveBtn">✅ Save Mix</button>
     <button class="ov-btn red" id="me-deleteBtn" style="display:none;">🗑️ Delete Mix</button>
@@ -2611,8 +2621,15 @@ function submitSubstitution(){
 // ── Mix Instructions Library ──────────────────────────────────────────
 var _mixEditCode=null; // null=adding new, string=editing existing
 var _mixEditIngredients=[]; // [{name,weight,unit,allergens,supplier}]
-var _mixEditMethod=[]; // [{text,photo}] — photo is a compressed data URI or empty
-function normalizeMethodStep(s){return typeof s==='string'?{text:s,photo:''}:{text:s.text||'',photo:s.photo||''};}
+var _mixEditMethod=[]; // [{text,detail,photo,highlight}] — photo is a compressed data URI or empty
+var _mixEditSubstitutes=[]; // [{name,code,supplier}]
+function normalizeMethodStep(s){return typeof s==='string'?{text:s,detail:'',photo:'',highlight:false}:{text:s.text||'',detail:s.detail||'',photo:s.photo||'',highlight:!!s.highlight};}
+var REF_BATCH_SIZES_G=[1000,2500,5000,10000];
+function computeRefWeight(pctInMix,batchG){
+  var pct=parseFloat((pctInMix||'0').toString().replace('%',''));
+  if(isNaN(pct)) return '—';
+  return Math.round(pct/100*batchG);
+}
 function compressImageFile(file,maxDim,quality,cb){
   var reader=new FileReader();
   reader.onload=function(e){
@@ -2784,11 +2801,13 @@ function viewMix(code){
   document.getElementById('mixViewSub').textContent='Code: '+mix.mixCode+(mix.scoopSize?' · Scoop: '+mix.scoopSize:'')+(mix.tubYield?' · Yield: '+mix.tubYield:'');
   var content=document.getElementById('mixViewContent');
   content.innerHTML='';
+  var TD='padding:5px 7px;border:1px solid #333;font-size:0.72rem;vertical-align:middle;';
+  var TH=TD+'background:#eee;font-weight:700;text-transform:uppercase;font-size:0.62rem;';
 
   // Shelf life banner
   var shelfColor=mix.shelfLifeDays<=1?'#e74c3c':mix.shelfLifeDays<=2?'#e67e22':'#27ae60';
   var sl=document.createElement('div');
-  sl.style.cssText='background:'+shelfColor+'22;border:1.5px solid '+shelfColor+';border-radius:8px;padding:8px 11px;margin-bottom:10px;font-size:0.82rem;color:'+shelfColor+';font-weight:700;';
+  sl.style.cssText='background:'+shelfColor+'22;border:1.5px solid '+shelfColor+';border-radius:8px;padding:8px 11px;margin-bottom:8px;font-size:0.82rem;color:'+shelfColor+';font-weight:700;';
   sl.innerHTML='⏱️ Shelf Life: +'+mix.shelfLifeDays+' day'+(mix.shelfLifeDays>1?'s':'')+' from date made — shortest ingredient expiry takes priority';
   content.appendChild(sl);
 
@@ -2796,64 +2815,131 @@ function viewMix(code){
   var allergenList=[...new Set(mix.ingredients.flatMap(function(i){return (i.allergens||'').split(',').map(function(a){return a.trim();}).filter(Boolean);}))];
   if(allergenList.length){
     var ab=document.createElement('div');
-    ab.style.cssText='background:#fff0f0;border:1.5px solid #e74c3c;border-radius:8px;padding:8px 11px;margin-bottom:10px;font-size:0.78rem;color:#c0392b;font-weight:600;';
+    ab.style.cssText='background:#fff0f0;border:1.5px solid #e74c3c;border-radius:8px;padding:8px 11px;margin-bottom:12px;font-size:0.78rem;color:#c0392b;font-weight:600;';
     ab.innerHTML='⚠️ Allergens: '+allergenList.join(', ');
     content.appendChild(ab);
   }
 
-  // Ingredients
+  // ── Document header — replicates the printed work-instruction sheet ──
+  var doc=document.createElement('div');
+  doc.style.cssText='background:#fff;border:1.5px solid #222;border-radius:8px;padding:10px 12px;margin-bottom:14px;';
+  var useByText=mix.useByLabel||('+'+mix.shelfLifeDays+' Day'+(mix.shelfLifeDays>1?'s':''));
+  doc.innerHTML=
+    (mix.versionDate||mix.version?'<div style="text-align:center;color:#c0392b;font-weight:800;font-size:0.68rem;margin-bottom:2px;">'+(mix.versionDate||'')+(mix.version?'   VERSION: '+mix.version:'')+'</div>':'')+
+    '<div style="text-align:center;font-weight:900;font-size:0.85rem;margin-bottom:8px;">IN-HOUSE MIX WORK INSTRUCTION</div>'+
+    '<table style="width:100%;border-collapse:collapse;margin-bottom:2px;">'+
+      '<tr><td style="'+TH+'width:26%;">Mix Name</td><td style="'+TD+'" colspan="2">'+mix.mixName+'</td><td style="'+TH+'width:20%;">Use By</td><td style="'+TD+'">'+useByText+'</td></tr>'+
+      '<tr><td style="'+TH+'">Product Code</td><td style="'+TD+'">'+mix.mixCode+'</td>'+
+        (mix.customer?'<td style="'+TH+'">Customer</td><td style="'+TD+'">'+mix.customer+'</td>':'<td style="'+TD+'" colspan="2"></td>')+
+      '</tr>'+
+      (mix.mixCategory?'<tr><td style="'+TH+'">Mix Category</td><td style="'+TD+'" colspan="4">'+mix.mixCategory+'</td></tr>':'')+
+    '</table>';
+  content.appendChild(doc);
+
+  // ── Method of Production — photo strip, one card per step ──────────
+  if(mix.method&&mix.method.length){
+    var methHdr=document.createElement('div');
+    methHdr.style.cssText='font-size:0.72rem;font-weight:800;color:#222;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;';
+    methHdr.textContent='Method of Production';
+    content.appendChild(methHdr);
+    var scrollWrap=document.createElement('div');
+    scrollWrap.style.cssText='overflow-x:auto;margin-bottom:14px;-webkit-overflow-scrolling:touch;';
+    var methRow=document.createElement('div');
+    methRow.style.cssText='display:flex;gap:8px;padding-bottom:4px;';
+    mix.method.map(normalizeMethodStep).forEach(function(step,i){
+      var card=document.createElement('div');
+      card.style.cssText='flex:0 0 140px;width:140px;border:1.5px solid #333;border-radius:6px;overflow:hidden;background:'+(step.highlight?'#fde3cf':'#fff')+';';
+      card.innerHTML=
+        '<div style="padding:6px 7px;">'+
+          '<div style="font-size:0.7rem;font-weight:800;color:#222;line-height:1.25;">'+(i+1)+'. '+step.text+'</div>'+
+          (step.detail?'<div style="font-size:0.72rem;font-weight:800;color:#c0392b;margin-top:3px;">'+step.detail+'</div>':'')+
+        '</div>'+
+        (step.photo?'<img src="'+step.photo+'" style="width:100%;height:110px;object-fit:cover;display:block;border-top:1.5px solid #333;"/>':'<div style="width:100%;height:110px;background:#f5f5f5;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:1.5rem;border-top:1.5px solid #333;">📷</div>');
+      methRow.appendChild(card);
+    });
+    scrollWrap.appendChild(methRow);
+    content.appendChild(scrollWrap);
+  }
+
+  // ── In-house mix assembly — ingredient table with reference weights ─
   var ingHdr=document.createElement('div');
-  ingHdr.style.cssText='font-size:0.72rem;font-weight:700;color:#9b59b6;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;';
-  ingHdr.textContent='Raw Ingredients';
+  ingHdr.style.cssText='font-size:0.72rem;font-weight:800;color:#222;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;';
+  ingHdr.textContent='In-House Mix Assembly: '+mix.mixName;
   content.appendChild(ingHdr);
 
-  var table=document.createElement('div');
-  table.style.cssText='background:#f9f9f9;border-radius:10px;overflow:hidden;margin-bottom:12px;';
-  var thead=document.createElement('div');
-  thead.style.cssText='display:grid;grid-template-columns:1fr 50px 70px 60px 1fr;background:#f5eeff;padding:6px 10px;border-bottom:1.5px solid #e8d5ff;';
-  thead.innerHTML='<div style="font-size:0.6rem;font-weight:700;color:#9b59b6;text-transform:uppercase;">Ingredient</div>'+
-    '<div style="font-size:0.6rem;font-weight:700;color:#9b59b6;text-transform:uppercase;text-align:center;">Code</div>'+
-    '<div style="font-size:0.6rem;font-weight:700;color:#9b59b6;text-transform:uppercase;text-align:center;">Weight</div>'+
-    '<div style="font-size:0.6rem;font-weight:700;color:#9b59b6;text-transform:uppercase;text-align:center;">% Mix</div>'+
-    '<div style="font-size:0.6rem;font-weight:700;color:#9b59b6;text-transform:uppercase;">Supplier</div>';
-  table.appendChild(thead);
-
+  var ingScroll=document.createElement('div');
+  ingScroll.style.cssText='overflow-x:auto;margin-bottom:10px;-webkit-overflow-scrolling:touch;';
+  var ingTable=document.createElement('table');
+  ingTable.style.cssText='border-collapse:collapse;width:100%;min-width:560px;';
+  var totalPct=0,totals=[0,0,0,0];
+  var rowsHtml='<tr>'+
+      '<th style="'+TH+'text-align:left;">Ingredient Description</th>'+
+      '<th style="'+TH+'">Code</th>'+
+      '<th style="'+TH+'">% in Mix</th>'+
+      REF_BATCH_SIZES_G.map(function(g){return '<th style="'+TH+'">Wt '+(g/1000)+'kg</th>';}).join('')+
+      '<th style="'+TH+'text-align:left;">Supplier</th>'+
+    '</tr>';
   mix.ingredients.forEach(function(ing){
-    var row=document.createElement('div');
-    row.style.cssText='display:grid;grid-template-columns:1fr 50px 70px 60px 1fr;padding:7px 10px;border-bottom:1px solid #eee;align-items:center;';
-    row.innerHTML=
-      '<div><div style="font-size:0.82rem;font-weight:600;color:#222;">'+ing.name+'</div>'+
-        (ing.allergens?'<div style="font-size:0.62rem;color:#e74c3c;font-weight:600;">⚠️ '+ing.allergens+'</div>':'')+
-      '</div>'+
-      '<div style="text-align:center;font-size:0.72rem;color:#888;font-family:monospace;">'+(ing.code||'—')+'</div>'+
-      '<div style="text-align:center;font-size:0.82rem;font-weight:700;color:#9b59b6;">'+ing.weight+' '+ing.unit+'</div>'+
-      '<div style="text-align:center;font-size:0.78rem;color:#555;">'+(ing.pctInMix||'—')+'</div>'+
-      '<div style="font-size:0.72rem;color:#888;">'+ing.supplier+'</div>';
-    table.appendChild(row);
+    var pct=parseFloat((ing.pctInMix||'0').toString().replace('%',''))||0;
+    totalPct+=pct;
+    rowsHtml+='<tr>'+
+      '<td style="'+TD+'text-align:left;">'+ing.name+(ing.allergens?'<div style="color:#e74c3c;font-weight:700;font-size:0.62rem;">⚠️ '+ing.allergens+'</div>':'')+'</td>'+
+      '<td style="'+TD+'text-align:center;">'+(ing.code||'—')+'</td>'+
+      '<td style="'+TD+'text-align:center;">'+(ing.pctInMix||'—')+'</td>'+
+      REF_BATCH_SIZES_G.map(function(g,gi){var w=computeRefWeight(ing.pctInMix,g);if(typeof w==='number')totals[gi]+=w;return '<td style="'+TD+'text-align:center;">'+w+'</td>';}).join('')+
+      '<td style="'+TD+'text-align:left;">'+ing.supplier+'</td>'+
+    '</tr>';
   });
-  content.appendChild(table);
+  rowsHtml+='<tr style="font-weight:800;background:#f5f5f5;">'+
+      '<td style="'+TD+'text-align:left;">TOTAL</td><td style="'+TD+'"></td>'+
+      '<td style="'+TD+'text-align:center;">'+Math.round(totalPct)+'</td>'+
+      totals.map(function(t){return '<td style="'+TD+'text-align:center;">'+t+'</td>';}).join('')+
+      '<td style="'+TD+'"></td>'+
+    '</tr>';
+  ingTable.innerHTML=rowsHtml;
+  ingScroll.appendChild(ingTable);
+  content.appendChild(ingScroll);
+
+  // ── Substitutes ──────────────────────────────────────────────────────
+  if(mix.substitutes&&mix.substitutes.length){
+    var subHdr=document.createElement('div');
+    subHdr.style.cssText='font-size:0.7rem;font-weight:800;color:#c0392b;margin-bottom:6px;';
+    subHdr.textContent='*'+(mix.substituteLabel||'Upon Site QA Approval Only – Substitute Ingredient');
+    content.appendChild(subHdr);
+    var subScroll=document.createElement('div');
+    subScroll.style.cssText='overflow-x:auto;margin-bottom:10px;';
+    var subTable=document.createElement('table');
+    subTable.style.cssText='border-collapse:collapse;width:100%;min-width:400px;';
+    var subHtml='<tr><th style="'+TH+'text-align:left;">Ingredient Description</th><th style="'+TH+'">Code</th><th style="'+TH+'text-align:left;">Supplier</th></tr>';
+    mix.substitutes.forEach(function(s){
+      subHtml+='<tr><td style="'+TD+'text-align:left;">'+s.name+'</td><td style="'+TD+'text-align:center;">'+(s.code||'—')+'</td><td style="'+TD+'text-align:left;">'+s.supplier+'</td></tr>';
+    });
+    subTable.innerHTML=subHtml;
+    subScroll.appendChild(subTable);
+    content.appendChild(subScroll);
+  }
 
   if(mix.notes){var notesDiv=document.createElement("div");notesDiv.style.cssText="background:#fff8e1;border:1.5px solid #f39c12;border-radius:8px;padding:8px 11px;margin-bottom:10px;font-size:0.75rem;color:#856404;";notesDiv.innerHTML="📋 "+mix.notes;content.appendChild(notesDiv);}
 
-  // Method
-  if(mix.method&&mix.method.length){
-    var methHdr=document.createElement('div');
-    methHdr.style.cssText='font-size:0.72rem;font-weight:700;color:#0074d9;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;';
-    methHdr.textContent='Method';
-    content.appendChild(methHdr);
-    var methDiv=document.createElement('div');
-    methDiv.style.cssText='background:#f0f4ff;border-radius:10px;padding:10px 12px;margin-bottom:10px;';
-    mix.method.map(normalizeMethodStep).forEach(function(step,i){
-      var s=document.createElement('div');
-      s.style.cssText='padding:8px 0;border-bottom:1px solid #e8f0ff;';
-      s.innerHTML='<div style="display:flex;gap:8px;font-size:0.78rem;color:#333;">'+
-          '<span style="font-weight:800;color:#0074d9;min-width:18px;">'+(i+1)+'.</span><span>'+step.text+'</span>'+
-        '</div>'+
-        (step.photo?'<img src="'+step.photo+'" style="max-width:100%;border-radius:8px;margin-top:8px;display:block;border:1.5px solid #d5e5ff;"/>':'');
-      methDiv.appendChild(s);
-    });
-    content.appendChild(methDiv);
+  // ── Company network ──────────────────────────────────────────────────
+  if(mix.companyName||mix.companyAddress){
+    var coHdr=document.createElement('div');
+    coHdr.style.cssText='font-size:0.7rem;font-weight:800;color:#222;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;';
+    coHdr.textContent='Company Network';
+    content.appendChild(coHdr);
+    var coTable=document.createElement('table');
+    coTable.style.cssText='border-collapse:collapse;width:100%;margin-bottom:10px;';
+    coTable.innerHTML=
+      (mix.companyName?'<tr><td style="'+TH+'width:34%;text-align:left;">Company Name</td><td style="'+TD+'text-align:left;">'+mix.companyName+'</td></tr>':'')+
+      (mix.companyAddress?'<tr><td style="'+TH+'text-align:left;">Company Address</td><td style="'+TD+'text-align:left;">'+mix.companyAddress+'</td></tr>':'');
+    content.appendChild(coTable);
   }
+
+  // ── Footer ───────────────────────────────────────────────────────────
+  var footer=document.createElement('div');
+  footer.style.cssText='text-align:center;color:#999;font-size:0.66rem;margin-top:6px;';
+  footer.innerHTML='FTG PRODUCT CODE: '+mix.mixCode+'<br/>Page 1 of 1';
+  content.appendChild(footer);
 
   showOverlay('mixViewOverlay');
 }
@@ -2873,8 +2959,16 @@ function openMixEdit(code){
     document.getElementById('me-shelflife').value='';
     document.getElementById('me-scoop').value='';
     document.getElementById('me-yield').value='';
-    _mixEditMethod=[{text:'',photo:''}];
+    document.getElementById('me-useby').value='';
+    document.getElementById('me-customer').value='';
+    document.getElementById('me-category').value='';
+    document.getElementById('me-sublabel').value='';
+    document.getElementById('me-coname').value='';
+    document.getElementById('me-coaddr').value='';
+    _mixEditMethod=[{text:'',detail:'',photo:'',highlight:false}];
     _mixEditIngredients=[{name:'',weight:'',unit:'g',allergens:'',supplier:''}];
+    _mixEditSubstitutes=[];
+    _mixEditExtra={version:'',versionDate:''};
   } else {
     var mix=mixLibrary.find(function(m){return m.mixCode===code;});
     if(!mix) return;
@@ -2883,14 +2977,24 @@ function openMixEdit(code){
     document.getElementById('me-shelflife').value=mix.shelfLifeDays||'';
     document.getElementById('me-scoop').value=mix.scoopSize||'';
     document.getElementById('me-yield').value=mix.tubYield||'';
+    document.getElementById('me-useby').value=mix.useByLabel||'';
+    document.getElementById('me-customer').value=mix.customer||'';
+    document.getElementById('me-category').value=mix.mixCategory||'';
+    document.getElementById('me-sublabel').value=mix.substituteLabel||'';
+    document.getElementById('me-coname').value=mix.companyName||'';
+    document.getElementById('me-coaddr').value=mix.companyAddress||'';
     _mixEditMethod=(mix.method||[]).map(normalizeMethodStep);
-    if(!_mixEditMethod.length) _mixEditMethod=[{text:'',photo:''}];
+    if(!_mixEditMethod.length) _mixEditMethod=[{text:'',detail:'',photo:'',highlight:false}];
     _mixEditIngredients=mix.ingredients.map(function(i){return Object.assign({},i);});
+    _mixEditSubstitutes=(mix.substitutes||[]).map(function(s){return Object.assign({},s);});
+    _mixEditExtra={version:mix.version||'',versionDate:mix.versionDate||'',notes:mix.notes||''};
   }
   renderMixMethodRows();
   renderMixIngredientRows();
+  renderMixSubstituteRows();
   showOverlay('mixEditOverlay');
 }
+var _mixEditExtra={};
 
 function renderMixMethodRows(){
   var container=document.getElementById('me-method-rows');
@@ -2903,7 +3007,9 @@ function renderMixMethodRows(){
         '<div style="font-size:0.72rem;font-weight:700;color:#9b59b6;">Step '+(i+1)+'</div>'+
         '<button data-delstepidx="'+i+'" style="background:none;border:none;color:#e74c3c;font-size:0.8rem;cursor:pointer;">✕ Remove</button>'+
       '</div>'+
-      '<textarea rows="2" placeholder="Describe this step…" data-stepidx="'+i+'" class="field-input" style="margin-bottom:8px;resize:vertical;">'+(step.text||'')+'</textarea>'+
+      '<textarea rows="2" placeholder="Describe this step…" data-stepidx="'+i+'" class="field-input" style="margin-bottom:6px;resize:vertical;">'+(step.text||'')+'</textarea>'+
+      '<input type="text" value="'+(step.detail||'')+'" placeholder="Measurement callout (optional, e.g. 1KG = 260g)" data-stepdetailidx="'+i+'" class="field-input" style="margin-bottom:6px;"/>'+
+      '<label style="display:flex;align-items:center;gap:6px;font-size:0.75rem;color:#555;margin-bottom:8px;cursor:pointer;"><input type="checkbox" data-stephlidx="'+i+'" '+(step.highlight?'checked':'')+'/> Highlight this step (combining/action step)</label>'+
       (step.photo?
         '<div style="position:relative;display:inline-block;margin-bottom:6px;">'+
           '<img src="'+step.photo+'" style="max-width:140px;max-height:140px;border-radius:8px;display:block;border:1.5px solid #e8d5ff;"/>'+
@@ -2915,6 +3021,8 @@ function renderMixMethodRows(){
     container.appendChild(row);
 
     row.querySelector('[data-stepidx]').onchange=function(e){_mixEditMethod[i].text=e.target.value;};
+    row.querySelector('[data-stepdetailidx]').onchange=function(e){_mixEditMethod[i].detail=e.target.value;};
+    row.querySelector('[data-stephlidx]').onchange=function(e){_mixEditMethod[i].highlight=e.target.checked;};
     row.querySelector('[data-delstepidx]').onclick=function(){_mixEditMethod.splice(i,1);renderMixMethodRows();};
     var photoBtn=row.querySelector('[data-photobtn]');
     var photoInput=row.querySelector('[data-photoinput]');
@@ -2963,12 +3071,46 @@ function renderMixIngredientRows(){
   });
 }
 
+function renderMixSubstituteRows(){
+  var container=document.getElementById('me-substitutes');
+  container.innerHTML='';
+  _mixEditSubstitutes.forEach(function(sub,i){
+    var row=document.createElement('div');
+    row.style.cssText='background:#fff8e1;border-radius:10px;padding:10px;margin-bottom:8px;border-left:4px solid #f39c12;';
+    row.innerHTML=
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'+
+        '<div style="font-size:0.72rem;font-weight:700;color:#b8860b;">Substitute '+(i+1)+'</div>'+
+        '<button data-delsubidx="'+i+'" style="background:none;border:none;color:#e74c3c;font-size:0.8rem;cursor:pointer;">✕ Remove</button>'+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 100px;gap:6px;margin-bottom:6px;">'+
+        '<input type="text" value="'+(sub.name||'')+'" placeholder="Ingredient name" data-subfield="name" data-subidx="'+i+'" class="field-input"/>'+
+        '<input type="text" value="'+(sub.code||'')+'" placeholder="Code" data-subfield="code" data-subidx="'+i+'" class="field-input" style="text-align:center;"/>'+
+      '</div>'+
+      '<input type="text" value="'+(sub.supplier||'')+'" placeholder="Supplier" data-subfield="supplier" data-subidx="'+i+'" class="field-input"/>';
+    container.appendChild(row);
+
+    row.querySelectorAll('[data-subfield]').forEach(function(el){
+      el.onchange=function(){_mixEditSubstitutes[parseInt(el.dataset.subidx)][el.dataset.subfield]=el.value;};
+    });
+    row.querySelector('[data-delsubidx]').onclick=function(e){
+      _mixEditSubstitutes.splice(parseInt(e.target.dataset.delsubidx),1);
+      renderMixSubstituteRows();
+    };
+  });
+}
+
 function submitMixSave(){
   var code=document.getElementById('me-code').value.trim();
   var name=document.getElementById('me-name').value.trim();
   var shelfLife=document.getElementById('me-shelflife').value;
   var scoop=document.getElementById('me-scoop').value.trim();
   var tubYield=document.getElementById('me-yield').value.trim();
+  var useByLabel=document.getElementById('me-useby').value.trim();
+  var customer=document.getElementById('me-customer').value.trim();
+  var mixCategory=document.getElementById('me-category').value.trim();
+  var substituteLabel=document.getElementById('me-sublabel').value.trim();
+  var companyName=document.getElementById('me-coname').value.trim();
+  var companyAddress=document.getElementById('me-coaddr').value.trim();
   var pin=document.getElementById('me-pin').value;
   document.getElementById('me-err').style.display='none';
 
@@ -2980,10 +3122,15 @@ function submitMixSave(){
   if(!code||!name||!shelfLife){showToast('Please fill in mix code, name and shelf life.');return;}
   if(!_mixEditIngredients.length||!_mixEditIngredients[0].name){showToast('Please add at least one ingredient.');return;}
 
-  var method=_mixEditMethod.filter(function(s){return s.text&&s.text.trim();}).map(function(s){return {text:s.text.trim(),photo:s.photo||''};});
+  var method=_mixEditMethod.filter(function(s){return s.text&&s.text.trim();}).map(function(s){return {text:s.text.trim(),detail:(s.detail||'').trim(),photo:s.photo||'',highlight:!!s.highlight};});
+  var substitutes=_mixEditSubstitutes.filter(function(s){return s.name&&s.name.trim();}).map(function(s){return {name:s.name.trim(),code:(s.code||'').trim(),supplier:(s.supplier||'').trim()};});
   var mix={
     mixCode:code, mixName:name, shelfLifeDays:parseInt(shelfLife),
     scoopSize:scoop, tubYield:tubYield, method:method,
+    useByLabel:useByLabel, customer:customer, mixCategory:mixCategory,
+    substituteLabel:substituteLabel, substitutes:substitutes,
+    companyName:companyName, companyAddress:companyAddress,
+    version:_mixEditExtra.version||'', versionDate:_mixEditExtra.versionDate||'', notes:_mixEditExtra.notes||'',
     ingredients:_mixEditIngredients.filter(function(i){return i.name;})
   };
 
@@ -3891,16 +4038,19 @@ var recipeChangesLog=[];
 var mixLibrary=[
   {
     mixCode:'940468',mixName:'R/W Mix OTR Eat Mix Chicken Mayo',shelfLifeDays:2,scoopSize:'',tubYield:'6 tubs per batch',
-    version:'1',versionDate:'28.03.2025',customer:'OTRG',mixCategory:'Chicken with Mayo',
+    version:'1',versionDate:'28.03.2025',customer:'OTRG',mixCategory:'Chicken with Mayo',useByLabel:'P+2 or SSL',
     method:[
-      'FTG Whole Egg Mayonnaise — 1KG = 260g.',
-      'Cracked Black Pepper — 1KG = 2g.',
-      'Blend Pepper and Mayonnaise together to ensure evenly mixed before adding Chicken.',
-      '92% RSPCA Chicken Breast Sliced — 1KG = 738g.',
-      'Add together and mix gently to combine all ingredients thoroughly. Ensure the chicken is coated consistently.',
-      'Date mark container with correct description and "Use By" date and refrigerate until required.'
+      {text:'FTG Whole Egg Mayonnaise',detail:'1KG = 260g',photo:'',highlight:false},
+      {text:'Cracked Black Pepper',detail:'1KG = 2g',photo:'',highlight:false},
+      {text:'Blend Pepper and Mayonnaise together to ensure evenly mixed before adding Chicken',detail:'',photo:'',highlight:true},
+      {text:'92% RSPCA Chicken Breast Sliced',detail:'1KG = 738g',photo:'',highlight:false},
+      {text:'Add together and mix gently to combine all ingredients thoroughly. Ensure the chicken is coated consistently.',detail:'',photo:'',highlight:true},
+      {text:'Date mark container with correct description and "Use By" date and refrigerate until required.',detail:'',photo:'',highlight:false}
     ],
-    notes:'*Upon site QA approval only — substitute mayonnaise: 10KG FTG Whole Egg Mayonnaise (Code 976591, Birch & Waite)',
+    substituteLabel:'Upon Site QA Approval Only – Substitute Mayonnaise',
+    substitutes:[{name:'10 KG FTG Whole Egg Mayonnaise*',code:'976591',supplier:'Birch & Waite'}],
+    companyName:'On the Run Pty Ltd',
+    companyAddress:'Level 16, 720 Bourke Street, Docklands, Vic 3008 · Customer Enquiries: 1800 325 225',
     ingredients:[
       {name:'Free Range Whole Egg Mayonnaise',code:'600013',weight:'260',unit:'g per kg',pctInMix:'26%',allergens:'Eggs',supplier:'Food FX'},
       {name:'1.05K (3) Black Cracked Pepper',code:'206081',weight:'2',unit:'g per kg',pctInMix:'0.2%',allergens:'',supplier:'Masterfoods'},
@@ -8897,7 +9047,8 @@ document.getElementById('me-saveBtn').onclick=submitMixSave;
 document.getElementById('me-deleteBtn').onclick=submitMixDelete;
 document.getElementById('me-cancelBtn').onclick=function(){hideOverlay('mixEditOverlay');};
 document.getElementById('me-addIngBtn').onclick=function(){_mixEditIngredients.push({name:'',weight:'',unit:'g',allergens:'',supplier:''});renderMixIngredientRows();};
-document.getElementById('me-addStepBtn').onclick=function(){_mixEditMethod.push({text:'',photo:''});renderMixMethodRows();};
+document.getElementById('me-addStepBtn').onclick=function(){_mixEditMethod.push({text:'',detail:'',photo:'',highlight:false});renderMixMethodRows();};
+document.getElementById('me-addSubBtn').onclick=function(){_mixEditSubstitutes.push({name:'',code:'',supplier:''});renderMixSubstituteRows();};
 document.getElementById('mixViewCloseBtn').onclick=function(){hideOverlay('mixViewOverlay');};
 document.getElementById('toolboxRegCloseBtn').onclick=function(){hidePanel('toolboxRegPanel');};
 document.getElementById('startupSafetyCloseBtn').onclick=function(){hidePanel('startupSafetyPanel');};
