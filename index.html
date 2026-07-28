@@ -2722,7 +2722,7 @@ function renderMixLib(){
       if(!confirm('Clear all '+mixLibrary.length+' mix instructions? This cannot be undone.')) return;
       var who=currentUser?currentUser.name:'Manager';
       mixChangesLog.push({type:'clearAll',count:mixLibrary.length,by:who,time:nowTime()});
-      mixLibrary=[];lsScheduleSave();showToast('🗑️ All mix instructions cleared');renderMixLib();
+      mixLibrary=[];fbClearCollection('mixes');lsScheduleSave();showToast('🗑️ All mix instructions cleared');renderMixLib();
     };
   },50);
 
@@ -3789,7 +3789,7 @@ function renderRecipeLib(){
       var isMgr=Object.keys(STAFF_PINS).some(function(id){return STAFF_PINS[id]===pin&&STAFF_ROLES[id]==='manager'||STAFF_ROLES[id]==='qa';});
       if(!isMgr){document.getElementById('rl-pinErr').style.display='block';return;}
       if(!confirm('Clear all '+recipeLibrary.length+' recipes? This cannot be undone.')) return;
-      recipeLibrary=[];lsScheduleSave();showToast('🗑️ All recipes cleared');renderRecipeLib();
+      recipeLibrary=[];fbClearCollection('recipes');lsScheduleSave();showToast('🗑️ All recipes cleared');renderRecipeLib();
     };
   },50);
 
@@ -3891,11 +3891,14 @@ function processRecipeUpload(rows){
     if(ingName) grouped[sku].ingredients.push({name:ingName,qty:qty,unit:unit,allergens:allergens,supplier:supplier});
   });
 
+  var fbBatch=fbDb.batch();
   Object.values(grouped).forEach(function(recipe){
     var existing=recipeLibrary.findIndex(function(r){return r.sku===recipe.sku;});
     if(existing>=0){recipeLibrary[existing]=recipe;updated++;}
     else{recipeLibrary.push(recipe);added++;}
+    fbBatch.set(fbDb.collection('recipes').doc(recipe.sku), recipe);
   });
+  fbBatch.commit().catch(function(e){console.error('Firestore recipe bulk upload failed:',e);showToast('⚠️ Saved locally, but sync to other devices failed — check connection.');});
 
   recipeChangesLog.push({type:'upload',added:added,updated:updated,by:currentUser?currentUser.name:'Manager',time:nowTime()});
   lsScheduleSave();
@@ -3990,9 +3993,40 @@ function viewRecipe(recipe){
 // sharepointLinks: [{id, productName, sku, url, addedBy, addedAt}]
 var sharepointLinks=[];
 
+// ── Firebase (live multi-device sync for Mix + Recipe Libraries) ───────
+var firebaseConfig={
+  apiKey:"AIzaSyDQcyBs9GJjt67FzOir0tIDDqs1Pp5DxnM",
+  authDomain:"frenzee-d2bdb.firebaseapp.com",
+  projectId:"frenzee-d2bdb",
+  storageBucket:"frenzee-d2bdb.firebasestorage.app",
+  messagingSenderId:"549847484526",
+  appId:"1:549847484526:web:174fa4026d7fb906723e7f"
+};
+firebase.initializeApp(firebaseConfig);
+var fbDb=firebase.firestore();
+var fbReady=firebase.auth().signInAnonymously().catch(function(e){console.error('Firebase anonymous auth failed:',e);});
+
+function fbSeedCollectionIfEmpty(collectionName, seedArray, idField){
+  return fbDb.collection(collectionName).limit(1).get().then(function(snap){
+    if(!snap.empty) return;
+    var batch=fbDb.batch();
+    seedArray.forEach(function(item){
+      batch.set(fbDb.collection(collectionName).doc(String(item[idField])), item);
+    });
+    return batch.commit();
+  });
+}
+function fbClearCollection(collectionName){
+  return fbDb.collection(collectionName).get().then(function(snap){
+    var batch=fbDb.batch();
+    snap.docs.forEach(function(d){batch.delete(d.ref);});
+    return batch.commit();
+  }).catch(function(e){console.error('Firestore clear '+collectionName+' failed:',e);showToast('⚠️ Cleared locally, but sync to other devices failed — check connection.');});
+}
+
 // ── Recipe Library ────────────────────────────────────────────────────
 // recipeLibrary: [{sku, productName, brand, ingredients:[{name,qty,unit,allergen,supplier}]}]
-var recipeLibrary=[
+var SEED_RECIPES=[
   {
     sku:'970950',productName:'WW Ham Cheese Tomato White',nameOnLabel:'WW Ham, Cheese & Tomato on White',brand:'Woolworths',customer:'Woolworths',ean:'9339687303625',useBy:'DOM+4 Days',itemCategory:'Pork/Ham with Cheese',version:'3',versionDate:'17.10.2024',
     method:['700G Rustic White Abbotts. No margarine. Bread = 2 slices (70-86g).','Mayonnaise to the BASE SLICE. Mayonnaise 10g (8-12g).','Primo SSF English Style Ham on mayonnaise on base. Ham = 55g, 5 slices folded (50-60g).','Tomato on folded ham. Tomato = 40g, 4 slices (36-44g).','Tasty Cheese Slice Mainland on tomato. 17g, 1 slice (15-19g).','Lid with top slice of bread and cut diagonally corner to corner.','Place in WW Standard 3D Formed Wedge and seal.','Apply the label on the front of wedge pack where indicated.','Pass through metal detector and through to picking cool room.'],
@@ -4044,31 +4078,23 @@ var recipeLibrary=[
     ingredients:[{name:'700G Low Carb 5 Seeds Loaf Helgas',qty:'2 slices',unit:'70-86g',allergens:'Gluten,Wheat',supplier:'Helgas'},{name:'Mayonnaise',qty:'20g total',unit:'10g each slice (8-12g)',allergens:'Eggs',supplier:''},{name:'SSF English Style Ham',qty:'4 slices folded in half',unit:'44g (42-46g)',allergens:'',supplier:'Primo'},{name:'Cheer Cheese',qty:'2 slices',unit:'30g (28-32g)',allergens:'Dairy',supplier:''},{name:'Dryslaw Mix',qty:'20g',unit:'15-25g',allergens:'',supplier:''},{name:'Cos Lettuce',qty:'20g',unit:'15-25g',allergens:'',supplier:''}]
   }
 ];
+var recipeLibrary=[]; // populated live from Firestore — see initRecipeSync()
 var recipeChangesLog=[];
-
-// ── Firebase (live multi-device sync for Mix + Recipe Libraries) ───────
-var firebaseConfig={
-  apiKey:"AIzaSyDQcyBs9GJjt67FzOir0tIDDqs1Pp5DxnM",
-  authDomain:"frenzee-d2bdb.firebaseapp.com",
-  projectId:"frenzee-d2bdb",
-  storageBucket:"frenzee-d2bdb.firebasestorage.app",
-  messagingSenderId:"549847484526",
-  appId:"1:549847484526:web:174fa4026d7fb906723e7f"
-};
-firebase.initializeApp(firebaseConfig);
-var fbDb=firebase.firestore();
-var fbReady=firebase.auth().signInAnonymously().catch(function(e){console.error('Firebase anonymous auth failed:',e);});
-
-function fbSeedCollectionIfEmpty(collectionName, seedArray, idField){
-  return fbDb.collection(collectionName).limit(1).get().then(function(snap){
-    if(!snap.empty) return;
-    var batch=fbDb.batch();
-    seedArray.forEach(function(item){
-      batch.set(fbDb.collection(collectionName).doc(String(item[idField])), item);
+var _recipeSyncStarted=false;
+function initRecipeSync(){
+  if(_recipeSyncStarted) return;
+  _recipeSyncStarted=true;
+  fbReady.then(function(){
+    fbSeedCollectionIfEmpty('recipes', SEED_RECIPES, 'sku').then(function(){
+      fbDb.collection('recipes').onSnapshot(function(snap){
+        recipeLibrary=snap.docs.map(function(d){return d.data();});
+        var panel=document.getElementById('recipeLibPanel');
+        if(panel&&panel.classList.contains('show')) renderRecipeLib();
+      }, function(err){console.error('Firestore recipes listener failed:',err);});
     });
-    return batch.commit();
   });
 }
+initRecipeSync();
 
 // ── Mix Instructions Library ───────────────────────────────────────────
 // mixLibrary: [{mixCode, mixName, shelfLife, shelfLifeDays, scoopSize, tubYield,
