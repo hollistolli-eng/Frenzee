@@ -6,6 +6,9 @@
 <title>Frenzee</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <style>
 :root{
   --fz-green:#2ecc40; --fz-green-dark:#1b4d2e; --fz-green-deep:#0f2e1c; --fz-green-soft:#eafbee;
@@ -3153,6 +3156,7 @@ function submitMixSave(){
     mixChangesLog.push({type:'edit',mixCode:code,mixName:name,by:who,time:t});
     showToast('✅ Mix instruction updated — '+name);
   }
+  fbDb.collection('mixes').doc(mix.mixCode).set(mix).catch(function(e){console.error('Firestore mix save failed:',e);showToast('⚠️ Saved locally, but sync to other devices failed — check connection.');});
   lsScheduleSave();
   hideOverlay('mixEditOverlay');
   renderMixLib();
@@ -3169,6 +3173,7 @@ function submitMixDelete(){
   var mix=mixLibrary.find(function(m){return m.mixCode===_mixEditCode;});
   if(mix) mixChangesLog.push({type:'delete',mixCode:mix.mixCode,mixName:mix.mixName,by:who,time:nowTime()});
   mixLibrary=mixLibrary.filter(function(m){return m.mixCode!==_mixEditCode;});
+  fbDb.collection('mixes').doc(_mixEditCode).delete().catch(function(e){console.error('Firestore mix delete failed:',e);showToast('⚠️ Deleted locally, but sync to other devices failed — check connection.');});
   lsScheduleSave();
   hideOverlay('mixEditOverlay');
   showToast('🗑️ Mix instruction deleted');
@@ -3223,13 +3228,16 @@ function processMixUpload(rows){
     if(ingName) grouped[code].ingredients.push({name:ingName,code:ingCode,weight:weight,unit:unit,pctInMix:pctInMix,allergens:allergens,supplier:supplier});
   });
 
+  var fbBatch=fbDb.batch();
   order.forEach(function(code){
     var mix=grouped[code];
     if(!mix.ingredients.length){errors++;return;}
     var existing=mixLibrary.findIndex(function(m){return m.mixCode===mix.mixCode;});
     if(existing>=0){mixLibrary[existing]=mix;updated++;}
     else{mixLibrary.push(mix);added++;}
+    fbBatch.set(fbDb.collection('mixes').doc(mix.mixCode), mix);
   });
+  fbBatch.commit().catch(function(e){console.error('Firestore mix bulk upload failed:',e);showToast('⚠️ Saved locally, but sync to other devices failed — check connection.');});
 
   mixChangesLog.push({type:'upload',added:added,updated:updated,by:currentUser?currentUser.name:'Manager',time:nowTime()});
   lsScheduleSave();
@@ -4038,10 +4046,34 @@ var recipeLibrary=[
 ];
 var recipeChangesLog=[];
 
+// ── Firebase (live multi-device sync for Mix + Recipe Libraries) ───────
+var firebaseConfig={
+  apiKey:"AIzaSyDQcyBs9GJjt67FzOir0tIDDqs1Pp5DxnM",
+  authDomain:"frenzee-d2bdb.firebaseapp.com",
+  projectId:"frenzee-d2bdb",
+  storageBucket:"frenzee-d2bdb.firebasestorage.app",
+  messagingSenderId:"549847484526",
+  appId:"1:549847484526:web:174fa4026d7fb906723e7f"
+};
+firebase.initializeApp(firebaseConfig);
+var fbDb=firebase.firestore();
+var fbReady=firebase.auth().signInAnonymously().catch(function(e){console.error('Firebase anonymous auth failed:',e);});
+
+function fbSeedCollectionIfEmpty(collectionName, seedArray, idField){
+  return fbDb.collection(collectionName).limit(1).get().then(function(snap){
+    if(!snap.empty) return;
+    var batch=fbDb.batch();
+    seedArray.forEach(function(item){
+      batch.set(fbDb.collection(collectionName).doc(String(item[idField])), item);
+    });
+    return batch.commit();
+  });
+}
+
 // ── Mix Instructions Library ───────────────────────────────────────────
 // mixLibrary: [{mixCode, mixName, shelfLife, shelfLifeDays, scoopSize, tubYield,
 //   method:[], ingredients:[{name,weight,unit,allergens,supplier}]}]
-var mixLibrary=[
+var SEED_MIXES=[
   {
     mixCode:'940468',mixName:'R/W Mix OTR Eat Mix Chicken Mayo',shelfLifeDays:2,scoopSize:'',tubYield:'6 tubs per batch',
     version:'1',versionDate:'28.03.2025',customer:'OTRG',mixCategory:'Chicken with Mayo',useByLabel:'P+2 or SSL',
@@ -4187,7 +4219,23 @@ var mixLibrary=[
     ]
   }
 ];
+var mixLibrary=[]; // populated live from Firestore — see initMixSync()
 var mixChangesLog=[];
+var _mixSyncStarted=false;
+function initMixSync(){
+  if(_mixSyncStarted) return;
+  _mixSyncStarted=true;
+  fbReady.then(function(){
+    fbSeedCollectionIfEmpty('mixes', SEED_MIXES, 'mixCode').then(function(){
+      fbDb.collection('mixes').onSnapshot(function(snap){
+        mixLibrary=snap.docs.map(function(d){return d.data();});
+        var panel=document.getElementById('mixLibPanel');
+        if(panel&&panel.classList.contains('show')) renderMixLib();
+      }, function(err){console.error('Firestore mixes listener failed:',err);});
+    });
+  });
+}
+initMixSync();
 
 // ── Prep Room state ───────────────────────────────────────────────────
 // prepSchedule: [{mixCode, mixName, shelfLife, position(1/2/3), tubsRequired, assignedTo}]
