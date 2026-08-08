@@ -3956,13 +3956,20 @@ function viewRecipe(sku){
   var TD='padding:5px 7px;border:1px solid #333;font-size:0.72rem;vertical-align:middle;';
   var TH=TD+'background:#eee;font-weight:700;text-transform:uppercase;font-size:0.62rem;';
 
-  // Allergen banner
-  var allergenList=[...new Set(recipe.ingredients.flatMap(function(i){return (i.allergens||'').split(',').map(function(a){return a.trim();}).filter(Boolean);}))];
-  if(allergenList.length){
-    var ab=document.createElement('div');
-    ab.style.cssText='background:#fff0f0;border:1.5px solid #e74c3c;border-radius:8px;padding:8px 11px;margin-bottom:12px;font-size:0.78rem;color:#c0392b;font-weight:600;';
-    ab.innerHTML='⚠️ Allergens: '+allergenList.join(', ');
-    content.appendChild(ab);
+  // Allergen banner — prefer the authoritative legal declaration when present
+  if(recipe.allergenContains||recipe.allergenMayContain){
+    var ab2=document.createElement('div');
+    ab2.style.cssText='background:#fff0f0;border:1.5px solid #e74c3c;border-radius:8px;padding:8px 11px;margin-bottom:12px;font-size:0.78rem;color:#c0392b;font-weight:600;line-height:1.5;';
+    ab2.innerHTML=(recipe.allergenContains?'⚠️ Contains: '+recipe.allergenContains:'')+(recipe.allergenMayContain?'<br/>⚠️ May Contain: '+recipe.allergenMayContain:'');
+    content.appendChild(ab2);
+  } else {
+    var allergenList=[...new Set(recipe.ingredients.flatMap(function(i){return (i.allergens||'').split(',').map(function(a){return a.trim();}).filter(Boolean);}))];
+    if(allergenList.length){
+      var ab=document.createElement('div');
+      ab.style.cssText='background:#fff0f0;border:1.5px solid #e74c3c;border-radius:8px;padding:8px 11px;margin-bottom:12px;font-size:0.78rem;color:#c0392b;font-weight:600;';
+      ab.innerHTML='⚠️ Allergens: '+allergenList.join(', ');
+      content.appendChild(ab);
+    }
   }
 
   // ── Document header — replicates the printed product work-instruction sheet ──
@@ -3974,6 +3981,8 @@ function viewRecipe(sku){
     '<table style="width:100%;border-collapse:collapse;margin-bottom:2px;">'+
       '<tr><td style="'+TH+'width:26%;">FTG Product Name</td><td style="'+TD+'" colspan="2">'+recipe.productName+'</td><td style="'+TH+'width:20%;">Item Category</td><td style="'+TD+'">'+(recipe.itemCategory||'—')+'</td></tr>'+
       (recipe.nameOnLabel?'<tr><td style="'+TH+'">Name on Label</td><td style="'+TD+'" colspan="4">'+recipe.nameOnLabel+'</td></tr>':'')+
+      (recipe.inProgressCode?'<tr><td style="'+TH+'">In Progress Item Code</td><td style="'+TD+'">'+recipe.inProgressCode+'</td>'+
+        '<td style="'+TH+'">Finished Product Code</td><td style="'+TD+'">'+recipe.sku+'</td></tr>':'')+
       '<tr><td style="'+TH+'">Product Code</td><td style="'+TD+'">'+recipe.sku+'</td>'+
         '<td style="'+TH+'">EAN</td><td style="'+TD+'">'+(recipe.ean||'—')+'</td>'+
       '</tr>'+
@@ -4092,6 +4101,111 @@ function viewRecipe(sku){
   content.appendChild(ingScroll);
 
   if(recipe.notes){var notesDiv=document.createElement("div");notesDiv.style.cssText="background:#fff8e1;border:1.5px solid #f39c12;border-radius:8px;padding:8px 11px;margin-bottom:10px;font-size:0.75rem;color:#856404;";notesDiv.innerHTML="📋 "+recipe.notes;content.appendChild(notesDiv);}
+
+  // ── Substitutes ──────────────────────────────────────────────────────
+  if(recipe.substitutes&&recipe.substitutes.length){
+    var rsubHdr=document.createElement('div');
+    rsubHdr.style.cssText='font-size:0.7rem;font-weight:800;color:#c0392b;margin-bottom:6px;';
+    rsubHdr.textContent='*'+(recipe.substituteLabel||'Upon Site QA Approval Only – Substitute Ingredient');
+    content.appendChild(rsubHdr);
+    var rsubTable=document.createElement('table');
+    rsubTable.style.cssText='border-collapse:collapse;width:100%;margin-bottom:10px;';
+    rsubTable.innerHTML='<tr><th style="'+TH+'text-align:left;">Ingredient Description</th><th style="'+TH+'">Code</th><th style="'+TH+'text-align:left;">Supplier</th></tr>'+
+      recipe.substitutes.map(function(s){return '<tr><td style="'+TD+'text-align:left;">'+s.name+'</td><td style="'+TD+'text-align:center;">'+(s.code||'—')+'</td><td style="'+TD+'text-align:left;">'+s.supplier+'</td></tr>';}).join('');
+    content.appendChild(rsubTable);
+  }
+
+  // ── Front of pack wording ───────────────────────────────────────────
+  if(recipe.frontOfPackWording){
+    var fopHdr=document.createElement('div');
+    fopHdr.style.cssText='font-size:0.7rem;font-weight:800;color:#222;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;';
+    fopHdr.textContent='Front of Pack Wording';
+    content.appendChild(fopHdr);
+    var fopBox=document.createElement('div');
+    fopBox.style.cssText='background:#f9f9f9;border-radius:8px;padding:8px 11px;margin-bottom:10px;font-size:0.78rem;font-style:italic;color:#333;';
+    fopBox.textContent=recipe.frontOfPackWording;
+    content.appendChild(fopBox);
+  }
+
+  // ── Ingredient declaration ──────────────────────────────────────────
+  if(recipe.ingredientDeclaration){
+    var idHdr=document.createElement('div');
+    idHdr.style.cssText='font-size:0.7rem;font-weight:800;color:#222;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;';
+    idHdr.textContent='Ingredient Declaration';
+    content.appendChild(idHdr);
+    var idBox=document.createElement('div');
+    idBox.style.cssText='background:#f9f9f9;border-radius:8px;padding:8px 11px;margin-bottom:10px;font-size:0.72rem;color:#333;line-height:1.5;';
+    idBox.innerHTML='<strong>Ingredients:</strong> '+recipe.ingredientDeclaration;
+    content.appendChild(idBox);
+  }
+
+  // ── Country of origin / caution statement ───────────────────────────
+  if(recipe.countryOfOrigin){
+    var coiHdr=document.createElement('div');
+    coiHdr.style.cssText='font-size:0.7rem;font-weight:800;color:#222;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;';
+    coiHdr.textContent='Country of Origin';
+    content.appendChild(coiHdr);
+    var coiBox=document.createElement('div');
+    coiBox.style.cssText='background:#f9f9f9;border-radius:8px;padding:8px 11px;margin-bottom:10px;font-size:0.78rem;color:#333;';
+    coiBox.textContent=recipe.countryOfOrigin;
+    content.appendChild(coiBox);
+  }
+  if(recipe.cautionStatement){
+    var cautBox=document.createElement('div');
+    cautBox.style.cssText='background:#fff8e1;border:1.5px solid #f39c12;border-radius:8px;padding:8px 11px;margin-bottom:10px;font-size:0.76rem;color:#856404;font-weight:600;';
+    cautBox.innerHTML='⚠️ Caution: '+recipe.cautionStatement;
+    content.appendChild(cautBox);
+  }
+
+  // ── Physical specification ──────────────────────────────────────────
+  if(recipe.physicalSpec&&(recipe.physicalSpec.appearance||recipe.physicalSpec.flavour||recipe.physicalSpec.texture)){
+    var psHdr=document.createElement('div');
+    psHdr.style.cssText='font-size:0.7rem;font-weight:800;color:#222;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;';
+    psHdr.textContent='Physical Specification';
+    content.appendChild(psHdr);
+    var psTable=document.createElement('table');
+    psTable.style.cssText='border-collapse:collapse;width:100%;margin-bottom:10px;';
+    psTable.innerHTML=
+      (recipe.physicalSpec.appearance?'<tr><td style="'+TH+'width:20%;text-align:left;">Appearance</td><td style="'+TD+'text-align:left;">'+recipe.physicalSpec.appearance+'</td></tr>':'')+
+      (recipe.physicalSpec.flavour?'<tr><td style="'+TH+'text-align:left;">Flavour</td><td style="'+TD+'text-align:left;">'+recipe.physicalSpec.flavour+'</td></tr>':'')+
+      (recipe.physicalSpec.texture?'<tr><td style="'+TH+'text-align:left;">Texture</td><td style="'+TD+'text-align:left;">'+recipe.physicalSpec.texture+'</td></tr>':'');
+    content.appendChild(psTable);
+  }
+
+  // ── Nutrition information ────────────────────────────────────────────
+  if(recipe.nutrition){
+    var n=recipe.nutrition;
+    var nHdr=document.createElement('div');
+    nHdr.style.cssText='font-size:0.7rem;font-weight:800;color:#222;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;';
+    nHdr.textContent='Nutrition Information';
+    content.appendChild(nHdr);
+    var nSub=document.createElement('div');
+    nSub.style.cssText='font-size:0.72rem;color:#555;margin-bottom:6px;';
+    nSub.textContent='Servings per package: '+(n.servingsPerPackage||'1')+'    Serving size: '+(n.servingSize||'—');
+    content.appendChild(nSub);
+    var nRows=[
+      ['Energy',n.energyKJ,n.energyKJ100,'kJ'],
+      ['Protein',n.protein,n.protein100,'g'],
+      ['Fat, Total',n.fat,n.fat100,'g'],
+      ['– Saturated',n.saturated,n.saturated100,'g'],
+      ['Carbohydrate',n.carb,n.carb100,'g'],
+      ['– Sugars',n.sugars,n.sugars100,'g'],
+      ['Sodium',n.sodium,n.sodium100,'mg'],
+    ].filter(function(r){return r[1]||r[2];});
+    if(nRows.length){
+      var nTable=document.createElement('table');
+      nTable.style.cssText='border-collapse:collapse;width:100%;margin-bottom:10px;';
+      nTable.innerHTML='<tr><th style="'+TH+'text-align:left;"></th><th style="'+TH+'">Per Serving</th><th style="'+TH+'">Per 100g</th></tr>'+
+        nRows.map(function(r){return '<tr><td style="'+TD+'text-align:left;">'+r[0]+'</td><td style="'+TD+'text-align:center;">'+(r[1]?r[1]+' '+r[3]:'—')+'</td><td style="'+TD+'text-align:center;">'+(r[2]?r[2]+' '+r[3]:'—')+'</td></tr>';}).join('');
+      content.appendChild(nTable);
+    }
+    if(n.dataSource){
+      var nSrc=document.createElement('div');
+      nSrc.style.cssText='font-size:0.66rem;color:#888;margin-bottom:10px;';
+      nSrc.textContent='Data source: '+n.dataSource;
+      content.appendChild(nSrc);
+    }
+  }
 
   // ── Company details ──────────────────────────────────────────────────
   if(recipe.companyName||recipe.companyAddress){
