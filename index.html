@@ -4765,6 +4765,7 @@ function buildTraceIngredients(recipe){
 // so the team leader can match it to the physical scoop by sight, not just text.
 var SCOOP_COLORS=[[/sky ?blue/i,'#5dade2'],[/dark ?blue/i,'#1a3e8c'],[/navy/i,'#1a3e8c'],[/light ?blue/i,'#85c1e9'],[/green/i,'#2ecc40'],[/yellow/i,'#f1c40f'],[/orange/i,'#e67e22'],[/red/i,'#e74c3c'],[/pink/i,'#ff69b4'],[/purple|orchid/i,'#9b59b6'],[/ivory|white/i,'#fffff0'],[/black/i,'#333'],[/grey|gray/i,'#95a5a6'],[/brown/i,'#8b5a2b']];
 function scoopColorHex(label){for(var i=0;i<SCOOP_COLORS.length;i++){if(SCOOP_COLORS[i][0].test(label))return SCOOP_COLORS[i][1];}return '#bbb';}
+function hexToRgba(hex,alpha){var h=hex.replace('#','');if(h.length===3)h=h.split('').map(function(c){return c+c;}).join('');var r=parseInt(h.substring(0,2),16),g=parseInt(h.substring(2,4),16),b=parseInt(h.substring(4,6),16);return 'rgba('+r+','+g+','+b+','+alpha+')';}
 function getJobRecipe(job){
   if(!job||!job.name) return null;
   var real=null;
@@ -5297,6 +5298,7 @@ function buildIngCard(ing,recipe,ph){
     '<span style="width:13px;height:13px;border-radius:50%;background:'+scoopColorHex(ing.scoopLabel)+';border:1px solid rgba(0,0,0,0.25);display:inline-block;flex-shrink:0;"></span>🥄 USE '+ing.scoopLabel.toUpperCase()+' SCOOP</div>':'';
   var card=document.createElement('div');
   card.className='ing-card '+cc;card.id='ing-card-'+ing.id;
+  if(ing.scoopLabel&&!isOv){var scoopHex=scoopColorHex(ing.scoopLabel);card.style.background=hexToRgba(scoopHex,0.16);card.style.borderLeftColor=cc?'':scoopHex;}
   card.innerHTML='<div class="ing-top"><div class="ing-icon">'+ing.icon+'</div><div class="ing-name">'+ing.name+'<br>'+scoopHTML+shelfTag+'</div><div class="ing-vi" id="vicon-'+ing.id+'">'+vi+'</div></div><div class="ing-fields"><div class="field-row"><div class="field-label">Use By Date</div><input class="field-input" type="date" value="'+st.useBy+'" data-ingid="'+ing.id+'" data-field="useBy" data-type="'+ing.type+'" data-mindays="'+minDays+'"/>'+shelfHTML+'</div>'+batchHTML+barcodeHTML+ovBtn+ovNote+'</div>';
   card.querySelectorAll('[data-ingid]').forEach(function(el){el.addEventListener('change',function(){updateField(el.dataset.ingid,el.dataset.field,el.value,el.dataset.type,el.dataset.mindays);});});
   card.querySelectorAll('[data-barcodeingid]').forEach(function(btn){btn.addEventListener('click',function(){scanBarcode(btn.dataset.barcodeingid,btn.dataset.barcode);});});
