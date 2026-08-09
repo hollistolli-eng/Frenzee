@@ -3849,6 +3849,35 @@ function renderRecipeLib(){
   var listWrap=document.createElement('div');
   body.appendChild(listWrap);
 
+  function renderRecipeCard(recipe){
+    var allergenList=[...new Set(recipe.ingredients.flatMap(function(i){return (i.allergens||'').split(',').map(function(a){return a.trim();}).filter(Boolean);}))];
+    var card=document.createElement('div');
+    card.style.cssText='background:#fff;border-radius:16px;padding:13px 15px;margin-bottom:8px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #27ae60;cursor:pointer;';
+    card.innerHTML=
+      '<div style="display:flex;align-items:flex-start;gap:10px;">'+
+        '<div style="font-size:1.3rem;">🥪</div>'+
+        '<div style="flex:1;">'+
+          '<div style="font-weight:800;font-size:0.9rem;color:#222;">'+recipe.productName+'</div>'+
+          '<div style="display:flex;gap:8px;margin-top:3px;flex-wrap:wrap;">'+
+            '<span style="font-size:0.68rem;font-weight:700;background:#e8f4fd;color:#0074d9;padding:2px 7px;border-radius:5px;">SKU: '+recipe.sku+'</span>'+
+            (recipe.brand?'<span style="font-size:0.68rem;font-weight:700;background:#f5f5f5;color:#555;padding:2px 7px;border-radius:5px;">'+recipe.brand+'</span>':'')+
+            '<span style="font-size:0.68rem;font-weight:700;background:#f0fdf4;color:#27ae60;padding:2px 7px;border-radius:5px;">'+recipe.ingredients.length+' ingredients</span>'+
+          '</div>'+
+          (allergenList.length?'<div style="font-size:0.68rem;color:#e74c3c;font-weight:600;margin-top:3px;">⚠️ Contains: '+allergenList.join(', ')+'</div>':'')+
+        '</div>'+
+        '<div style="display:flex;flex-direction:column;gap:5px;">'+
+          '<button data-recipeview="'+recipe.sku+'" style="background:#f0fdf4;color:#27ae60;border:1.5px solid #27ae60;border-radius:8px;padding:5px 10px;font-size:0.72rem;font-weight:700;cursor:pointer;">View</button>'+
+          '<button data-recipeedit="'+recipe.sku+'" style="background:#f0f4ff;color:#0074d9;border:1.5px solid #0074d9;border-radius:8px;padding:5px 10px;font-size:0.72rem;font-weight:700;cursor:pointer;">✏️ Edit</button>'+
+        '</div>'+
+      '</div>';
+    card.querySelector('[data-recipeview]').onclick=(function(sku){return function(){viewRecipe(sku);};})(recipe.sku);
+    card.querySelector('[data-recipeedit]').onclick=(function(sku){return function(){openRecipeEdit(sku);};})(recipe.sku);
+    return card;
+  }
+
+  var FOLDER_ICONS={'Woolworths':'🛒','Emirates':'✈️','Dnata':'🛫','BP':'⛽'};
+  var recipeFoldersOpen=window.recipeFoldersOpen||(window.recipeFoldersOpen={});
+
   function renderList(filter){
     listWrap.innerHTML='';
     var filtered=recipeLibrary.filter(function(r){
@@ -3862,30 +3891,42 @@ function renderRecipeLib(){
       return;
     }
 
+    var searching=!!filter;
+    var groups={};
+    var groupOrder=[];
     filtered.forEach(function(recipe){
-      var allergenList=[...new Set(recipe.ingredients.flatMap(function(i){return (i.allergens||'').split(',').map(function(a){return a.trim();}).filter(Boolean);}))];
-      var card=document.createElement('div');
-      card.style.cssText='background:#fff;border-radius:16px;padding:13px 15px;margin-bottom:8px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #27ae60;cursor:pointer;';
-      card.innerHTML=
-        '<div style="display:flex;align-items:flex-start;gap:10px;">'+
-          '<div style="font-size:1.3rem;">🥪</div>'+
-          '<div style="flex:1;">'+
-            '<div style="font-weight:800;font-size:0.9rem;color:#222;">'+recipe.productName+'</div>'+
-            '<div style="display:flex;gap:8px;margin-top:3px;flex-wrap:wrap;">'+
-              '<span style="font-size:0.68rem;font-weight:700;background:#e8f4fd;color:#0074d9;padding:2px 7px;border-radius:5px;">SKU: '+recipe.sku+'</span>'+
-              (recipe.brand?'<span style="font-size:0.68rem;font-weight:700;background:#f5f5f5;color:#555;padding:2px 7px;border-radius:5px;">'+recipe.brand+'</span>':'')+
-              '<span style="font-size:0.68rem;font-weight:700;background:#f0fdf4;color:#27ae60;padding:2px 7px;border-radius:5px;">'+recipe.ingredients.length+' ingredients</span>'+
-            '</div>'+
-            (allergenList.length?'<div style="font-size:0.68rem;color:#e74c3c;font-weight:600;margin-top:3px;">⚠️ Contains: '+allergenList.join(', ')+'</div>':'')+
-          '</div>'+
-          '<div style="display:flex;flex-direction:column;gap:5px;">'+
-            '<button data-recipeview="'+recipe.sku+'" style="background:#f0fdf4;color:#27ae60;border:1.5px solid #27ae60;border-radius:8px;padding:5px 10px;font-size:0.72rem;font-weight:700;cursor:pointer;">View</button>'+
-            '<button data-recipeedit="'+recipe.sku+'" style="background:#f0f4ff;color:#0074d9;border:1.5px solid #0074d9;border-radius:8px;padding:5px 10px;font-size:0.72rem;font-weight:700;cursor:pointer;">✏️ Edit</button>'+
-          '</div>'+
-        '</div>';
-      card.querySelector('[data-recipeview]').onclick=(function(sku){return function(){viewRecipe(sku);};})(recipe.sku);
-      card.querySelector('[data-recipeedit]').onclick=(function(sku){return function(){openRecipeEdit(sku);};})(recipe.sku);
-      listWrap.appendChild(card);
+      var g=recipe.customer||'Other';
+      if(!groups[g]){groups[g]=[];groupOrder.push(g);}
+      groups[g].push(recipe);
+    });
+    groupOrder.sort(function(a,b){
+      if(a==='Other') return 1;
+      if(b==='Other') return -1;
+      return a.localeCompare(b);
+    });
+
+    groupOrder.forEach(function(g){
+      var items=groups[g];
+      var isOpen=searching||recipeFoldersOpen[g];
+      var folder=document.createElement('div');
+      folder.style.cssText='margin-bottom:10px;';
+      var header=document.createElement('div');
+      header.style.cssText='display:flex;align-items:center;gap:8px;background:#fff;border-radius:12px;padding:11px 14px;box-shadow:0 4px 18px rgba(15,46,28,0.07);cursor:pointer;';
+      header.innerHTML=
+        '<div style="font-size:1.1rem;">'+(FOLDER_ICONS[g]||'📁')+'</div>'+
+        '<div style="flex:1;font-weight:800;font-size:0.85rem;color:#222;">'+g+'</div>'+
+        '<span style="font-size:0.68rem;font-weight:700;background:#f5f5f5;color:#555;padding:2px 8px;border-radius:5px;">'+items.length+'</span>'+
+        '<div style="font-size:0.8rem;color:#aaa;transition:transform 0.15s;'+(isOpen?'transform:rotate(90deg);':'')+'">▶</div>';
+      var contents=document.createElement('div');
+      contents.style.cssText='padding:8px 0 0 0;display:'+(isOpen?'block':'none')+';';
+      items.forEach(function(recipe){contents.appendChild(renderRecipeCard(recipe));});
+      header.onclick=function(){
+        recipeFoldersOpen[g]=!isOpen;
+        renderList(searchEl.value);
+      };
+      folder.appendChild(header);
+      folder.appendChild(contents);
+      listWrap.appendChild(folder);
     });
 
     var countEl=document.createElement('div');
