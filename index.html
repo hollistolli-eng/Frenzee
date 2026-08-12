@@ -251,6 +251,7 @@ if(sessionStorage.getItem(PW_KEY)==='1'){
 <!-- OVERLAYS -->
 <div class="overlay" id="scanOverlay"><div class="ov-box"><div class="ov-icon" id="ovIcon"></div><div class="ov-title" id="ovTitle"></div><div class="ov-sub" id="ovSub"></div><button class="ov-btn" id="ovBtn">OK</button></div></div>
 <div class="overlay" id="notifOverlay"><div class="ov-box"><div style="font-size:1.1rem;font-weight:900;margin-bottom:12px;">📨 Messages</div><div id="notifList"></div><button class="ov-btn grey" id="notifCloseBtn">Close</button></div></div>
+<div class="overlay" id="importReportOverlay"><div class="ov-box"><div style="font-size:1.1rem;font-weight:900;margin-bottom:12px;">⚠️ Rows Skipped on Import</div><div id="importReportList" style="max-height:340px;overflow-y:auto;"></div><button class="ov-btn grey" id="importReportCloseBtn">Close</button></div></div>
 <div class="overlay" id="overrideOverlay"><div class="ov-box"><div class="ov-icon">🔒</div><div class="ov-title">Supervisor Override</div><div class="ov-sub">Original use-by date will not be changed.</div><div class="ov-field"><label>Authorised By</label><input type="text" id="ovName"/></div><div class="ov-field"><label>PIN</label><input type="password" id="ovPin"/><div class="ov-err" id="ovErr">❌ Incorrect PIN.</div></div><div class="ov-field"><label>Reason</label><textarea id="ovReason" rows="3"></textarea></div><div class="info-box orange">⚠️ Original use-by date unchanged. For audit purposes only.</div><button class="ov-btn orange" id="ovSubmitBtn">✅ Authorise</button><button class="ov-btn grey" id="ovCancelBtn">Cancel</button></div></div>
 <div class="overlay" id="transferOverlay"><div class="ov-box"><div class="ov-icon">🔀</div><div class="ov-title">Transfer to Another Line</div><div class="ov-sub" id="txSub"></div><div class="ov-field"><label>Authorised By</label><input type="text" id="txName"/></div><div class="ov-field"><label>PIN</label><input type="password" id="txPin"/><div class="ov-err" id="txErr">❌ Incorrect PIN.</div></div><div class="ov-field"><label>Transfer to Line</label><select id="txLine"></select></div><div class="ov-field"><label>Reason</label><textarea id="txReason" rows="2"></textarea></div><div class="info-box">📋 Logged for auditing.</div><button class="ov-btn purple" id="txSubmitBtn">🔀 Confirm Transfer</button><button class="ov-btn grey" id="txCancelBtn">Cancel</button></div></div>
 <div class="overlay" id="issueOverlay"><div class="ov-box"><div class="ov-icon">⚠️</div><div class="ov-title">Log an Issue</div><div class="ov-sub" id="issueSub"></div><div class="ov-field"><label>Category</label><select id="issueCategory"><option value="">Select…</option><option>🔧 Equipment / Machinery</option><option>🥗 Ingredient / Raw Material</option><option>🏷️ Labelling / Packaging</option><option>🌡️ Temperature / Food Safety</option><option>👷 Staffing</option><option>📦 Supply / Stock</option><option>🧹 Hygiene / Cleaning</option><option>⚡ Other</option></select></div><div class="ov-field"><label>Severity</label><div style="display:flex;gap:8px;"><button class="mtype-btn active" id="sev-low">🟡 Low</button><button class="mtype-btn" id="sev-medium">🟠 Medium</button><button class="mtype-btn" id="sev-high">🔴 High</button></div></div><div class="ov-field"><label>Describe the Issue</label><textarea id="issueDescription" rows="3"></textarea></div><div class="ov-field"><label>Action Taken</label><input type="text" id="issueAction"/></div><button class="ov-btn orange" id="issueSubmitBtn">⚠️ Submit Issue</button><button class="ov-btn grey" id="issueCancelBtn">Cancel</button></div></div>
@@ -2550,6 +2551,19 @@ function processPrepSchedule(rows){
   lsScheduleSave();
   showToast('✅ Prep schedule loaded — '+prepSchedule.length+' mixes');
   renderPrepRoom();
+}
+
+function downloadScheduleTemplate(){
+  var csv='Line,SKU,Product Name,Quantity,Time,Finish,Bread Description\n'+
+    'A,971110,GO FRESH Egg Mayo Cos White,120,06:00,08:00,The One White Toast\n'+
+    'B,971111,GO FRESH Ham Cheese Tomato White,80,06:00,08:00,The One White Toast\n'+
+    'STAT,971118,GO FRESH Chicken Caesar Wrap,40,06:00,08:00,10 Inch Flour Tortilla\n';
+  var blob=new Blob([csv],{type:'text/csv'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='Frenzee_Schedule_Template.csv';
+  a.click();
+  showToast('✅ Template downloaded');
 }
 
 function downloadPrepTemplate(){
@@ -5110,8 +5124,9 @@ function updateSidebar(){
 // ── File Upload ────────────────────────────────────────────────────────
 function parseAndLoad(rows){
   if(!rows.length){showToast('❌ File empty.');return;}
-  var fresh={};LINES.forEach(function(l){fresh[l]=[];});var sk=0;
-  rows.forEach(function(row){
+  var fresh={};LINES.forEach(function(l){fresh[l]=[];});
+  var skipped=[];
+  rows.forEach(function(row,idx){
     var keys=Object.keys(row);
     function fc(){var names=Array.prototype.slice.call(arguments);for(var i=0;i<names.length;i++){var m=keys.find(function(k){return norm(k)===norm(names[i]);});if(m!==undefined)return row[m];}return '';}
     var name=String(fc('Product Name','Product','Name')||'').trim();
@@ -5119,14 +5134,33 @@ function parseAndLoad(rows){
     var qty=parseInt(fc('Quantity','Qty')||0);
     var time=String(fc('Time','Start')||'').trim();
     var fin=String(fc('Finish','End')||'').trim();
-    var line=String(fc('Line','line')||'').trim().toUpperCase();
+    var lineRaw=String(fc('Line','line')||'').trim();
+    var line=lineRaw.toUpperCase();
     var bread=String(fc('Bread Description','Bread')||'').trim();
-    if(!name){sk++;return;}
+    var rowNum=idx+2; // +1 for header row, +1 for 1-based row numbering
+    if(!name){skipped.push({rowNum:rowNum,name:name,reason:'Missing product name'});return;}
     var key=line==='STAT'?'STAT':'Line '+line;
-    if(!fresh[key]){sk++;return;}
+    if(!fresh[key]){skipped.push({rowNum:rowNum,name:name,reason:lineRaw?'Unrecognised Line value "'+lineRaw+'" (expected A–E or STAT)':'Missing Line value'});return;}
     fresh[key].push({name:name,sku:sku||'',qty:qty||0,time:time||'—',finishTime:fin||'',status:'pending',bread:bread||''});
   });
-  scheduleData=fresh;showToast('✅ '+(rows.length-sk)+' jobs loaded');showLines();
+  scheduleData=fresh;
+  var loaded=rows.length-skipped.length;
+  if(skipped.length){
+    showToast('⚠️ '+loaded+' jobs loaded, '+skipped.length+' row'+(skipped.length===1?'':'s')+' skipped — see warning below');
+    lastImportSkipped=skipped;
+  }else{
+    showToast('✅ '+loaded+' jobs loaded');
+    lastImportSkipped=[];
+  }
+  showLines();
+}
+var lastImportSkipped=[];
+function openImportReport(){
+  var list=document.getElementById('importReportList');
+  list.innerHTML=lastImportSkipped.length?lastImportSkipped.map(function(s){return '<div style="background:#fff8f0;border-radius:8px;padding:9px 11px;margin-bottom:7px;border-left:4px solid #e67e22;">'+
+    '<div style="font-weight:700;font-size:0.8rem;color:#e67e22;">Row '+s.rowNum+(s.name?' — '+s.name:'')+'</div>'+
+    '<div style="font-size:0.82rem;color:#555;">'+s.reason+'</div></div>';}).join(''):'<div style="text-align:center;color:#bbb;padding:16px;">No rows were skipped on the last import.</div>';
+  showOverlay('importReportOverlay');
 }
 
 // ── Navigation ─────────────────────────────────────────────────────────
@@ -5145,12 +5179,14 @@ function renderLines(){
       '<div style="font-size:0.9rem;font-weight:700;color:#555;margin-bottom:14px;">No schedule loaded yet</div>'+
       '<input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none;"/>'+
       '<button id="uploadBtn" style="background:#2ecc40;color:#fff;border:none;border-radius:10px;padding:11px 20px;font-size:0.9rem;font-weight:700;cursor:pointer;margin-bottom:10px;width:100%;">📂 Upload Schedule</button>'+
-      '<div style="color:#aaa;font-size:0.8rem;">or <span id="demoLink" style="color:#0074d9;cursor:pointer;text-decoration:underline;">load demo schedule</span></div>';
+      '<div style="color:#aaa;font-size:0.8rem;margin-bottom:4px;">or <span id="demoLink" style="color:#0074d9;cursor:pointer;text-decoration:underline;">load demo schedule</span></div>'+
+      '<div style="color:#aaa;font-size:0.8rem;"><span id="scheduleTemplateLink" style="color:#0074d9;cursor:pointer;text-decoration:underline;">⬇️ download blank template</span></div>';
     grid.appendChild(imp);
     setTimeout(function(){
       var ub=document.getElementById('uploadBtn');
       var fi=document.getElementById('fileInput');
       var dl=document.getElementById('demoLink');
+      var tl=document.getElementById('scheduleTemplateLink');
       if(ub) ub.onclick=function(){fi.click();};
       if(fi) fi.onchange=function(){
         var file=this.files[0];if(!file)return;
@@ -5159,8 +5195,16 @@ function renderLines(){
         reader.readAsArrayBuffer(file);
       };
       if(dl) dl.onclick=function(){scheduleData=JSON.parse(JSON.stringify(DEMO));showToast('Demo schedule loaded ✓');showLines();};
+      if(tl) tl.onclick=downloadScheduleTemplate;
     },50);
     return;
+  }
+  if(lastImportSkipped.length){
+    var warn=document.createElement('div');
+    warn.style.cssText='grid-column:1/-1;background:#fff8f0;border-radius:14px;padding:14px 16px;margin-bottom:4px;border-left:5px solid #e67e22;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;';
+    warn.innerHTML='<div><div style="font-weight:700;font-size:0.85rem;color:#e67e22;">⚠️ '+lastImportSkipped.length+' row'+(lastImportSkipped.length===1?'':'s')+' skipped on last import</div><div style="font-size:0.78rem;color:#888;">Tap to see which rows and why</div></div><div style="font-size:1.2rem;color:#e67e22;">›</div>';
+    warn.onclick=openImportReport;
+    grid.appendChild(warn);
   }
   LINES.forEach(function(line){
     var jobs=(scheduleData[line]||[]).filter(function(j){return j.status!=='transferred'&&j.status!=='removed';});
@@ -9648,6 +9692,7 @@ document.getElementById('logWastageBtn').onclick=function(){openDamages(currentL
 document.getElementById('looseItemsBtn').onclick=function(){openLooseItems(currentLine);};
 document.getElementById('ovBtn').onclick=function(){hideOverlay('scanOverlay');};
 document.getElementById('notifCloseBtn').onclick=function(){hideOverlay('notifOverlay');};
+document.getElementById('importReportCloseBtn').onclick=function(){hideOverlay('importReportOverlay');};
 document.getElementById('ovCancelBtn').onclick=function(){hideOverlay('overrideOverlay');};
 document.getElementById('ovSubmitBtn').onclick=submitOverride;
 document.getElementById('txCancelBtn').onclick=function(){hideOverlay('transferOverlay');};
