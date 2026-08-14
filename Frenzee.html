@@ -3906,7 +3906,8 @@ function renderRecipeLib(){
     return card;
   }
 
-  var FOLDER_ICONS={'Woolworths':'🛒','Emirates':'✈️','Dnata':'🛫','BP':'⛽','Rise':'🥐','Go Fresh':'🥗'};
+  var FOLDER_ICONS={'Woolworths':'🛒','Emirates':'✈️','Dnata':'🛫','BP':'⛽','Rise':'🥐','Go Fresh':'🥗','Frozen':'🧊','OTR Eat':'🥪'};
+  var NESTED_FOLDERS={'Frozen':true}; // customers grouped by two levels: customer, then brand
   var recipeFoldersOpen=window.recipeFoldersOpen||(window.recipeFoldersOpen={});
 
   function renderList(filter){
@@ -3950,7 +3951,47 @@ function renderRecipeLib(){
         '<div style="font-size:0.8rem;color:#aaa;transition:transform 0.15s;'+(isOpen?'transform:rotate(90deg);':'')+'">▶</div>';
       var contents=document.createElement('div');
       contents.style.cssText='padding:8px 0 0 0;display:'+(isOpen?'block':'none')+';';
-      items.forEach(function(recipe){contents.appendChild(renderRecipeCard(recipe));});
+
+      if(NESTED_FOLDERS[g]){
+        var subGroups={};var subOrder=[];
+        items.forEach(function(recipe){
+          var sg=recipe.brand||'Other';
+          if(!subGroups[sg]){subGroups[sg]=[];subOrder.push(sg);}
+          subGroups[sg].push(recipe);
+        });
+        subOrder.sort(function(a,b){
+          if(a==='Other') return 1;
+          if(b==='Other') return -1;
+          return a.localeCompare(b);
+        });
+        subOrder.forEach(function(sg){
+          var subItems=subGroups[sg];
+          var subKey=g+'/'+sg;
+          var subOpen=searching||recipeFoldersOpen[subKey];
+          var subFolder=document.createElement('div');
+          subFolder.style.cssText='margin:6px 0 6px 16px;';
+          var subHeader=document.createElement('div');
+          subHeader.style.cssText='display:flex;align-items:center;gap:8px;background:#fafafa;border:1px solid #eee;border-radius:10px;padding:9px 12px;cursor:pointer;';
+          subHeader.innerHTML=
+            '<div style="font-size:1rem;">'+(FOLDER_ICONS[sg]||'📁')+'</div>'+
+            '<div style="flex:1;font-weight:700;font-size:0.8rem;color:#444;">'+sg+'</div>'+
+            '<span style="font-size:0.65rem;font-weight:700;background:#eee;color:#555;padding:2px 7px;border-radius:5px;">'+subItems.length+'</span>'+
+            '<div style="font-size:0.75rem;color:#aaa;transition:transform 0.15s;'+(subOpen?'transform:rotate(90deg);':'')+'">▶</div>';
+          var subContents=document.createElement('div');
+          subContents.style.cssText='padding:6px 0 0 0;display:'+(subOpen?'block':'none')+';';
+          subItems.forEach(function(recipe){subContents.appendChild(renderRecipeCard(recipe));});
+          subHeader.onclick=function(){
+            recipeFoldersOpen[subKey]=!subOpen;
+            renderList(searchEl.value);
+          };
+          subFolder.appendChild(subHeader);
+          subFolder.appendChild(subContents);
+          contents.appendChild(subFolder);
+        });
+      }else{
+        items.forEach(function(recipe){contents.appendChild(renderRecipeCard(recipe));});
+      }
+
       header.onclick=function(){
         recipeFoldersOpen[g]=!isOpen;
         renderList(searchEl.value);
