@@ -195,6 +195,7 @@ header{background:#fff;padding:14px 22px;display:flex;align-items:center;justify
 .audit-row.add{border-left-color:#2ecc40;}
 .audit-row.remove{border-left-color:#e74c3c;}
 .audit-row.move{border-left-color:#9b59b6;}
+.audit-row.update{border-left-color:#0074d9;}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:11px 22px;border-radius:16px;font-size:0.88rem;font-weight:600;opacity:0;pointer-events:none;transition:opacity 0.3s;z-index:999;white-space:nowrap;}
 .toast.show{opacity:1;}
 @keyframes allergenPulse{0%,100%{box-shadow:0 0 0 0 rgba(155,89,182,0.5);border-color:#9b59b6;}50%{box-shadow:0 0 0 8px rgba(155,89,182,0);border-color:#6c3483;}}
@@ -313,6 +314,22 @@ if(sessionStorage.getItem(PW_KEY)==='1'){
     <div class="info-box">📋 Job will be marked as Transferred and added to the destination line.</div>
     <button class="ov-btn purple" id="smMoveSubmitBtn">🔀 Confirm Move</button>
     <button class="ov-btn grey" id="smMoveCancelBtn">Cancel</button>
+  </div>
+</div>
+
+<div class="overlay" id="smUpdateOverlay">
+  <div class="ov-box">
+    <div class="ov-icon">⬆️</div>
+    <div class="ov-title">Update Line Schedule</div>
+    <div class="ov-sub" id="smUpdateSub"></div>
+    <input type="file" id="smUpdateFile" accept=".xlsx,.xls,.csv" style="display:none;"/>
+    <button class="ov-btn grey" type="button" id="smUpdateFileBtn">📂 Choose File</button>
+    <div id="smUpdateFileStatus" style="font-size:0.78rem;color:#888;text-align:center;margin:-6px 0 6px;"></div>
+    <div class="ov-field"><label>Authorised By</label><input type="text" id="smUpdateAuth" placeholder="Your name"/></div>
+    <div class="ov-field"><label>PIN</label><input type="password" id="smUpdatePin"/><div class="ov-err" id="smUpdateErr">❌ Incorrect PIN.</div></div>
+    <div class="info-box">📋 Replaces only <strong>pending</strong> jobs on this line. Jobs already started, completed, transferred, or removed are untouched. Rows in the file for other lines are ignored.</div>
+    <button class="ov-btn" id="smUpdateSubmitBtn">⬆️ Update Schedule</button>
+    <button class="ov-btn grey" id="smUpdateCancelBtn">Cancel</button>
   </div>
 </div>
 
@@ -5122,26 +5139,32 @@ function updateSidebar(){
 }
 
 // ── File Upload ────────────────────────────────────────────────────────
+// Shared by the full-schedule import and the per-line "Update Schedule" upload.
+function parseScheduleRow(row,idx){
+  var keys=Object.keys(row);
+  function fc(){var names=Array.prototype.slice.call(arguments);for(var i=0;i<names.length;i++){var m=keys.find(function(k){return norm(k)===norm(names[i]);});if(m!==undefined)return row[m];}return '';}
+  var name=String(fc('Product Name','Product','Name')||'').trim();
+  var sku=String(fc('SKU','Product Code','ProductCode','Code')||'').trim();
+  var qty=parseInt(fc('Quantity','Qty')||0);
+  var time=String(fc('Time','Start')||'').trim();
+  var fin=String(fc('Finish','End')||'').trim();
+  var lineRaw=String(fc('Line','line')||'').trim();
+  var line=lineRaw.toUpperCase();
+  var bread=String(fc('Bread Description','Bread')||'').trim();
+  var rowNum=idx+2; // +1 for header row, +1 for 1-based row numbering
+  if(!name) return {ok:false,rowNum:rowNum,name:name,reason:'Missing product name'};
+  var key=line==='STAT'?'STAT':'Line '+line;
+  if(LINES.indexOf(key)===-1) return {ok:false,rowNum:rowNum,name:name,reason:lineRaw?'Unrecognised Line value "'+lineRaw+'" (expected A–E or STAT)':'Missing Line value'};
+  return {ok:true,rowNum:rowNum,key:key,job:{name:name,sku:sku||'',qty:qty||0,time:time||'—',finishTime:fin||'',status:'pending',bread:bread||''}};
+}
 function parseAndLoad(rows){
   if(!rows.length){showToast('❌ File empty.');return;}
   var fresh={};LINES.forEach(function(l){fresh[l]=[];});
   var skipped=[];
   rows.forEach(function(row,idx){
-    var keys=Object.keys(row);
-    function fc(){var names=Array.prototype.slice.call(arguments);for(var i=0;i<names.length;i++){var m=keys.find(function(k){return norm(k)===norm(names[i]);});if(m!==undefined)return row[m];}return '';}
-    var name=String(fc('Product Name','Product','Name')||'').trim();
-    var sku=String(fc('SKU','Product Code','ProductCode','Code')||'').trim();
-    var qty=parseInt(fc('Quantity','Qty')||0);
-    var time=String(fc('Time','Start')||'').trim();
-    var fin=String(fc('Finish','End')||'').trim();
-    var lineRaw=String(fc('Line','line')||'').trim();
-    var line=lineRaw.toUpperCase();
-    var bread=String(fc('Bread Description','Bread')||'').trim();
-    var rowNum=idx+2; // +1 for header row, +1 for 1-based row numbering
-    if(!name){skipped.push({rowNum:rowNum,name:name,reason:'Missing product name'});return;}
-    var key=line==='STAT'?'STAT':'Line '+line;
-    if(!fresh[key]){skipped.push({rowNum:rowNum,name:name,reason:lineRaw?'Unrecognised Line value "'+lineRaw+'" (expected A–E or STAT)':'Missing Line value'});return;}
-    fresh[key].push({name:name,sku:sku||'',qty:qty||0,time:time||'—',finishTime:fin||'',status:'pending',bread:bread||''});
+    var parsed=parseScheduleRow(row,idx);
+    if(!parsed.ok){skipped.push({rowNum:parsed.rowNum,name:parsed.name,reason:parsed.reason});return;}
+    fresh[parsed.key].push(parsed.job);
   });
   scheduleData=fresh;
   var loaded=rows.length-skipped.length;
@@ -5924,6 +5947,67 @@ function submitSmMove(){
   if(document.getElementById('mgrPanel').classList.contains('show')){if(mgrDrillLine)renderDrilldown(mgrDrillLine);else renderMgr();}
 }
 
+// ── Schedule Management: Update (re-upload just one line's schedule) ───
+var smUpdateRows=null;
+function openSmUpdate(line){
+  document.getElementById('smUpdateSub').textContent='Upload an updated schedule for '+line+'.';
+  document.getElementById('smUpdateFileStatus').textContent='';
+  document.getElementById('smUpdateFile').value='';
+  ['smUpdateAuth','smUpdatePin'].forEach(function(id){document.getElementById(id).value='';});
+  document.getElementById('smUpdateErr').style.display='none';
+  smUpdateRows=null;
+  smPendingAction={type:'update',line:line};
+  showOverlay('smUpdateOverlay');
+}
+
+function submitSmUpdate(){
+  if(!smPendingAction||smPendingAction.type!=='update')return;
+  var line=smPendingAction.line;
+  if(!smUpdateRows){showToast('Please choose a file.');return;}
+  var auth=document.getElementById('smUpdateAuth').value.trim();
+  var pin=document.getElementById('smUpdatePin').value;
+  document.getElementById('smUpdateErr').style.display='none';
+  if(!auth){showToast('Please enter your name.');return;}
+  if(!isSupervisorPin(pin)){document.getElementById('smUpdateErr').style.display='block';return;}
+
+  var newJobs=[];
+  var skipped=[];
+  smUpdateRows.forEach(function(row,idx){
+    var parsed=parseScheduleRow(row,idx);
+    if(!parsed.ok){skipped.push({rowNum:parsed.rowNum,name:parsed.name,reason:parsed.reason});return;}
+    if(parsed.key!==line){skipped.push({rowNum:parsed.rowNum,name:parsed.name,reason:'Row is for '+parsed.key+' — ignored when updating '+line});return;}
+    newJobs.push(parsed.job);
+  });
+  if(!newJobs.length){showToast('❌ No rows for '+line+' found in that file.');return;}
+
+  var t=nowTime();
+  var jobs=scheduleData[line]||[];
+  var removedCount=0;
+  jobs.forEach(function(job){
+    if(job.status==='pending'){
+      job.status='removed';
+      job.removedBy=auth;
+      job.removedReason='Schedule updated for '+line;
+      job.removedTime=t;
+      removedCount++;
+    }
+  });
+  newJobs.forEach(function(j){jobs.push(j);});
+  scheduleData[line]=jobs;
+
+  scheduleChanges.push({id:'SC-'+Date.now(),type:'update',line:line,jobName:'(bulk)',
+    details:'Schedule updated for '+line+': '+removedCount+' pending job'+(removedCount===1?'':'s')+' replaced, '+newJobs.length+' new job'+(newJobs.length===1?'':'s')+' added'+(skipped.length?', '+skipped.length+' row'+(skipped.length===1?'':'s')+' skipped':''),
+    auth:auth,reason:'Schedule re-upload',time:t});
+  if(skipped.length){lastImportSkipped=skipped;}
+
+  hideOverlay('smUpdateOverlay');
+  showToast('⬆️ '+line+' updated: '+removedCount+' replaced, '+newJobs.length+' added'+(skipped.length?' ('+skipped.length+' skipped)':''));
+  renderLines();
+  if(currentLine===line)renderSchedule();
+  if(document.getElementById('supervisorPanel').classList.contains('show'))renderSupervisorDash();
+  if(document.getElementById('mgrPanel').classList.contains('show')){if(mgrDrillLine)renderDrilldown(mgrDrillLine);else renderMgr();}
+}
+
 // Renders the Schedule Management section into a given container element
 function renderSchedMgmt(container, defaultLine){
   var hasSchedule=Object.keys(scheduleData).length>0;
@@ -5983,6 +6067,12 @@ function renderSchedMgmt(container, defaultLine){
     lineAddBtn.textContent='+ Add';
     lineAddBtn.onclick=(function(l){return function(e){e.stopPropagation();openSmAdd(l);};})(line);
     lhdrRight.appendChild(lineAddBtn);
+
+    var lineUpdateBtn=document.createElement('button');
+    lineUpdateBtn.style.cssText='background:#0074d9;color:#fff;border:none;border-radius:7px;padding:4px 10px;font-size:0.72rem;font-weight:700;cursor:pointer;';
+    lineUpdateBtn.textContent='⬆️ Update';
+    lineUpdateBtn.onclick=(function(l){return function(e){e.stopPropagation();openSmUpdate(l);};})(line);
+    lhdrRight.appendChild(lineUpdateBtn);
 
     if(isCollapsible){
       var chev=document.createElement('span');
@@ -6067,8 +6157,8 @@ function renderSchedMgmt(container, defaultLine){
     scheduleChanges.slice().reverse().forEach(function(chg){
       var arow=document.createElement('div');
       arow.className='audit-row '+chg.type;
-      var typeLabel=chg.type==='add'?'➕ Added':chg.type==='remove'?'🗑️ Removed':'🔀 Moved';
-      var typeColor=chg.type==='add'?'#27ae60':chg.type==='remove'?'#e74c3c':'#9b59b6';
+      var typeLabel=chg.type==='add'?'➕ Added':chg.type==='remove'?'🗑️ Removed':chg.type==='update'?'⬆️ Updated':'🔀 Moved';
+      var typeColor=chg.type==='add'?'#27ae60':chg.type==='remove'?'#e74c3c':chg.type==='update'?'#0074d9':'#9b59b6';
       arow.innerHTML=
         '<div style="display:flex;justify-content:space-between;margin-bottom:2px;">'+
         '<span style="font-weight:700;color:'+typeColor+';">'+typeLabel+'</span>'+
@@ -9245,6 +9335,7 @@ function buildEosPDF(){
     '.pill-ok{background:#f0fdf4;color:#27ae60;border:1px solid #27ae60;}'+
     '.pill-warn{background:#fff8f0;color:#e67e22;border:1px solid #e67e22;}'+
     '.pill-err{background:#fff0f0;color:#e74c3c;border:1px solid #e74c3c;}'+
+    '.pill-info{background:#eaf6ff;color:#0074d9;border:1px solid #0074d9;}'+
     '.pill-grey{background:#f5f5f5;color:#888;border:1px solid #ccc;}'+
     '.note{background:#fff3cd;border:1px solid #f39c12;border-radius:4px;padding:6px 10px;font-size:10px;color:#856404;font-weight:600;margin-bottom:10px;}'+
     '.no-data{color:#bbb;font-style:italic;padding:8px 0;font-size:10px;}'+
@@ -9347,6 +9438,7 @@ function buildEosPDF(){
     scheduleChanges.forEach(function(c){
       var typePill=c.type==='add'?'<span class="pill pill-ok">Added</span>':
         c.type==='remove'?'<span class="pill pill-err">Removed</span>':
+        c.type==='update'?'<span class="pill pill-info">Updated</span>':
         '<span class="pill pill-warn">Moved</span>';
       html+='<tr><td>'+c.time+'</td><td>'+typePill+'</td><td><strong>'+c.jobName+'</strong></td><td>'+c.details+'</td><td>'+c.auth+'</td><td>'+c.reason+'</td></tr>';
     });
@@ -9773,6 +9865,27 @@ document.getElementById('smRemoveSubmitBtn').onclick=submitSmRemove;
 document.getElementById('smRemoveCancelBtn').onclick=function(){hideOverlay('smRemoveOverlay');};
 document.getElementById('smMoveSubmitBtn').onclick=submitSmMove;
 document.getElementById('smMoveCancelBtn').onclick=function(){hideOverlay('smMoveOverlay');};
+document.getElementById('smUpdateFileBtn').onclick=function(){document.getElementById('smUpdateFile').click();};
+document.getElementById('smUpdateFile').onchange=function(){
+  var file=this.files[0];
+  if(!file){smUpdateRows=null;document.getElementById('smUpdateFileStatus').textContent='';return;}
+  var reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      var wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      var rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
+      smUpdateRows=rows;
+      document.getElementById('smUpdateFileStatus').textContent='✓ '+file.name+' ('+rows.length+' row'+(rows.length===1?'':'s')+')';
+    }catch(er){
+      smUpdateRows=null;
+      document.getElementById('smUpdateFileStatus').textContent='';
+      showToast('❌ Could not read file.');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+};
+document.getElementById('smUpdateSubmitBtn').onclick=submitSmUpdate;
+document.getElementById('smUpdateCancelBtn').onclick=function(){hideOverlay('smUpdateOverlay');};
 // New shift + archive
 document.getElementById('confirmNewShiftBtn').onclick=confirmNewShift;
 document.getElementById('cancelNewShiftBtn').onclick=function(){hideOverlay('newShiftOverlay');};
