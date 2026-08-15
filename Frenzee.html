@@ -3817,23 +3817,19 @@ function renderRecipeLib(){
     },50);
   }
 
-  // Add button + search
+  // Search
   var topRow=document.createElement('div');
   topRow.style.cssText='display:flex;gap:8px;margin-bottom:12px;';
   var searchEl=document.createElement('input');
   searchEl.type='text';searchEl.placeholder='🔍 Search by SKU, product name or brand…';
   searchEl.className='field-input';searchEl.style.cssText='flex:1;';
-  var addBtn=document.createElement('button');
-  addBtn.style.cssText='background:#27ae60;color:#fff;border:none;border-radius:10px;padding:10px 14px;font-size:0.85rem;font-weight:700;cursor:pointer;white-space:nowrap;';
-  addBtn.textContent='+ Add Recipe';
-  addBtn.onclick=function(){openRecipeEdit(null);};
-  topRow.appendChild(searchEl);topRow.appendChild(addBtn);
+  topRow.appendChild(searchEl);
   body.appendChild(topRow);
 
   if(!recipeLibrary.length){
     var noRecipes=document.createElement('div');
     noRecipes.style.cssText='text-align:center;color:#bbb;padding:30px;font-size:0.85rem;';
-    noRecipes.innerHTML='<div style="font-size:2.5rem;margin-bottom:8px;">📋</div>No recipes yet.<br><span style="font-size:0.75rem;">Tap + Add Recipe, or download the template above and upload a CSV.</span>';
+    noRecipes.innerHTML='<div style="font-size:2.5rem;margin-bottom:8px;">📋</div>No recipes yet.';
     body.appendChild(noRecipes);
     return;
   }
@@ -5144,9 +5140,11 @@ function openImportReport(){
 function showLines(){renderLines();renderMsgBannerAll();showScreen('lineScreen');}
 function showSchedule(line){
   currentLine=line;
-  if(currentUser&&currentUser.role==='teamleader'&&!lineTeamLeaders[line]){
-    if(confirm('Register as today\'s team leader for '+line+'?')){
-      lineTeamLeaders[line]={name:currentUser.name,time:nowTime()};
+  if(currentUser&&(currentUser.role==='teamleader'||currentUser.role==='supervisor')&&!lineTeamLeaders[line]){
+    var isCover=currentUser.role==='supervisor';
+    var promptMsg=isCover?('No team leader registered for '+line+' yet. Register as covering supervisor?'):('Register as today\'s team leader for '+line+'?');
+    if(confirm(promptMsg)){
+      lineTeamLeaders[line]={name:currentUser.name,time:nowTime(),role:currentUser.role};
       lsScheduleSave();
     }
   }
@@ -5208,7 +5206,7 @@ function renderLines(){
       (openIss?' <span style="color:#e67e22;font-size:0.85rem;">⚠️</span>':'')+
       '</div>'+
       '<div class="line-lbl">'+line+'</div>'+
-      (leader?'<div style="font-size:0.72rem;color:#27ae60;font-weight:600;">👤 '+leader.name+'</div>':'')+
+      (leader?'<div style="font-size:0.72rem;color:#27ae60;font-weight:600;">👤 '+leader.name+(leader.role==='supervisor'?' (covering)':'')+'</div>':'')+
       '<div class="line-cnt">'+done+'/'+jobs.length+' complete</div>'+
       '<div class="lp"><div class="lp-fill" style="width:'+pct+'%"></div></div>';
     card.onclick=(function(l){return function(){showSchedule(l);};})(line);
@@ -5237,7 +5235,7 @@ function renderSchedule(){
   var done=active.filter(function(j){return j.status==='complete';}).length;
   document.getElementById('lineTitle').textContent=currentLine;
   var lineLeader=lineTeamLeaders[currentLine];
-  document.getElementById('lineSubtitle').textContent=done+' of '+active.length+' jobs complete'+(lineLeader?' · 👤 '+lineLeader.name:'');
+  document.getElementById('lineSubtitle').textContent=done+' of '+active.length+' jobs complete'+(lineLeader?' · 👤 '+lineLeader.name+(lineLeader.role==='supervisor'?' (covering)':''):'');
   document.getElementById('lineDate').textContent=new Date().toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
   renderLineMsgBanner();renderIssuesBanner();
   var list=document.getElementById('jobList');list.innerHTML='';
@@ -6339,7 +6337,7 @@ function renderMgr(){
           '<div style="flex:1;">'+
             '<div style="font-weight:800;font-size:0.95rem;">'+line+'</div>'+
             '<div style="font-size:0.8rem;color:'+bc+';font-weight:600;margin-top:1px;">'+st+'</div>'+
-            '<div style="font-size:0.72rem;color:'+(lineLeader?'#27ae60':'#bbb')+';font-weight:600;margin-top:1px;">'+(lineLeader?'👤 '+lineLeader.name:'No team leader registered')+'</div>'+
+            '<div style="font-size:0.72rem;color:'+(lineLeader?'#27ae60':'#bbb')+';font-weight:600;margin-top:1px;">'+(lineLeader?'👤 '+lineLeader.name+(lineLeader.role==='supervisor'?' (covering)':''):'No team leader registered')+'</div>'+
           '</div>'+
           '<div style="text-align:right;display:flex;align-items:center;gap:10px;">'+
             '<div><div style="font-size:1.2rem;font-weight:900;">'+pl+'%</div><div style="font-size:0.68rem;color:#aaa;">'+dn+'/'+jobs.length+'</div></div>'+
