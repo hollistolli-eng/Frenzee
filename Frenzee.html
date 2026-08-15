@@ -2155,7 +2155,7 @@ function renderPrepRoom(){
 
 function openPrepPosition(position){
   currentPrepPosition=position;
-  document.getElementById('prepWorkTitle').textContent='Position '+position+' — '+PREP_POSITION_LABELS[position];
+  document.getElementById('prepWorkTitle').textContent=PREP_POSITION_LABELS[position];
   showPanel('prepWorkPanel');
   renderPrepWork(position);
   if(!prepPositionLeaders[position]) openPrepSignIn(position);
@@ -2178,7 +2178,7 @@ function renderPrepWork(position){
     '<div style="flex:1;text-align:center;">'+
       '<div style="font-size:0.7rem;font-weight:700;color:#555;text-transform:uppercase;">Quality Assurance Manual</div>'+
       '<div style="font-size:0.9rem;font-weight:900;color:#222;">FORM062.0 — INGREDIENT MIXING RECORD QLD</div>'+
-      '<div style="font-size:0.75rem;color:#555;">Position '+position+' — '+PREP_POSITION_LABELS[position]+'</div>'+
+      '<div style="font-size:0.75rem;color:#555;">'+PREP_POSITION_LABELS[position]+'</div>'+
     '</div></div>'+
     '<div style="display:flex;gap:16px;font-size:0.82rem;margin-bottom:6px;">'+
       '<div><span style="font-weight:700;">Date:</span> '+today+'</div>'+
