@@ -869,6 +869,7 @@ var LC_CHECKS=[
 
 // ── State ──────────────────────────────────────────────────────────────
 var scheduleData={}, currentLine=null, currentJobIdx=null;
+var lineTeamLeaders={}; // {lineName: {name, time}} — who registered as running each line today
 var ingredientState={}, currentOverrideIngId=null, currentTxJobIdx=null;
 
 // ingredientState keyed by line+jobIdx+ingId — each line team leader scans independently
@@ -3797,64 +3798,24 @@ function renderRecipeLib(){
   infoCard.style.cssText='background:#f0fff4;border-radius:16px;padding:12px 14px;margin-bottom:14px;border-left:5px solid #27ae60;';
   infoCard.innerHTML=
     '<div style="font-size:0.8rem;font-weight:700;color:#27ae60;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">📋 Recipe Library</div>'+
-    '<div style="font-size:0.82rem;color:#555;line-height:1.5;">'+recipeLibrary.length+' recipe'+(recipeLibrary.length!==1?'s':'')+' loaded. Recipes auto-match to jobs on the line by SKU. Manager PIN required to upload or edit.</div>';
+    '<div style="font-size:0.82rem;color:#555;line-height:1.5;">'+recipeLibrary.length+' recipe'+(recipeLibrary.length!==1?'s':'')+' loaded. Recipes auto-match to jobs on the line by SKU.</div>';
   body.appendChild(infoCard);
 
-  // CSV Template download
-  var templateCard=document.createElement('div');
-  templateCard.style.cssText='background:#fff;border-radius:16px;padding:12px 14px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:4px solid #f39c12;';
-  templateCard.innerHTML=
-    '<div style="font-size:0.78rem;font-weight:700;color:#b8860b;margin-bottom:6px;">📥 CSV Upload Format</div>'+
-    '<div style="font-size:0.75rem;color:#555;margin-bottom:8px;">Your CSV must have these columns: <code style="background:#f5f5f5;padding:1px 5px;border-radius:4px;">SKU, ProductName, Brand, IngredientName, Qty, Unit, Allergens, Supplier</code><br>'+
-    'One row per ingredient. Multiple ingredients for the same SKU = multiple rows with the same SKU.</div>'+
-    '<button id="rl-templateBtn" style="background:#f39c12;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:0.78rem;font-weight:700;cursor:pointer;">⬇️ Download Template CSV</button>';
-  body.appendChild(templateCard);
-  document.getElementById('rl-templateBtn').onclick=downloadRecipeTemplate;
-
-  // Upload section
-  var uploadCard=document.createElement('div');
-  uploadCard.style.cssText='background:#fff;border-radius:16px;padding:14px;margin-bottom:14px;box-shadow:0 4px 18px rgba(15,46,28,0.07);';
-  uploadCard.innerHTML=
-    '<div style="font-size:0.78rem;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">⬆️ Upload Recipes</div>'+
-    '<div class="field-row" style="margin-bottom:10px;"><div class="field-label">Manager PIN</div><input class="field-input" type="password" id="rl-pin" placeholder="Required to upload"/><div style="color:#e74c3c;font-size:0.75rem;font-weight:700;display:none;margin-top:3px;" id="rl-pinErr">❌ Incorrect PIN — Manager access only.</div></div>'+
-    '<div style="display:flex;gap:8px;">'+
-      '<input type="file" id="rl-fileInput" accept=".csv,.xlsx,.xls" style="display:none;"/>'+
-      '<button id="rl-uploadBtn" style="flex:1;background:#27ae60;color:#fff;border:none;border-radius:10px;padding:11px;font-size:0.88rem;font-weight:700;cursor:pointer;">📂 Choose CSV / Excel File</button>'+
-      (recipeLibrary.length?'<button id="rl-clearBtn" style="background:#e74c3c;color:#fff;border:none;border-radius:10px;padding:11px 14px;font-size:0.88rem;font-weight:700;cursor:pointer;">🗑️ Clear All</button>':'')+'</div>'+
-    '<div style="font-size:0.72rem;color:#aaa;margin-top:6px;">Uploading a new file will merge with existing recipes (same SKU = update). Clear All removes everything.</div>';
-  body.appendChild(uploadCard);
-
-  setTimeout(function(){
-    var uploadBtn=document.getElementById('rl-uploadBtn');
-    var fileInput=document.getElementById('rl-fileInput');
-    var clearBtn=document.getElementById('rl-clearBtn');
-    if(uploadBtn) uploadBtn.onclick=function(){
-      var pin=document.getElementById('rl-pin').value;
-      var isMgr=Object.keys(STAFF_PINS).some(function(id){return STAFF_PINS[id]===pin&&(STAFF_ROLES[id]==='manager'||STAFF_ROLES[id]==='qa');});
-      if(!isMgr){document.getElementById('rl-pinErr').style.display='block';return;}
-      document.getElementById('rl-pinErr').style.display='none';
-      fileInput.click();
-    };
-    if(fileInput) fileInput.onchange=function(){
-      var file=fileInput.files[0];if(!file)return;
-      var reader=new FileReader();
-      reader.onload=function(e){
-        try{
-          var wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
-          var rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
-          processRecipeUpload(rows);
-        }catch(err){showToast('❌ Could not read file.');}
+  if(recipeLibrary.length){
+    var clearCard=document.createElement('div');
+    clearCard.style.cssText='background:#fff;border-radius:16px;padding:14px;margin-bottom:14px;box-shadow:0 4px 18px rgba(15,46,28,0.07);display:flex;align-items:center;justify-content:space-between;gap:10px;';
+    clearCard.innerHTML=
+      '<div style="font-size:0.75rem;color:#888;">Removes every recipe from the library.</div>'+
+      '<button id="rl-clearBtn" style="background:#e74c3c;color:#fff;border:none;border-radius:10px;padding:9px 14px;font-size:0.82rem;font-weight:700;cursor:pointer;white-space:nowrap;">🗑️ Clear All</button>';
+    body.appendChild(clearCard);
+    setTimeout(function(){
+      var clearBtn=document.getElementById('rl-clearBtn');
+      if(clearBtn) clearBtn.onclick=function(){
+        if(!confirm('Clear all '+recipeLibrary.length+' recipes? This cannot be undone.')) return;
+        recipeLibrary=[];fbClearCollection('recipes');lsScheduleSave();showToast('🗑️ All recipes cleared');renderRecipeLib();
       };
-      reader.readAsArrayBuffer(file);
-    };
-    if(clearBtn) clearBtn.onclick=function(){
-      var pin=document.getElementById('rl-pin').value;
-      var isMgr=Object.keys(STAFF_PINS).some(function(id){return STAFF_PINS[id]===pin&&(STAFF_ROLES[id]==='manager'||STAFF_ROLES[id]==='qa');});
-      if(!isMgr){document.getElementById('rl-pinErr').style.display='block';return;}
-      if(!confirm('Clear all '+recipeLibrary.length+' recipes? This cannot be undone.')) return;
-      recipeLibrary=[];fbClearCollection('recipes');lsScheduleSave();showToast('🗑️ All recipes cleared');renderRecipeLib();
-    };
-  },50);
+    },50);
+  }
 
   // Add button + search
   var topRow=document.createElement('div');
@@ -4009,54 +3970,6 @@ function renderRecipeLib(){
 
   renderList('');
   searchEl.oninput=function(){renderList(searchEl.value);};
-}
-
-function downloadRecipeTemplate(){
-  var csv='SKU,ProductName,Brand,IngredientName,Qty,Unit,Allergens,Supplier\n'+
-    '940456,WW Chicken Caesar Wrap,Woolworths,Chicken Caesar Mix,200,g,Eggs|Dairy,Inghams\n'+
-    '940456,WW Chicken Caesar Wrap,Woolworths,Romaine Lettuce,50,g,,Fresh Co\n'+
-    '940456,WW Chicken Caesar Wrap,Woolworths,10 Inch Flour Tortilla,1,each,Gluten|Wheat,Mission\n'+
-    '940457,WW Chicken Mayo Sandwich,Woolworths,Chicken Mayo Mix,180,g,Eggs,Inghams\n';
-  var blob=new Blob([csv],{type:'text/csv'});
-  var a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download='Frenzee_Recipe_Template.csv';
-  a.click();
-  showToast('✅ Template downloaded');
-}
-
-function processRecipeUpload(rows){
-  if(!rows.length){showToast('❌ File is empty.');return;}
-  var added=0,updated=0,errors=0;
-  // Group rows by SKU
-  var grouped={};
-  rows.forEach(function(row){
-    var sku=String(row['SKU']||row['sku']||'').trim();
-    var productName=String(row['ProductName']||row['Product Name']||row['productname']||'').trim();
-    var brand=String(row['Brand']||row['brand']||'').trim();
-    var ingName=String(row['IngredientName']||row['Ingredient Name']||row['ingredientname']||'').trim();
-    var qty=String(row['Qty']||row['qty']||row['Quantity']||'').trim();
-    var unit=String(row['Unit']||row['unit']||'').trim();
-    var allergens=String(row['Allergens']||row['allergens']||'').trim();
-    var supplier=String(row['Supplier']||row['supplier']||'').trim();
-    if(!sku||!productName){errors++;return;}
-    if(!grouped[sku]) grouped[sku]={sku:sku,productName:productName,brand:brand,ingredients:[]};
-    if(ingName) grouped[sku].ingredients.push({name:ingName,qty:qty,unit:unit,allergens:allergens,supplier:supplier});
-  });
-
-  var fbBatch=fbDb.batch();
-  Object.values(grouped).forEach(function(recipe){
-    var existing=recipeLibrary.findIndex(function(r){return r.sku===recipe.sku;});
-    if(existing>=0){recipeLibrary[existing]=recipe;updated++;}
-    else{recipeLibrary.push(recipe);added++;}
-    fbBatch.set(fbDb.collection('recipes').doc(recipe.sku), recipe);
-  });
-  fbBatch.commit().catch(function(e){console.error('Firestore recipe bulk upload failed:',e);showToast('⚠️ Saved locally, but sync to other devices failed — check connection.');});
-
-  recipeChangesLog.push({type:'upload',added:added,updated:updated,by:currentUser?currentUser.name:'Manager',time:nowTime()});
-  lsScheduleSave();
-  showToast('✅ '+added+' added, '+updated+' updated'+(errors?' ('+errors+' skipped)':''));
-  renderRecipeLib();
 }
 
 function viewRecipe(sku){
@@ -5229,7 +5142,16 @@ function openImportReport(){
 
 // ── Navigation ─────────────────────────────────────────────────────────
 function showLines(){renderLines();renderMsgBannerAll();showScreen('lineScreen');}
-function showSchedule(line){currentLine=line;renderSchedule();renderLineMsgBanner();renderIssuesBanner();showScreen('scheduleScreen');}
+function showSchedule(line){
+  currentLine=line;
+  if(currentUser&&currentUser.role==='teamleader'&&!lineTeamLeaders[line]){
+    if(confirm('Register as today\'s team leader for '+line+'?')){
+      lineTeamLeaders[line]={name:currentUser.name,time:nowTime()};
+      lsScheduleSave();
+    }
+  }
+  renderSchedule();renderLineMsgBanner();renderIssuesBanner();showScreen('scheduleScreen');
+}
 function showTrace(idx){currentJobIdx=idx;renderTrace();showScreen('traceScreen');}
 
 // ── Lines ──────────────────────────────────────────────────────────────
@@ -5277,6 +5199,7 @@ function renderLines(){
     var isStat=line==='STAT';
     var hasMsg=messages.some(function(m){return (m.to===line||m.to==='all')&&!m.read;});
     var openIss=issueLog.filter(function(i){return i.line===line&&!i.resolved;}).length;
+    var leader=lineTeamLeaders[line];
     var card=document.createElement('div');
     card.className='line-card';
     card.innerHTML='<div class="line-num">'+
@@ -5285,6 +5208,7 @@ function renderLines(){
       (openIss?' <span style="color:#e67e22;font-size:0.85rem;">⚠️</span>':'')+
       '</div>'+
       '<div class="line-lbl">'+line+'</div>'+
+      (leader?'<div style="font-size:0.72rem;color:#27ae60;font-weight:600;">👤 '+leader.name+'</div>':'')+
       '<div class="line-cnt">'+done+'/'+jobs.length+' complete</div>'+
       '<div class="lp"><div class="lp-fill" style="width:'+pct+'%"></div></div>';
     card.onclick=(function(l){return function(){showSchedule(l);};})(line);
@@ -5312,7 +5236,8 @@ function renderSchedule(){
   var active=jobs.filter(function(j){return j.status!=='transferred'&&j.status!=='removed';});
   var done=active.filter(function(j){return j.status==='complete';}).length;
   document.getElementById('lineTitle').textContent=currentLine;
-  document.getElementById('lineSubtitle').textContent=done+' of '+active.length+' jobs complete';
+  var lineLeader=lineTeamLeaders[currentLine];
+  document.getElementById('lineSubtitle').textContent=done+' of '+active.length+' jobs complete'+(lineLeader?' · 👤 '+lineLeader.name:'');
   document.getElementById('lineDate').textContent=new Date().toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
   renderLineMsgBanner();renderIssuesBanner();
   var list=document.getElementById('jobList');list.innerHTML='';
@@ -6399,6 +6324,7 @@ function renderMgr(){
       var openIss=issueLog.filter(function(i){return i.line===line&&!i.resolved;}).length;
       var bc=errs?'#e74c3c':openIss?'#e67e22':run?'#0074d9':pl===100?'#2ecc40':'#f39c12';
       var st=errs?('🛑 '+errs+' DO NOT MAKE'):openIss?('⚠️ '+openIss+' issue'+(openIss>1?'s':'')):run?('🔵 '+(run.name.length>24?run.name.substring(0,24)+'…':run.name)):pl===100?'✅ All Complete':'⏳ Waiting';
+      var lineLeader=lineTeamLeaders[line];
 
       // Wrapper card
       var card=document.createElement('div');
@@ -6413,6 +6339,7 @@ function renderMgr(){
           '<div style="flex:1;">'+
             '<div style="font-weight:800;font-size:0.95rem;">'+line+'</div>'+
             '<div style="font-size:0.8rem;color:'+bc+';font-weight:600;margin-top:1px;">'+st+'</div>'+
+            '<div style="font-size:0.72rem;color:'+(lineLeader?'#27ae60':'#bbb')+';font-weight:600;margin-top:1px;">'+(lineLeader?'👤 '+lineLeader.name:'No team leader registered')+'</div>'+
           '</div>'+
           '<div style="text-align:right;display:flex;align-items:center;gap:10px;">'+
             '<div><div style="font-size:1.2rem;font-weight:900;">'+pl+'%</div><div style="font-size:0.68rem;color:#aaa;">'+dn+'/'+jobs.length+'</div></div>'+
@@ -9078,6 +9005,7 @@ function lsSave(){
       savedDate: new Date().toLocaleDateString('en-AU'),
       scheduleData: scheduleData,
       scheduleChanges: scheduleChanges,
+      lineTeamLeaders: lineTeamLeaders,
       mixCountWeights: mixCountWeights,
       stockCountData: stockCountData,
       issueLog: issueLog,
@@ -9143,6 +9071,7 @@ function lsLoad(){
     }
     scheduleData     = snap.scheduleData     || {};
     scheduleChanges  = snap.scheduleChanges  || [];
+    lineTeamLeaders  = snap.lineTeamLeaders  || {};
     mixCountWeights  = snap.mixCountWeights  || {};
     stockCountData   = snap.stockCountData   || {};
     issueLog         = snap.issueLog         || [];
@@ -9206,7 +9135,7 @@ function confirmNewShift(){
   // Trigger the end-of-shift email/download flow
   openEndOfShiftReport(function(){
     // After report flow, wipe state
-    scheduleData={};scheduleChanges=[];mixCountWeights={};stockCountData={};form067Manual={};
+    scheduleData={};scheduleChanges=[];lineTeamLeaders={};mixCountWeights={};stockCountData={};form067Manual={};
     toolUsageForm={date:"",day:"",startCount:"",startCompletedBy:"",startSignature:"",entries:[],endCount:"",endCompletedBy:"",endSignature:"",allAccountedFor:"",comments:"",prodMgrName:"",prodMgrSig:"",prodMgrDate:"",qaName:"",qaSig:"",qaDate:"",status:"in-progress"};
     toolboxRegisterForm={checked:{},missingReasons:{},comments:'',prodMgrName:'',prodMgrSig:'',prodMgrDate:'',qaName:'',qaSig:'',qaDate:'',status:'in-progress'};
     toolboxChangesLog=[];
