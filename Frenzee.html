@@ -826,6 +826,21 @@ if(sessionStorage.getItem(PW_KEY)==='1'){
   </div>
 </div>
 
+<!-- PREP MIX QUANTITY ADJUST (SUPERVISOR OVERRIDE) -->
+<div class="overlay" id="prepAdjustOverlay">
+  <div class="ov-box">
+    <div class="ov-icon">⚖️</div>
+    <div class="ov-title">Adjust Mix Quantity</div>
+    <div class="ov-sub" id="prepAdjustSub"></div>
+    <div class="ov-field"><label>New Total Kg</label><input type="number" step="0.1" min="0" class="field-input" id="prepAdjustKg"/></div>
+    <div class="ov-field"><label>New Tubs Required</label><input type="number" min="1" class="field-input" id="prepAdjustTubs"/></div>
+    <div class="ov-field"><label>Reason</label><input type="text" class="field-input" id="prepAdjustReason" placeholder="e.g. 10kg carried over from yesterday"/></div>
+    <div class="ov-field"><label>Supervisor / Manager PIN</label><input type="password" class="field-input" id="prepAdjustPin"/><div class="ov-err" id="prepAdjustErr">❌ Incorrect PIN — Supervisor, QA or Manager required.</div></div>
+    <button class="ov-btn blue" id="prepAdjustConfirmBtn">⚖️ Apply Change</button>
+    <button class="ov-btn grey" id="prepAdjustCancelBtn">Cancel</button>
+  </div>
+</div>
+
 <!-- PREP MIX COMPLETE — PRINT LABELS PROMPT -->
 <div class="overlay" id="prepLabelPromptOverlay">
   <div class="ov-box">
@@ -938,6 +953,7 @@ var scheduleData={}, currentLine=null, currentJobIdx=null;
 var lineTeamLeaders={}; // {lineName: {name, time}} — who registered as running each line today
 var prepPositionLeaders={}; // {position(1/2/3): {name, time, role}} — who registered as running each prep position today
 var prepTransferLog=[]; // [{mixName, mixCode, fromPosition, toPosition, fromLeader, toLeader, time}]
+var prepQtyAdjustLog=[]; // [{mixCode, position, oldKg, newKg, oldTubs, newTubs, reason, by, time}]
 var ingredientState={}, currentOverrideIngId=null, currentTxJobIdx=null;
 
 // ingredientState keyed by line+jobIdx+ingId — each line team leader scans independently
@@ -2312,6 +2328,14 @@ function renderPrepMixCard(body,job,position,color){
   tbl.appendChild(totalRow);
   expandBody.appendChild(tbl);
 
+  if(!isDone){
+    var adjustBtn=document.createElement('button');
+    adjustBtn.style.cssText='width:calc(100% - 28px);margin:0 14px 10px;background:#fff;color:#555;border:1.5px solid #ddd;border-radius:8px;padding:8px;font-size:0.78rem;font-weight:700;cursor:pointer;';
+    adjustBtn.textContent='⚖️ Adjust Quantity (Supervisor)';
+    adjustBtn.onclick=(function(j,p){return function(e){e.stopPropagation();openPrepAdjust(j,p);};})(job,position);
+    expandBody.appendChild(adjustBtn);
+  }
+
   // Timing + UBD inputs (only if not done)
   if(!isDone){
     var inputSection=document.createElement('div');
@@ -2673,6 +2697,47 @@ function submitPrepTransfer(toPosition){
   renderPrepRoom();
   if(currentPrepPosition===fromPosition||currentPrepPosition===toPosition) renderPrepWork(currentPrepPosition);
   _prepTransferCtx=null;
+}
+
+// ── Supervisor override: adjust a mix's kg/tubs live during production ──
+var _prepAdjustCtx=null;
+function openPrepAdjust(job,position){
+  _prepAdjustCtx={job:job,position:position};
+  document.getElementById('prepAdjustSub').textContent=job.mixCode+' — '+job.mixName;
+  document.getElementById('prepAdjustKg').value=job.totalKgRequired||'';
+  document.getElementById('prepAdjustTubs').value=job.tubsRequired||'';
+  document.getElementById('prepAdjustReason').value='';
+  document.getElementById('prepAdjustPin').value='';
+  document.getElementById('prepAdjustErr').style.display='none';
+  showOverlay('prepAdjustOverlay');
+}
+function submitPrepAdjust(){
+  if(!_prepAdjustCtx) return;
+  var job=_prepAdjustCtx.job, position=_prepAdjustCtx.position;
+  var newKg=parseFloat(document.getElementById('prepAdjustKg').value);
+  var newTubs=parseInt(document.getElementById('prepAdjustTubs').value);
+  var reason=document.getElementById('prepAdjustReason').value.trim();
+  var pin=document.getElementById('prepAdjustPin').value;
+  var errEl=document.getElementById('prepAdjustErr');
+  errEl.style.display='none';
+  if(isNaN(newKg)||newKg<0){showToast('Please enter a valid kg amount.');return;}
+  if(isNaN(newTubs)||newTubs<1){showToast('Please enter a valid tub count.');return;}
+  if(!reason){showToast('Please enter a reason.');return;}
+  if(!isSupervisorPin(pin)){errEl.style.display='block';return;}
+  var authId=Object.keys(STAFF_PINS).find(function(id){return STAFF_PINS[id]===pin;});
+  var oldKg=job.totalKgRequired, oldTubs=job.tubsRequired;
+  job.totalKgRequired=newKg;
+  job.tubsRequired=newTubs;
+  prepQtyAdjustLog.push({
+    mixCode:job.mixCode,position:position,oldKg:oldKg,newKg:newKg,oldTubs:oldTubs,newTubs:newTubs,
+    reason:reason,by:authId?STAFF_NAMES[authId]:'Supervisor',time:nowTime()
+  });
+  lsScheduleSave();
+  hideOverlay('prepAdjustOverlay');
+  showToast('⚖️ '+job.mixCode+' updated — '+newTubs+' tubs · '+newKg.toFixed(1)+'kg');
+  renderPrepRoom();
+  if(currentPrepPosition===position) renderPrepWork(position);
+  _prepAdjustCtx=null;
 }
 
 // ── Print Labels prompt on mix completion ────────────────────────────
@@ -6914,6 +6979,25 @@ function renderMgr(){
       prepMgrCard.appendChild(sRow);
     });
   }
+
+  var adjHdr=document.createElement('div');
+  adjHdr.style.cssText='font-size:0.78rem;font-weight:700;color:#555;margin-top:12px;margin-bottom:6px;';
+  adjHdr.textContent='⚖️ Quantity Overrides ('+prepQtyAdjustLog.length+')';
+  prepMgrCard.appendChild(adjHdr);
+  if(!prepQtyAdjustLog.length){
+    var noAdj=document.createElement('div');
+    noAdj.style.cssText='font-size:0.78rem;color:#bbb;padding:4px 0;';
+    noAdj.textContent='None today.';
+    prepMgrCard.appendChild(noAdj);
+  } else {
+    prepQtyAdjustLog.slice().reverse().forEach(function(a){
+      var aRow=document.createElement('div');
+      aRow.style.cssText='background:#e8f4fd;border-left:3px solid #0074d9;border-radius:6px;padding:6px 9px;margin-bottom:5px;font-size:0.76rem;color:#0d4c73;';
+      aRow.innerHTML='<b>'+a.mixCode+'</b> (Position '+a.position+') — '+a.oldTubs+' tubs · '+a.oldKg.toFixed(1)+'kg → <b>'+a.newTubs+' tubs · '+a.newKg.toFixed(1)+'kg</b><br>'+
+        '<span style="color:#888;">'+a.reason+' — approved by '+a.by+' ('+a.time+')</span>';
+      prepMgrCard.appendChild(aRow);
+    });
+  }
   linesEl.appendChild(prepMgrCard);
 
   // ── Archive card ──────────────────────────────────────────────────
@@ -9397,6 +9481,7 @@ function lsSave(){
       lineTeamLeaders: lineTeamLeaders,
       prepPositionLeaders: prepPositionLeaders,
       prepTransferLog: prepTransferLog,
+      prepQtyAdjustLog: prepQtyAdjustLog,
       mixCountWeights: mixCountWeights,
       stockCountData: stockCountData,
       issueLog: issueLog,
@@ -9465,6 +9550,7 @@ function lsLoad(){
     lineTeamLeaders  = snap.lineTeamLeaders  || {};
     prepPositionLeaders = snap.prepPositionLeaders || {};
     prepTransferLog = snap.prepTransferLog || [];
+    prepQtyAdjustLog = snap.prepQtyAdjustLog || [];
     mixCountWeights  = snap.mixCountWeights  || {};
     stockCountData   = snap.stockCountData   || {};
     issueLog         = snap.issueLog         || [];
@@ -9528,7 +9614,7 @@ function confirmNewShift(){
   // Trigger the end-of-shift email/download flow
   openEndOfShiftReport(function(){
     // After report flow, wipe state
-    scheduleData={};scheduleChanges=[];lineTeamLeaders={};prepPositionLeaders={};prepTransferLog=[];mixCountWeights={};stockCountData={};form067Manual={};
+    scheduleData={};scheduleChanges=[];lineTeamLeaders={};prepPositionLeaders={};prepTransferLog=[];prepQtyAdjustLog=[];mixCountWeights={};stockCountData={};form067Manual={};
     toolUsageForm={date:"",day:"",startCount:"",startCompletedBy:"",startSignature:"",entries:[],endCount:"",endCompletedBy:"",endSignature:"",allAccountedFor:"",comments:"",prodMgrName:"",prodMgrSig:"",prodMgrDate:"",qaName:"",qaSig:"",qaDate:"",status:"in-progress"};
     toolboxRegisterForm={checked:{},missingReasons:{},comments:'',prodMgrName:'',prodMgrSig:'',prodMgrDate:'',qaName:'',qaSig:'',qaDate:'',status:'in-progress'};
     toolboxChangesLog=[];
@@ -10193,6 +10279,8 @@ document.getElementById('mixLibCloseBtn').onclick=function(){hidePanel('mixLibPa
 document.getElementById('staffMgmtCloseBtn').onclick=function(){hidePanel('staffMgmtPanel');};
 document.getElementById('prepTransferCancelBtn').onclick=function(){hideOverlay('prepTransferOverlay');_prepTransferCtx=null;};
 document.getElementById('prepLabelPromptCancelBtn').onclick=function(){hideOverlay('prepLabelPromptOverlay');};
+document.getElementById('prepAdjustConfirmBtn').onclick=submitPrepAdjust;
+document.getElementById('prepAdjustCancelBtn').onclick=function(){hideOverlay('prepAdjustOverlay');_prepAdjustCtx=null;};
 document.getElementById('staffEditCancelBtn').onclick=function(){hideOverlay('staffEditOverlay');};
 document.getElementById('prepRoomCloseBtn').onclick=function(){hidePanel('prepRoomPanel');};
 document.getElementById('prepWorkCloseBtn').onclick=function(){hidePanel('prepWorkPanel');showPanel('prepRoomPanel');renderPrepRoom();};
