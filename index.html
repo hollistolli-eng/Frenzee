@@ -662,6 +662,43 @@ if(sessionStorage.getItem(PW_KEY)==='1'){
   <div class="mgr-body" id="mixLibBody"></div>
 </div>
 
+<div class="mgr-panel" id="staffMgmtPanel">
+  <div class="mgr-hdr">
+    <div class="mgr-hdr-title"><span style="color:#2ecc40;">FRENZ</span><span style="color:#0074d9;">EE</span> <span style="font-size:0.8rem;color:#888;">👥 Employee Management</span></div>
+    <button class="mgr-close" id="staffMgmtCloseBtn">✕ Close</button>
+  </div>
+  <div class="mgr-body" id="staffMgmtBody"></div>
+</div>
+
+<!-- STAFF ADD/EDIT OVERLAY -->
+<div class="overlay" id="staffEditOverlay">
+  <div class="ov-box" style="max-width:400px;">
+    <div class="ov-icon" id="staffEditIcon">👤</div>
+    <div class="ov-title" id="staffEditTitle">Add Employee</div>
+    <div class="ov-field">
+      <label>Full Name</label>
+      <input type="text" class="field-input" id="staffEditName" placeholder="e.g. Jordan Smith"/>
+    </div>
+    <div class="ov-field">
+      <label>Role</label>
+      <select id="staffEditRole">
+        <option value="manager">Manager</option>
+        <option value="supervisor">Supervisor</option>
+        <option value="qa">QA / QC</option>
+        <option value="teamleader">Team Leader</option>
+        <option value="labelprinter">Label Printer</option>
+      </select>
+    </div>
+    <div class="ov-field">
+      <label>4-Digit PIN</label>
+      <input type="text" class="field-input" id="staffEditPin" maxlength="4" inputmode="numeric" placeholder="e.g. 4821"/>
+    </div>
+    <div style="color:#e74c3c;font-size:0.78rem;min-height:16px;margin-bottom:6px;" id="staffEditMsg"></div>
+    <button class="ov-btn" id="staffEditSaveBtn">Save</button>
+    <button class="ov-btn grey" id="staffEditCancelBtn">Cancel</button>
+  </div>
+</div>
+
 <!-- MIX ADD/EDIT OVERLAY -->
 <div class="overlay" id="mixEditOverlay">
   <div class="ov-box" style="max-width:440px;">
@@ -777,6 +814,17 @@ if(sessionStorage.getItem(PW_KEY)==='1'){
   </div>
 </div>
 
+<!-- PREP MIX TRANSFER OVERLAY -->
+<div class="overlay" id="prepTransferOverlay">
+  <div class="ov-box">
+    <div class="ov-icon">🔀</div>
+    <div class="ov-title">Send Mix</div>
+    <div class="ov-sub" id="prepTransferSub"></div>
+    <div id="prepTransferBtns" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;"></div>
+    <button class="ov-btn grey" id="prepTransferCancelBtn">Cancel</button>
+  </div>
+</div>
+
 <!-- SCREENS -->
 <div class="screen active" id="loginScreen">
   <div class="login-wrap">
@@ -788,11 +836,7 @@ if(sessionStorage.getItem(PW_KEY)==='1'){
       <h2>Sign In</h2>
       <label>Select Your Name</label>
       <select id="staffDropdown">
-        <option value="">-- Select name --</option>
-        <option value="15">Debbie Daniell (Manager)</option>
-        <option value="16">Heather Storey (Supervisor)</option>
-        <option value="17">Adam Rainbow (Supervisor)</option>
-        <option value="14">Renae Curtis (Team Leader)</option>
+        <option value="">Loading staff…</option>
       </select>
       <label>Enter 4-Digit PIN</label>
       <input type="password" id="pinInput" placeholder="••••" maxlength="4"/>
@@ -840,9 +884,10 @@ if(sessionStorage.getItem(PW_KEY)==='1'){
 
 <script>
 // ── Staff ──────────────────────────────────────────────────────────────
-var STAFF_PINS = {'14':'2301','15':'2201','16':'3108','17':'2907'};
-var STAFF_ROLES = {'14':'teamleader','15':'manager','16':'supervisor','17':'supervisor'};
-var STAFF_NAMES = {'14':'Renae Curtis','15':'Debbie Daniell','16':'Heather Storey','17':'Adam Rainbow'};
+// Populated live from Firestore — see initStaffSync(). Keyed by staff id.
+var STAFF_PINS = {};
+var STAFF_ROLES = {};
+var STAFF_NAMES = {};
 var ROLE_COLORS = {manager:'#0074d9',supervisor:'#9b59b6',qa:'#27ae60',teamleader:'#e67e22',labelprinter:'#8e44ad'};
 var ROLE_LABELS = {manager:'Manager',supervisor:'Supervisor',qa:'QA / QC',teamleader:'Team Leader',labelprinter:'Label Printer'};
 var currentUser = null;
@@ -853,7 +898,6 @@ function canAccess(role){
   if (role==='manager') return r==='manager';
   if (role==='supervisor') return r==='manager'||r==='supervisor';
   if (role==='qa') return r==='manager'||r==='supervisor'||r==='qa';
-  if (role==='labelprinter') return r!=='teamleader';
   return true;
 }
 function isSupervisorPin(pin){
@@ -880,6 +924,8 @@ var LC_CHECKS=[
 // ── State ──────────────────────────────────────────────────────────────
 var scheduleData={}, currentLine=null, currentJobIdx=null;
 var lineTeamLeaders={}; // {lineName: {name, time}} — who registered as running each line today
+var prepPositionLeaders={}; // {position(1/2/3): {name, time, role}} — who registered as running each prep position today
+var prepTransferLog=[]; // [{mixName, mixCode, fromPosition, toPosition, fromLeader, toLeader, time}]
 var ingredientState={}, currentOverrideIngId=null, currentTxJobIdx=null;
 
 // ingredientState keyed by line+jobIdx+ingId — each line team leader scans independently
@@ -2082,6 +2128,7 @@ function renderPrepRoom(){
     var posJobs=prepSchedule.filter(function(j){return j.position===pos;});
     var doneCount=prepRecords.filter(function(r){return r.position===pos&&r.status==='complete';}).length;
     var color=posColors[pos-1];
+    var posLeader=prepPositionLeaders[pos];
     var card=document.createElement('div');
     card.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:10px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid '+color+';cursor:pointer;';
     card.innerHTML=
@@ -2090,6 +2137,7 @@ function renderPrepRoom(){
         '<div style="flex:1;">'+
           '<div style="font-weight:800;font-size:0.95rem;color:'+color+';">Position '+pos+'</div>'+
           '<div style="font-size:0.78rem;color:#888;margin-top:2px;">'+PREP_POSITION_LABELS[pos]+'</div>'+
+          '<div style="font-size:0.72rem;font-weight:600;margin-top:2px;color:'+(posLeader?'#27ae60':'#bbb')+';">'+(posLeader?'👤 '+posLeader.name:'No one registered')+'</div>'+
           '<div style="font-size:0.72rem;font-weight:600;margin-top:4px;color:'+(doneCount===posJobs.length&&posJobs.length>0?'#27ae60':'#aaa')+';">'+
             (posJobs.length?doneCount+'/'+posJobs.length+' mixes complete':'No mixes assigned today')+
           '</div>'+
@@ -2109,6 +2157,7 @@ function openPrepPosition(position){
   document.getElementById('prepWorkTitle').textContent='Position '+position+' — '+PREP_POSITION_LABELS[position];
   showPanel('prepWorkPanel');
   renderPrepWork(position);
+  if(!prepPositionLeaders[position]) openPrepSignIn(position);
 }
 
 function renderPrepWork(position){
@@ -2130,11 +2179,14 @@ function renderPrepWork(position){
       '<div style="font-size:0.9rem;font-weight:900;color:#222;">FORM062.0 — INGREDIENT MIXING RECORD QLD</div>'+
       '<div style="font-size:0.75rem;color:#555;">Position '+position+' — '+PREP_POSITION_LABELS[position]+'</div>'+
     '</div></div>'+
-    '<div style="display:flex;gap:16px;font-size:0.82rem;">'+
+    '<div style="display:flex;gap:16px;font-size:0.82rem;margin-bottom:6px;">'+
       '<div><span style="font-weight:700;">Date:</span> '+today+'</div>'+
       '<div><span style="font-weight:700;">Day:</span> '+new Date().toLocaleDateString('en-AU',{weekday:'long'})+'</div>'+
-    '</div>';
+    '</div>'+
+    (prepPositionLeaders[position]?'<div id="prepPosLeaderTag" style="font-size:0.78rem;color:#27ae60;font-weight:700;text-decoration:underline;cursor:pointer;">👤 '+prepPositionLeaders[position].name+'</div>':'');
   body.appendChild(frmHdr);
+  var posLeaderTag=document.getElementById('prepPosLeaderTag');
+  if(posLeaderTag) posLeaderTag.onclick=function(){openPrepSignIn(position);};
 
   if(!posJobs.length){
     var noJobs=document.createElement('div');
@@ -2190,9 +2242,9 @@ function renderPrepMixCard(body,job,position,color){
   hdr.style.cssText='display:flex;align-items:center;gap:10px;padding:12px 14px;';
   hdr.innerHTML=
     '<div style="flex:1;">'+
-      '<div style="font-weight:800;font-size:0.88rem;color:#222;">'+job.mixName+'</div>'+
+      '<div style="font-weight:900;font-size:1rem;color:#222;">'+job.mixCode+'</div>'+
+      '<div style="font-size:0.76rem;color:#888;margin-top:1px;">'+job.mixName+'</div>'+
       '<div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap;">'+
-        '<span style="font-size:0.68rem;font-weight:700;background:#f5eeff;color:#9b59b6;padding:2px 8px;border-radius:5px;">'+job.mixCode+'</span>'+
         '<span style="font-size:0.68rem;font-weight:700;background:#fff8e1;color:#b8860b;padding:2px 8px;border-radius:5px;">P+'+( mix?mix.shelfLifeDays:job.shelfLife||2)+'</span>'+
         '<span style="font-size:0.68rem;color:#555;padding:2px 8px;background:#f5f5f5;border-radius:5px;">'+actualTubs+' tub'+(actualTubs>1?'s':'')+' · '+totalKgReq.toFixed(1)+'kg</span>'+
         (isDone?'<span style="font-size:0.68rem;font-weight:700;background:#f0fdf4;color:#27ae60;padding:2px 8px;border-radius:5px;">✅ Done · Last Day: '+rec.lastDay+'</span>':
@@ -2200,6 +2252,7 @@ function renderPrepMixCard(body,job,position,color){
       '</div>'+
     '</div>'+
     '<button class="prep-instr-btn" style="background:#f5eeff;color:#9b59b6;border:1.5px solid #9b59b6;border-radius:8px;padding:5px 10px;font-size:0.72rem;font-weight:700;cursor:pointer;white-space:nowrap;margin-right:6px;">📋 Instructions</button>'+
+    '<button class="prep-transfer-btn" style="background:#fff8e1;color:#b8860b;border:1.5px solid #f39c12;border-radius:8px;padding:5px 10px;font-size:0.72rem;font-weight:700;cursor:pointer;white-space:nowrap;margin-right:6px;">🔀 Send</button>'+
     '<span class="prep-chevron" style="font-size:0.85rem;color:#aaa;transition:transform 0.2s;display:inline-block;">▶</span>';
   card.appendChild(hdr);
 
@@ -2415,6 +2468,10 @@ function renderPrepMixCard(body,job,position,color){
   var instrBtn=card.querySelector('.prep-instr-btn');
   if(instrBtn&&mix) instrBtn.onclick=function(e){e.stopPropagation();viewMix(job.mixCode);};
 
+  // Wire Transfer button
+  var transferBtn=card.querySelector('.prep-transfer-btn');
+  if(transferBtn) transferBtn.onclick=(function(j,p){return function(e){e.stopPropagation();openPrepTransfer(j,p);};})(job,position);
+
   // Toggle expand/collapse
   var isOpen=false;
   hdr.onclick=function(){
@@ -2564,6 +2621,48 @@ function openPrepReassign(){
   showToast('Supervisor reassignment — coming soon!');
 }
 
+// ── Prep Mix Transfer (peer-to-peer, no supervisor gate) ────────────────
+var _prepTransferCtx=null;
+function openPrepTransfer(job,fromPosition){
+  _prepTransferCtx={job:job,fromPosition:fromPosition};
+  document.getElementById('prepTransferSub').textContent='Send '+job.mixCode+' to another position:';
+  var posColors=['#e74c3c','#0074d9','#27ae60'];
+  var btnsWrap=document.getElementById('prepTransferBtns');
+  btnsWrap.innerHTML='';
+  [1,2,3].filter(function(p){return p!==fromPosition;}).forEach(function(p){
+    var leader=prepPositionLeaders[p];
+    var b=document.createElement('button');
+    b.className='ov-btn';
+    b.style.background=posColors[p-1];
+    b.style.marginBottom='0';
+    b.textContent='Position '+p+(leader?' — '+leader.name:' — unregistered');
+    b.onclick=(function(pos){return function(){submitPrepTransfer(pos);};})(p);
+    btnsWrap.appendChild(b);
+  });
+  showOverlay('prepTransferOverlay');
+}
+function submitPrepTransfer(toPosition){
+  if(!_prepTransferCtx) return;
+  var job=_prepTransferCtx.job, fromPosition=_prepTransferCtx.fromPosition;
+  var today=new Date().toLocaleDateString('en-AU');
+  job.position=toPosition;
+  var rec=prepRecords.find(function(r){return r.mixCode===job.mixCode&&r.position===fromPosition&&r.date===today;});
+  if(rec) rec.position=toPosition;
+  prepTransferLog.push({
+    mixName:job.mixName,mixCode:job.mixCode,fromPosition:fromPosition,toPosition:toPosition,
+    fromLeader:prepPositionLeaders[fromPosition]?prepPositionLeaders[fromPosition].name:'',
+    toLeader:prepPositionLeaders[toPosition]?prepPositionLeaders[toPosition].name:'',
+    time:nowTime()
+  });
+  lsScheduleSave();
+  hideOverlay('prepTransferOverlay');
+  var toLeader=prepPositionLeaders[toPosition];
+  showToast('🔀 '+job.mixCode+' sent to Position '+toPosition+(toLeader?' ('+toLeader.name+')':''));
+  renderPrepRoom();
+  if(currentPrepPosition===fromPosition||currentPrepPosition===toPosition) renderPrepWork(currentPrepPosition);
+  _prepTransferCtx=null;
+}
+
 function processPrepSchedule(rows){
   prepSchedule=[];
   rows.forEach(function(row){
@@ -2614,7 +2713,7 @@ function buildPrepPDFSection(){
   var html='<h2 class="purple">FORM062.0 — Ingredient Mixing Record QLD</h2>'+
     '<div style="font-size:10px;color:#888;margin-bottom:8px;">Date: '+new Date().toLocaleDateString('en-AU')+'</div>';
   completed.forEach(function(rec){
-    html+='<div style="font-size:11px;font-weight:700;margin:8px 0 4px;color:#9b59b6;">'+rec.mixName+' ('+rec.mixCode+') — Position '+rec.position+'</div>'+
+    html+='<div style="font-size:11px;font-weight:700;margin:8px 0 4px;color:#9b59b6;">'+rec.mixCode+' — '+rec.mixName+' — Position '+rec.position+'</div>'+
       '<div style="font-size:10px;color:#555;margin-bottom:4px;">Start: '+rec.startTime+' · End: '+rec.endTime+' · Mix Time: '+rec.mixingTime+' · Tubs: '+rec.tubsMade+' · Last Day: '+rec.lastDay+' · Mixed By: '+rec.mixedBy+'</div>'+
       '<table><thead><tr><th>Ingredient</th><th>Supplier</th><th>Batch/UBD</th><th>Qty (kg)</th></tr></thead><tbody>'+
       rec.ingredients.map(function(i){return '<tr><td>'+i.description+'</td><td>'+i.supplier+'</td><td>'+i.batchUBD+'</td><td>'+i.qty+'</td></tr>';}).join('')+
@@ -4770,6 +4869,117 @@ function initMixSync(){
 }
 initMixSync();
 
+// ── Staff Roster ──────────────────────────────────────────────────────
+// STAFF_PINS/STAFF_ROLES/STAFF_NAMES populated live from Firestore — see initStaffSync()
+var SEED_STAFF=[
+  {id:'14',name:'Renae Curtis',role:'teamleader',pin:'2301'},
+  {id:'15',name:'Debbie Daniell',role:'manager',pin:'2201'},
+  {id:'16',name:'Heather Storey',role:'supervisor',pin:'3108'},
+  {id:'17',name:'Adam Rainbow',role:'supervisor',pin:'2907'},
+  {id:'18',name:'Susan Veamatahau',role:'labelprinter',pin:'1245'},
+  {id:'19',name:'Mia Vaematahau',role:'labelprinter',pin:'1256'},
+  {id:'20',name:'Kirsten Thompson',role:'labelprinter',pin:'1267'}
+];
+var staffRoster=[]; // populated live from Firestore — [{id,name,role,pin}]
+var _staffSyncStarted=false;
+function initStaffSync(){
+  if(_staffSyncStarted) return;
+  _staffSyncStarted=true;
+  fbReady.then(function(){
+    fbSeedCollectionIfEmpty('staff', SEED_STAFF, 'id').then(function(){
+      fbDb.collection('staff').onSnapshot(function(snap){
+        staffRoster=snap.docs.map(function(d){return d.data();});
+        STAFF_PINS={};STAFF_ROLES={};STAFF_NAMES={};
+        staffRoster.forEach(function(s){STAFF_PINS[s.id]=s.pin;STAFF_ROLES[s.id]=s.role;STAFF_NAMES[s.id]=s.name;});
+        renderStaffDropdown();
+        var panel=document.getElementById('staffMgmtPanel');
+        if(panel&&panel.classList.contains('show')) renderStaffMgmt();
+      }, function(err){console.error('Firestore staff listener failed:',err);});
+    });
+  });
+}
+initStaffSync();
+var STAFF_DROPDOWN_ORDER=['manager','supervisor','qa','teamleader','labelprinter'];
+function renderStaffDropdown(){
+  var sel=document.getElementById('staffDropdown');
+  if(!sel) return;
+  var prev=sel.value;
+  var ordered=staffRoster.slice().sort(function(a,b){
+    var ra=STAFF_DROPDOWN_ORDER.indexOf(a.role), rb=STAFF_DROPDOWN_ORDER.indexOf(b.role);
+    if(ra!==rb) return ra-rb;
+    return a.name.localeCompare(b.name);
+  });
+  sel.innerHTML='<option value="">-- Select name --</option>'+
+    ordered.map(function(s){return '<option value="'+s.id+'">'+s.name+' ('+ROLE_LABELS[s.role]+')</option>';}).join('');
+  if(prev&&STAFF_NAMES[prev]) sel.value=prev;
+}
+
+// ── Employee Management ─────────────────────────────────────────────────
+function openStaffMgmt(){showPanel('staffMgmtPanel');renderStaffMgmt();}
+function renderStaffMgmt(){
+  var body=document.getElementById('staffMgmtBody');
+  body.innerHTML='';
+  var addBtn=document.createElement('button');
+  addBtn.style.cssText='background:#27ae60;color:#fff;border:none;border-radius:10px;padding:11px;font-size:0.9rem;font-weight:700;cursor:pointer;width:100%;margin-bottom:14px;';
+  addBtn.textContent='+ Add Employee';
+  addBtn.onclick=function(){openStaffEdit(null);};
+  body.appendChild(addBtn);
+
+  var ordered=staffRoster.slice().sort(function(a,b){
+    var ra=STAFF_DROPDOWN_ORDER.indexOf(a.role), rb=STAFF_DROPDOWN_ORDER.indexOf(b.role);
+    if(ra!==rb) return ra-rb;
+    return a.name.localeCompare(b.name);
+  });
+  if(!ordered.length){
+    body.innerHTML+='<div style="text-align:center;color:#bbb;padding:30px;font-size:0.85rem;">No employees yet.</div>';
+    return;
+  }
+  ordered.forEach(function(s){
+    var card=document.createElement('div');
+    card.style.cssText='background:#fff;border-radius:16px;padding:13px 15px;margin-bottom:8px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid '+(ROLE_COLORS[s.role]||'#888')+';display:flex;align-items:center;gap:10px;';
+    card.innerHTML=
+      '<div style="flex:1;">'+
+        '<div style="font-weight:800;font-size:0.9rem;color:#222;">'+s.name+'</div>'+
+        '<div style="display:flex;gap:8px;margin-top:3px;align-items:center;">'+
+          '<span style="font-size:0.68rem;font-weight:700;background:'+(ROLE_COLORS[s.role]||'#888')+';color:#fff;padding:2px 8px;border-radius:5px;">'+ROLE_LABELS[s.role]+'</span>'+
+          '<span style="font-size:0.72rem;color:#888;">PIN: '+s.pin+'</span>'+
+        '</div>'+
+      '</div>'+
+      '<button data-staffedit="'+s.id+'" style="background:#e8f4fd;color:#0074d9;border:none;border-radius:8px;padding:7px 12px;font-size:0.78rem;font-weight:700;cursor:pointer;">Edit</button>'+
+      '<button data-staffrm="'+s.id+'" style="background:#fff0f0;color:#e74c3c;border:none;border-radius:8px;padding:7px 12px;font-size:0.78rem;font-weight:700;cursor:pointer;">Remove</button>';
+    card.querySelector('[data-staffedit]').onclick=(function(id){return function(){openStaffEdit(id);};})(s.id);
+    card.querySelector('[data-staffrm]').onclick=(function(id,name){return function(){
+      if(!confirm('Remove '+name+'? They will no longer be able to sign in.')) return;
+      fbDb.collection('staff').doc(id).delete().catch(function(e){console.error('Firestore staff delete failed:',e);showToast('⚠️ Delete failed — check connection.');});
+    };})(s.id,s.name);
+    body.appendChild(card);
+  });
+}
+function openStaffEdit(id){
+  var existing=id?staffRoster.find(function(s){return s.id===id;}):null;
+  document.getElementById('staffEditTitle').textContent=existing?'Edit Employee':'Add Employee';
+  document.getElementById('staffEditName').value=existing?existing.name:'';
+  document.getElementById('staffEditRole').value=existing?existing.role:'teamleader';
+  document.getElementById('staffEditPin').value=existing?existing.pin:'';
+  document.getElementById('staffEditMsg').textContent='';
+  document.getElementById('staffEditSaveBtn').onclick=function(){
+    var name=document.getElementById('staffEditName').value.trim();
+    var role=document.getElementById('staffEditRole').value;
+    var pin=document.getElementById('staffEditPin').value.trim();
+    var msgEl=document.getElementById('staffEditMsg');
+    if(!name){msgEl.textContent='Please enter a name.';return;}
+    if(!/^\d{4}$/.test(pin)){msgEl.textContent='PIN must be exactly 4 digits.';return;}
+    var staffId=existing?existing.id:String(Date.now());
+    fbDb.collection('staff').doc(staffId).set({id:staffId,name:name,role:role,pin:pin})
+      .then(function(){
+        hideOverlay('staffEditOverlay');
+        showToast((existing?'✅ Updated ':'✅ Added ')+name);
+      })
+      .catch(function(e){console.error('Firestore staff save failed:',e);msgEl.textContent='Save failed — check connection.';});
+  };
+  showOverlay('staffEditOverlay');
+}
+
 // ── Prep Room state ───────────────────────────────────────────────────
 // prepSchedule: [{mixCode, mixName, shelfLife, position(1/2/3), tubsRequired, assignedTo}]
 // prepRecords: [{mixCode, position, date, ingredients:[{code,description,supplier,batchSizeKg,qty,batchUBD}],
@@ -5014,7 +5224,7 @@ function updateHeader(){
 function doLogout(){
   currentUser=null;
   document.getElementById('hdrRight').innerHTML='<div style="font-size:0.78rem;color:#aaa;">☀️ Shift starts 6:00 AM</div>';
-  ['mgrPanel','supervisorPanel','effPanel','labelPanel','form093Panel','damagesPanel','qaPanel','form067Panel','formMgmtPanel','toolUsagePanel','toolboxRegPanel','startupSafetyPanel','eggCountPanel','looseItemsPanel','sharepointPanel','recipeLibPanel','traceAnalyticsPanel','mixLibPanel','prepRoomPanel','prepWorkPanel'].forEach(function(id){hidePanel(id);});
+  ['mgrPanel','supervisorPanel','effPanel','labelPanel','form093Panel','damagesPanel','qaPanel','form067Panel','formMgmtPanel','toolUsagePanel','toolboxRegPanel','startupSafetyPanel','eggCountPanel','looseItemsPanel','sharepointPanel','recipeLibPanel','traceAnalyticsPanel','mixLibPanel','prepRoomPanel','prepWorkPanel','staffMgmtPanel'].forEach(function(id){hidePanel(id);});
   document.getElementById('staffDropdown').value='';
   document.getElementById('pinInput').value='';
   document.getElementById('loginMsg').textContent='';
@@ -5038,7 +5248,8 @@ var FZ_ICONS={
   logout:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
   folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/>',
   link:'<path d="M9 15 15 9"/><path d="M11 6l1.5-1.5a3.5 3.5 0 1 1 5 5L16 11"/><path d="M13 18l-1.5 1.5a3.5 3.5 0 1 1-5-5L8 13"/>',
-  menu:'<path d="M4 6h16M4 12h16M4 18h16"/>'
+  menu:'<path d="M4 6h16M4 12h16M4 18h16"/>',
+  users:'<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'
 };
 function fzIcon(name,size){
   return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:'+(size||18)+'px;height:'+(size||18)+'px;display:block;">'+(FZ_ICONS[name]||'')+'</svg>';
@@ -5067,10 +5278,13 @@ function updateSidebar(){
     html+='<div class="fz-navlabel">Insights</div>';
     html+=fzNavBtn('search','Traceability &amp; Analytics','sb-trace');
   }
-  if(canAccess('qa')){
+  if(canAccess('qa')||canAccess('manager')){
     html+='<div class="fz-navlabel">Team</div>';
-    html+=fzNavBtn('shield','QA Dashboard','sb-qa');
-    html+=fzNavBtn('eye','Supervisor Dashboard','sb-sup');
+    if(canAccess('qa')){
+      html+=fzNavBtn('shield','QA Dashboard','sb-qa');
+      html+=fzNavBtn('eye','Supervisor Dashboard','sb-sup');
+    }
+    if(canAccess('manager')) html+=fzNavBtn('users','Employee Management','sb-staff');
   }
   if(canAccess('labelprinter')) html+=fzNavBtn('tag','Label Printing','sb-labels');
   html+='<div class="fz-foot">';
@@ -5093,6 +5307,7 @@ function updateSidebar(){
   wire('sb-trace',openTraceAnalytics);
   wire('sb-qa',openQaDash);
   wire('sb-sup',openSupervisorDash);
+  wire('sb-staff',openStaffMgmt);
   wire('sb-labels',function(){renderLabelStation();showPanel('labelPanel');});
   wire('sb-newshift',openNewShiftConfirm);
   wire('sb-logout',doLogout);
@@ -5153,15 +5368,14 @@ function showSchedule(line){
   renderSchedule();renderLineMsgBanner();renderIssuesBanner();showScreen('scheduleScreen');
   if(!lineTeamLeaders[line]) openLineSignIn(line);
 }
-function openLineSignIn(line){
-  var curLeader=lineTeamLeaders[line];
-  document.getElementById('lineSignInTitle').textContent='Log in as Team Leader';
-  document.getElementById('lineSignInSub').textContent=curLeader?
-    (curLeader.name+' is currently registered for '+line+(curLeader.role==='supervisor'?' (covering)':'')+'. Sign in to take over.'):
-    ('Sign in to register as running '+line+' today.');
+// Generic "who's actually here" login used by both line and prep-position sign-in.
+// opts: {title, sub, roleFilter(id)->bool (optional, defaults to all staff), onConfirm(id)}
+function openStaffSignIn(opts){
+  document.getElementById('lineSignInTitle').textContent=opts.title;
+  document.getElementById('lineSignInSub').textContent=opts.sub;
   var nameSel=document.getElementById('lineSignInName');
   nameSel.innerHTML='<option value="">-- Select name --</option>'+
-    Object.keys(STAFF_ROLES).filter(function(id){return STAFF_ROLES[id]==='teamleader'||STAFF_ROLES[id]==='supervisor';})
+    Object.keys(STAFF_ROLES).filter(opts.roleFilter||function(){return true;})
       .map(function(id){return '<option value="'+id+'">'+STAFF_NAMES[id]+' ('+ROLE_LABELS[STAFF_ROLES[id]]+')</option>';}).join('');
   document.getElementById('lineSignInPin').value='';
   document.getElementById('lineSignInMsg').textContent='';
@@ -5173,14 +5387,44 @@ function openLineSignIn(line){
     if(!id){msgEl.textContent='Please select your name.';return;}
     if(pin.length!==4){msgEl.textContent='Please enter your 4-digit PIN.';return;}
     if(STAFF_PINS[id]!==pin){msgEl.textContent='Incorrect PIN. Please try again.';document.getElementById('lineSignInPin').value='';return;}
-    lineTeamLeaders[line]={name:STAFF_NAMES[id],time:nowTime(),role:STAFF_ROLES[id]};
     currentUser={id:id,name:STAFF_NAMES[id],role:STAFF_ROLES[id]};
     lsScheduleSave();
     updateHeader();
     hideOverlay('lineSignInOverlay');
-    if(currentLine===line) renderSchedule();
+    opts.onConfirm(id);
   };
   showOverlay('lineSignInOverlay');
+}
+function openLineSignIn(line){
+  var curLeader=lineTeamLeaders[line];
+  openStaffSignIn({
+    title:'Log in as Team Leader',
+    sub:curLeader?
+      (curLeader.name+' is currently registered for '+line+(curLeader.role==='supervisor'?' (covering)':'')+'. Sign in to take over.'):
+      ('Sign in to register as running '+line+' today.'),
+    roleFilter:function(id){return STAFF_ROLES[id]==='teamleader'||STAFF_ROLES[id]==='supervisor';},
+    onConfirm:function(id){
+      lineTeamLeaders[line]={name:STAFF_NAMES[id],time:nowTime(),role:STAFF_ROLES[id]};
+      lsScheduleSave();
+      if(currentLine===line) renderSchedule();
+    }
+  });
+}
+function openPrepSignIn(position){
+  var curLeader=prepPositionLeaders[position];
+  openStaffSignIn({
+    title:'Log in to Position '+position,
+    sub:curLeader?
+      (curLeader.name+' is currently registered for Position '+position+'. Sign in to take over.'):
+      ('Sign in to register as running Position '+position+' today.'),
+    roleFilter:null,
+    onConfirm:function(id){
+      prepPositionLeaders[position]={name:STAFF_NAMES[id],time:nowTime(),role:STAFF_ROLES[id]};
+      lsScheduleSave();
+      if(currentPrepPosition===position) renderPrepWork(position);
+      renderPrepRoom();
+    }
+  });
 }
 function showTrace(idx){currentJobIdx=idx;renderTrace();showScreen('traceScreen');}
 
@@ -6185,7 +6429,7 @@ function renderLabelStation(){
     '<div class="sec-title" style="margin-top:0;">Production Date</div>'+
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'+
     '<div class="field-row"><div class="field-label">Labels Are For</div><input class="field-input" type="date" id="lblProdDate" value="'+tomorrow.toISOString().split('T')[0]+'"/></div>'+
-    '<div class="field-row"><div class="field-label">Printed By</div><input class="field-input" type="text" id="lblPrintedBy" placeholder="Your name"/></div></div></div>'+
+    '<div class="field-row"><div class="field-label">Printed By</div><input class="field-input" type="text" id="lblPrintedBy" value="'+(currentUser?currentUser.name:'')+'" readonly style="background:#f5f5f5;color:#555;"/></div></div></div>'+
     '<div style="background:#fff;border-radius:18px;padding:14px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);">'+
     '<div class="sec-title" style="margin-top:0;">Add Mix to Queue</div>'+
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">'+
@@ -6558,6 +6802,75 @@ function renderMgr(){
     renderSchedMgmt(smDiv, null);
     linesEl.appendChild(smDiv);
   }
+
+  // ── Prep Room live status ───────────────────────────────────────────
+  var prepMgrCard=document.createElement('div');
+  prepMgrCard.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-top:8px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #9b59b6;';
+  var prepMgrHdr=document.createElement('div');
+  prepMgrHdr.style.cssText='font-weight:800;font-size:0.9rem;margin-bottom:10px;color:#9b59b6;';
+  prepMgrHdr.textContent='🧪 Prep Room';
+  prepMgrCard.appendChild(prepMgrHdr);
+
+  var prepPosColors=['#e74c3c','#0074d9','#27ae60'];
+  [1,2,3].forEach(function(pos){
+    var leader=prepPositionLeaders[pos];
+    var posJobs=prepSchedule.filter(function(j){return j.position===pos;});
+    var doneCount=prepRecords.filter(function(r){return r.position===pos&&r.status==='complete';}).length;
+    var pct=posJobs.length?Math.round((doneCount/posJobs.length)*100):0;
+    var row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f5f5f5;';
+    row.innerHTML=
+      '<div style="font-size:0.85rem;font-weight:800;color:'+prepPosColors[pos-1]+';min-width:70px;">Position '+pos+'</div>'+
+      '<div style="flex:1;">'+
+        '<div style="font-size:0.8rem;font-weight:700;color:'+(leader?'#27ae60':'#bbb')+';">'+(leader?'👤 '+leader.name:'No one registered')+'</div>'+
+        '<div style="font-size:0.72rem;color:#888;">'+(posJobs.length?doneCount+'/'+posJobs.length+' mixes complete':'No mixes assigned')+'</div>'+
+      '</div>'+
+      '<div style="font-size:0.9rem;font-weight:900;color:'+prepPosColors[pos-1]+';">'+pct+'%</div>';
+    prepMgrCard.appendChild(row);
+  });
+
+  var transferHdr=document.createElement('div');
+  transferHdr.style.cssText='font-size:0.78rem;font-weight:700;color:#555;margin-top:12px;margin-bottom:6px;';
+  transferHdr.textContent='🔀 Transfers Today ('+prepTransferLog.length+')';
+  prepMgrCard.appendChild(transferHdr);
+  if(!prepTransferLog.length){
+    var noTransfers=document.createElement('div');
+    noTransfers.style.cssText='font-size:0.78rem;color:#bbb;padding:4px 0;';
+    noTransfers.textContent='No transfers yet.';
+    prepMgrCard.appendChild(noTransfers);
+  } else {
+    prepTransferLog.slice().reverse().forEach(function(t){
+      var tRow=document.createElement('div');
+      tRow.style.cssText='font-size:0.76rem;color:#555;padding:4px 0;border-bottom:1px dashed #f0f0f0;';
+      tRow.innerHTML='<b>'+t.mixCode+'</b> — Position '+t.fromPosition+' → Position '+t.toPosition+' <span style="color:#aaa;">('+t.time+')</span>';
+      prepMgrCard.appendChild(tRow);
+    });
+  }
+
+  var prepSubs=[];
+  prepRecords.forEach(function(r){
+    (r.ingredients||[]).forEach(function(ing){
+      if(ing.substituted) prepSubs.push({mixCode:r.mixCode,position:r.position,ing:ing.description,sub:ing.substituteDesc,by:ing.substituteApprovedBy});
+    });
+  });
+  var subHdr=document.createElement('div');
+  subHdr.style.cssText='font-size:0.78rem;font-weight:700;color:#555;margin-top:12px;margin-bottom:6px;';
+  subHdr.textContent='⚠️ QA-Approved Substitutions ('+prepSubs.length+')';
+  prepMgrCard.appendChild(subHdr);
+  if(!prepSubs.length){
+    var noSubs=document.createElement('div');
+    noSubs.style.cssText='font-size:0.78rem;color:#bbb;padding:4px 0;';
+    noSubs.textContent='None today.';
+    prepMgrCard.appendChild(noSubs);
+  } else {
+    prepSubs.forEach(function(s){
+      var sRow=document.createElement('div');
+      sRow.style.cssText='background:#fff8e1;border-left:3px solid #f39c12;border-radius:6px;padding:6px 9px;margin-bottom:5px;font-size:0.76rem;color:#856404;';
+      sRow.innerHTML='<b>'+s.mixCode+'</b> (Position '+s.position+') — '+s.ing+' → '+s.sub+' <span style="color:#888;">Approved by '+s.by+'</span>';
+      prepMgrCard.appendChild(sRow);
+    });
+  }
+  linesEl.appendChild(prepMgrCard);
 
   // ── Archive card ──────────────────────────────────────────────────
   var archCard=document.createElement('div');
@@ -9038,6 +9351,8 @@ function lsSave(){
       scheduleData: scheduleData,
       scheduleChanges: scheduleChanges,
       lineTeamLeaders: lineTeamLeaders,
+      prepPositionLeaders: prepPositionLeaders,
+      prepTransferLog: prepTransferLog,
       mixCountWeights: mixCountWeights,
       stockCountData: stockCountData,
       issueLog: issueLog,
@@ -9104,6 +9419,8 @@ function lsLoad(){
     scheduleData     = snap.scheduleData     || {};
     scheduleChanges  = snap.scheduleChanges  || [];
     lineTeamLeaders  = snap.lineTeamLeaders  || {};
+    prepPositionLeaders = snap.prepPositionLeaders || {};
+    prepTransferLog = snap.prepTransferLog || [];
     mixCountWeights  = snap.mixCountWeights  || {};
     stockCountData   = snap.stockCountData   || {};
     issueLog         = snap.issueLog         || [];
@@ -9167,7 +9484,7 @@ function confirmNewShift(){
   // Trigger the end-of-shift email/download flow
   openEndOfShiftReport(function(){
     // After report flow, wipe state
-    scheduleData={};scheduleChanges=[];lineTeamLeaders={};mixCountWeights={};stockCountData={};form067Manual={};
+    scheduleData={};scheduleChanges=[];lineTeamLeaders={};prepPositionLeaders={};prepTransferLog=[];mixCountWeights={};stockCountData={};form067Manual={};
     toolUsageForm={date:"",day:"",startCount:"",startCompletedBy:"",startSignature:"",entries:[],endCount:"",endCompletedBy:"",endSignature:"",allAccountedFor:"",comments:"",prodMgrName:"",prodMgrSig:"",prodMgrDate:"",qaName:"",qaSig:"",qaDate:"",status:"in-progress"};
     toolboxRegisterForm={checked:{},missingReasons:{},comments:'',prodMgrName:'',prodMgrSig:'',prodMgrDate:'',qaName:'',qaSig:'',qaDate:'',status:'in-progress'};
     toolboxChangesLog=[];
@@ -9829,6 +10146,9 @@ document.getElementById('re-addStepBtn').onclick=function(){_recipeEditMethod.pu
 document.getElementById('re-addPkgBtn').onclick=function(){_recipeEditPackaging.push({name:'',code:'',supplier:''});renderRecipePackagingRows();};
 document.getElementById('traceAnalyticsCloseBtn').onclick=function(){hidePanel('traceAnalyticsPanel');};
 document.getElementById('mixLibCloseBtn').onclick=function(){hidePanel('mixLibPanel');};
+document.getElementById('staffMgmtCloseBtn').onclick=function(){hidePanel('staffMgmtPanel');};
+document.getElementById('prepTransferCancelBtn').onclick=function(){hideOverlay('prepTransferOverlay');_prepTransferCtx=null;};
+document.getElementById('staffEditCancelBtn').onclick=function(){hideOverlay('staffEditOverlay');};
 document.getElementById('prepRoomCloseBtn').onclick=function(){hidePanel('prepRoomPanel');};
 document.getElementById('prepWorkCloseBtn').onclick=function(){hidePanel('prepWorkPanel');showPanel('prepRoomPanel');renderPrepRoom();};
 document.getElementById('pmOverlayCancelBtn').onclick=function(){hideOverlay('prepMixOverlay');};
