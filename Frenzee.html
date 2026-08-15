@@ -826,6 +826,17 @@ if(sessionStorage.getItem(PW_KEY)==='1'){
   </div>
 </div>
 
+<!-- PREP MIX COMPLETE — PRINT LABELS PROMPT -->
+<div class="overlay" id="prepLabelPromptOverlay">
+  <div class="ov-box">
+    <div class="ov-icon">🏷️</div>
+    <div class="ov-title">Mix Complete!</div>
+    <div class="ov-sub" id="prepLabelPromptSub"></div>
+    <button class="ov-btn" id="prepLabelPromptPrintBtn">🏷️ Print Labels Now</button>
+    <button class="ov-btn grey" id="prepLabelPromptCancelBtn">Not Now</button>
+  </div>
+</div>
+
 <!-- SCREENS -->
 <div class="screen active" id="loginScreen">
   <div class="login-wrap">
@@ -2426,8 +2437,8 @@ function renderPrepMixCard(body,job,position,color){
         r.lastDay=lastDay?new Date(lastDay).toLocaleDateString('en-AU'):'';
         r.status='complete';
         lsScheduleSave();
-        showToast('✅ Mix completed — Last Day: '+r.lastDay);
         renderPrepWork(p);
+        promptPrintLabels(j,r,lastDay);
       };})(job,position,rec);
       btnRow.appendChild(completeBtn);
     }
@@ -2611,8 +2622,8 @@ function openPrepMixRecord(job,position,rec){
       rec.lastDay=lastDayStr;rec.status='complete';
       lsScheduleSave();
       hideOverlay('prepMixOverlay');
-      showToast('✅ Mix completed — Last Day: '+lastDayStr);
       renderPrepWork(currentPrepPosition);
+      promptPrintLabels(job,rec,lastDay);
     };
     content.appendChild(completeBtn);
   }
@@ -2662,6 +2673,32 @@ function submitPrepTransfer(toPosition){
   renderPrepRoom();
   if(currentPrepPosition===fromPosition||currentPrepPosition===toPosition) renderPrepWork(currentPrepPosition);
   _prepTransferCtx=null;
+}
+
+// ── Print Labels prompt on mix completion ────────────────────────────
+function promptPrintLabels(job,rec,lastDayISO){
+  document.getElementById('prepLabelPromptSub').textContent=job.mixCode+' complete — Last Day: '+rec.lastDay+'. Print labels for this mix now?';
+  document.getElementById('prepLabelPromptPrintBtn').onclick=function(){
+    hideOverlay('prepLabelPromptOverlay');
+    queueLabelsForPrepMix(job,rec,lastDayISO);
+  };
+  showOverlay('prepLabelPromptOverlay');
+}
+function queueLabelsForPrepMix(job,rec,lastDayISO){
+  var mix=getMixByCode(job.mixCode);
+  var isEgg=mix&&((mix.mixCategory||'')+(mix.mixName||'')).toLowerCase().indexOf('egg')!==-1;
+  var tomorrow=new Date();tomorrow.setDate(tomorrow.getDate()+1);
+  var initials=(rec.mixedBy||'').split(' ').map(function(w){return w[0]||'';}).join('').toUpperCase().substring(0,4)||'—';
+  labelQueue.push({
+    id:++labelQueueIdCtr,name:job.mixName,code:job.mixCode,type:isEgg?'egg':'chicken',
+    ubd:lastDayISO,batch:job.totalKgRequired?job.totalKgRequired.toFixed(1):'',
+    qty:rec.tubsMade||job.tubsRequired,madeBy:initials,printedBy:currentUser?currentUser.name:'',
+    prodDate:tomorrow.toISOString().split('T')[0],
+    shelfDays:mix?mix.shelfLifeDays:2,addedTime:nowTime()
+  });
+  showPanel('labelPanel');
+  renderLabelStation();
+  showToast('🏷️ '+job.mixCode+' added to print queue');
 }
 
 function processPrepSchedule(rows){
@@ -10155,6 +10192,7 @@ document.getElementById('traceAnalyticsCloseBtn').onclick=function(){hidePanel('
 document.getElementById('mixLibCloseBtn').onclick=function(){hidePanel('mixLibPanel');};
 document.getElementById('staffMgmtCloseBtn').onclick=function(){hidePanel('staffMgmtPanel');};
 document.getElementById('prepTransferCancelBtn').onclick=function(){hideOverlay('prepTransferOverlay');_prepTransferCtx=null;};
+document.getElementById('prepLabelPromptCancelBtn').onclick=function(){hideOverlay('prepLabelPromptOverlay');};
 document.getElementById('staffEditCancelBtn').onclick=function(){hideOverlay('staffEditOverlay');};
 document.getElementById('prepRoomCloseBtn').onclick=function(){hidePanel('prepRoomPanel');};
 document.getElementById('prepWorkCloseBtn').onclick=function(){hidePanel('prepWorkPanel');showPanel('prepRoomPanel');renderPrepRoom();};
