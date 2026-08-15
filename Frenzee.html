@@ -791,8 +791,10 @@ if(sessionStorage.getItem(PW_KEY)==='1'){
         <option value="">-- Select name --</option>
         <option value="1">Sarah Johnson (Manager)</option>
         <option value="2">David Chen (Manager)</option>
+        <option value="15">Debbie Daniell (Manager)</option>
         <option value="3">Mark Williams (Supervisor)</option>
         <option value="4">Lisa Thompson (Supervisor)</option>
+        <option value="16">Heather Storey (Supervisor)</option>
         <option value="5">Emma Rodriguez (QA / QC)</option>
         <option value="6">James O'Brien (QA / QC)</option>
         <option value="7">Tom Baker (Team Leader)</option>
@@ -850,9 +852,9 @@ if(sessionStorage.getItem(PW_KEY)==='1'){
 
 <script>
 // ── Staff ──────────────────────────────────────────────────────────────
-var STAFF_PINS = {'1':'1234','2':'2345','3':'3456','4':'4567','5':'5678','6':'6789','7':'7890','8':'8901','9':'9012','10':'0123','11':'1357','12':'2468','13':'3579','14':'2301'};
-var STAFF_ROLES = {'1':'manager','2':'manager','3':'supervisor','4':'supervisor','5':'qa','6':'qa','7':'teamleader','8':'teamleader','9':'teamleader','10':'teamleader','11':'teamleader','12':'teamleader','13':'labelprinter','14':'teamleader'};
-var STAFF_NAMES = {'1':'Sarah Johnson','2':'David Chen','3':'Mark Williams','4':'Lisa Thompson','5':'Emma Rodriguez','6':"James O'Brien",'7':'Tom Baker','8':'Amy Nguyen','9':'Chris Patel','10':'Jade Wilson','11':'Ryan Murphy','12':'Priya Sharma','13':'Kevin Hart','14':'Renae Curtis'};
+var STAFF_PINS = {'1':'1234','2':'2345','3':'3456','4':'4567','5':'5678','6':'6789','7':'7890','8':'8901','9':'9012','10':'0123','11':'1357','12':'2468','13':'3579','14':'2301','15':'2201','16':'3108'};
+var STAFF_ROLES = {'1':'manager','2':'manager','3':'supervisor','4':'supervisor','5':'qa','6':'qa','7':'teamleader','8':'teamleader','9':'teamleader','10':'teamleader','11':'teamleader','12':'teamleader','13':'labelprinter','14':'teamleader','15':'manager','16':'supervisor'};
+var STAFF_NAMES = {'1':'Sarah Johnson','2':'David Chen','3':'Mark Williams','4':'Lisa Thompson','5':'Emma Rodriguez','6':"James O'Brien",'7':'Tom Baker','8':'Amy Nguyen','9':'Chris Patel','10':'Jade Wilson','11':'Ryan Murphy','12':'Priya Sharma','13':'Kevin Hart','14':'Renae Curtis','15':'Debbie Daniell','16':'Heather Storey'};
 var ROLE_COLORS = {manager:'#0074d9',supervisor:'#9b59b6',qa:'#27ae60',teamleader:'#e67e22',labelprinter:'#8e44ad'};
 var ROLE_LABELS = {manager:'Manager',supervisor:'Supervisor',qa:'QA / QC',teamleader:'Team Leader',labelprinter:'Label Printer'};
 var currentUser = null;
