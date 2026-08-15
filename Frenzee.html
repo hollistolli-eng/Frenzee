@@ -351,9 +351,18 @@ if(sessionStorage.getItem(PW_KEY)==='1'){
 <div class="overlay" id="lineSignInOverlay">
   <div class="ov-box">
     <div class="ov-icon">👤</div>
-    <div class="ov-title" id="lineSignInTitle">Sign In</div>
+    <div class="ov-title" id="lineSignInTitle">Log in as Team Leader</div>
     <div class="ov-sub" id="lineSignInSub"></div>
-    <button class="ov-btn" id="lineSignInConfirmBtn">Confirm</button>
+    <div class="ov-field">
+      <label>Your Name</label>
+      <select id="lineSignInName"><option value="">-- Select name --</option></select>
+    </div>
+    <div class="ov-field">
+      <label>4-Digit PIN</label>
+      <input type="password" id="lineSignInPin" maxlength="4" inputmode="numeric" placeholder="••••"/>
+    </div>
+    <div style="color:#e74c3c;font-size:0.78rem;min-height:16px;margin-bottom:6px;" id="lineSignInMsg"></div>
+    <button class="ov-btn" id="lineSignInConfirmBtn">Sign In</button>
     <button class="ov-btn grey" id="lineSignInCancelBtn">Not now</button>
   </div>
 </div>
@@ -5151,30 +5160,32 @@ function showLines(){renderLines();renderMsgBannerAll();showScreen('lineScreen')
 function showSchedule(line){
   currentLine=line;
   renderSchedule();renderLineMsgBanner();renderIssuesBanner();showScreen('scheduleScreen');
-  maybePromptLineSignIn(line);
+  if(!lineTeamLeaders[line]) openLineSignIn(line);
 }
-function maybePromptLineSignIn(line){
-  if(!currentUser) return;
+function openLineSignIn(line){
   var curLeader=lineTeamLeaders[line];
-  if(currentUser.role==='teamleader'&&curLeader&&curLeader.name!==currentUser.name){
-    openLineSignIn(line,'takeover',curLeader);
-  } else if((currentUser.role==='teamleader'||currentUser.role==='supervisor')&&!curLeader){
-    openLineSignIn(line,currentUser.role==='supervisor'?'cover':'register',null);
-  }
-}
-function openLineSignIn(line,mode,curLeader){
-  document.getElementById('lineSignInTitle').textContent=
-    mode==='takeover'?('Take Over '+line+'?'):
-    mode==='cover'?('Cover '+line+'?'):
-    ('Sign In to '+line);
-  document.getElementById('lineSignInSub').textContent=
-    mode==='takeover'?(curLeader.name+' is currently registered for '+line+(curLeader.role==='supervisor'?' (covering)':'')+'. Take over as today\'s team leader?'):
-    mode==='cover'?('No team leader has registered for '+line+' yet. Sign in as covering supervisor?'):
-    ('Register as today\'s team leader for '+line+'?');
+  document.getElementById('lineSignInTitle').textContent='Log in as Team Leader';
+  document.getElementById('lineSignInSub').textContent=curLeader?
+    (curLeader.name+' is currently registered for '+line+(curLeader.role==='supervisor'?' (covering)':'')+'. Sign in to take over.'):
+    ('Sign in to register as running '+line+' today.');
+  var nameSel=document.getElementById('lineSignInName');
+  nameSel.innerHTML='<option value="">-- Select name --</option>'+
+    Object.keys(STAFF_ROLES).filter(function(id){return STAFF_ROLES[id]==='teamleader'||STAFF_ROLES[id]==='supervisor';})
+      .map(function(id){return '<option value="'+id+'">'+STAFF_NAMES[id]+' ('+ROLE_LABELS[STAFF_ROLES[id]]+')</option>';}).join('');
+  document.getElementById('lineSignInPin').value='';
+  document.getElementById('lineSignInMsg').textContent='';
   var confirmBtn=document.getElementById('lineSignInConfirmBtn');
   confirmBtn.onclick=function(){
-    lineTeamLeaders[line]={name:currentUser.name,time:nowTime(),role:currentUser.role};
+    var id=nameSel.value;
+    var pin=document.getElementById('lineSignInPin').value;
+    var msgEl=document.getElementById('lineSignInMsg');
+    if(!id){msgEl.textContent='Please select your name.';return;}
+    if(pin.length!==4){msgEl.textContent='Please enter your 4-digit PIN.';return;}
+    if(STAFF_PINS[id]!==pin){msgEl.textContent='Incorrect PIN. Please try again.';document.getElementById('lineSignInPin').value='';return;}
+    lineTeamLeaders[line]={name:STAFF_NAMES[id],time:nowTime(),role:STAFF_ROLES[id]};
+    currentUser={id:id,name:STAFF_NAMES[id],role:STAFF_ROLES[id]};
     lsScheduleSave();
+    updateHeader();
     hideOverlay('lineSignInOverlay');
     if(currentLine===line) renderSchedule();
   };
@@ -5265,7 +5276,11 @@ function renderSchedule(){
   var done=active.filter(function(j){return j.status==='complete';}).length;
   document.getElementById('lineTitle').textContent=currentLine;
   var lineLeader=lineTeamLeaders[currentLine];
-  document.getElementById('lineSubtitle').textContent=done+' of '+active.length+' jobs complete'+(lineLeader?' · 👤 '+lineLeader.name+(lineLeader.role==='supervisor'?' (covering)':''):'');
+  var subEl=document.getElementById('lineSubtitle');
+  subEl.innerHTML=done+' of '+active.length+' jobs complete'+
+    (lineLeader?' · <span id="lineLeaderTag" style="text-decoration:underline;cursor:pointer;">👤 '+lineLeader.name+(lineLeader.role==='supervisor'?' (covering)':'')+'</span>':'');
+  var leaderTag=document.getElementById('lineLeaderTag');
+  if(leaderTag){var _line=currentLine;leaderTag.onclick=function(){openLineSignIn(_line);};}
   document.getElementById('lineDate').textContent=new Date().toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
   renderLineMsgBanner();renderIssuesBanner();
   var list=document.getElementById('jobList');list.innerHTML='';
