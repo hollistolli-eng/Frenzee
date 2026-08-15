@@ -5140,7 +5140,13 @@ function openImportReport(){
 function showLines(){renderLines();renderMsgBannerAll();showScreen('lineScreen');}
 function showSchedule(line){
   currentLine=line;
-  if(currentUser&&(currentUser.role==='teamleader'||currentUser.role==='supervisor')&&!lineTeamLeaders[line]){
+  var curLeader=lineTeamLeaders[line];
+  if(currentUser&&currentUser.role==='teamleader'&&curLeader&&curLeader.name!==currentUser.name){
+    if(confirm(curLeader.name+' is currently registered for '+line+(curLeader.role==='supervisor'?' (covering)':'')+'. Take over as team leader?')){
+      lineTeamLeaders[line]={name:currentUser.name,time:nowTime(),role:currentUser.role};
+      lsScheduleSave();
+    }
+  } else if(currentUser&&(currentUser.role==='teamleader'||currentUser.role==='supervisor')&&!curLeader){
     var isCover=currentUser.role==='supervisor';
     var promptMsg=isCover?('No team leader registered for '+line+' yet. Register as covering supervisor?'):('Register as today\'s team leader for '+line+'?');
     if(confirm(promptMsg)){
