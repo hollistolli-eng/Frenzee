@@ -347,6 +347,17 @@ if(sessionStorage.getItem(PW_KEY)==='1'){
   </div>
 </div>
 
+<!-- LINE SIGN-IN OVERLAY -->
+<div class="overlay" id="lineSignInOverlay">
+  <div class="ov-box">
+    <div class="ov-icon">👤</div>
+    <div class="ov-title" id="lineSignInTitle">Sign In</div>
+    <div class="ov-sub" id="lineSignInSub"></div>
+    <button class="ov-btn" id="lineSignInConfirmBtn">Confirm</button>
+    <button class="ov-btn grey" id="lineSignInCancelBtn">Not now</button>
+  </div>
+</div>
+
 <!-- ARCHIVE VIEWER OVERLAY -->
 <div class="overlay" id="archiveOverlay">
   <div class="ov-box" style="max-width:400px;">
@@ -5140,21 +5151,35 @@ function openImportReport(){
 function showLines(){renderLines();renderMsgBannerAll();showScreen('lineScreen');}
 function showSchedule(line){
   currentLine=line;
-  var curLeader=lineTeamLeaders[line];
-  if(currentUser&&currentUser.role==='teamleader'&&curLeader&&curLeader.name!==currentUser.name){
-    if(confirm(curLeader.name+' is currently registered for '+line+(curLeader.role==='supervisor'?' (covering)':'')+'. Take over as team leader?')){
-      lineTeamLeaders[line]={name:currentUser.name,time:nowTime(),role:currentUser.role};
-      lsScheduleSave();
-    }
-  } else if(currentUser&&(currentUser.role==='teamleader'||currentUser.role==='supervisor')&&!curLeader){
-    var isCover=currentUser.role==='supervisor';
-    var promptMsg=isCover?('No team leader registered for '+line+' yet. Register as covering supervisor?'):('Register as today\'s team leader for '+line+'?');
-    if(confirm(promptMsg)){
-      lineTeamLeaders[line]={name:currentUser.name,time:nowTime(),role:currentUser.role};
-      lsScheduleSave();
-    }
-  }
   renderSchedule();renderLineMsgBanner();renderIssuesBanner();showScreen('scheduleScreen');
+  maybePromptLineSignIn(line);
+}
+function maybePromptLineSignIn(line){
+  if(!currentUser) return;
+  var curLeader=lineTeamLeaders[line];
+  if(currentUser.role==='teamleader'&&currentUser.line===line&&curLeader&&curLeader.name!==currentUser.name){
+    openLineSignIn(line,'takeover',curLeader);
+  } else if(((currentUser.role==='teamleader'&&currentUser.line===line)||currentUser.role==='supervisor')&&!curLeader){
+    openLineSignIn(line,currentUser.role==='supervisor'?'cover':'register',null);
+  }
+}
+function openLineSignIn(line,mode,curLeader){
+  document.getElementById('lineSignInTitle').textContent=
+    mode==='takeover'?('Take Over '+line+'?'):
+    mode==='cover'?('Cover '+line+'?'):
+    ('Sign In to '+line);
+  document.getElementById('lineSignInSub').textContent=
+    mode==='takeover'?(curLeader.name+' is currently registered for '+line+(curLeader.role==='supervisor'?' (covering)':'')+'. Take over as today\'s team leader?'):
+    mode==='cover'?('No team leader has registered for '+line+' yet. Sign in as covering supervisor?'):
+    ('Register as today\'s team leader for '+line+'?');
+  var confirmBtn=document.getElementById('lineSignInConfirmBtn');
+  confirmBtn.onclick=function(){
+    lineTeamLeaders[line]={name:currentUser.name,time:nowTime(),role:currentUser.role};
+    lsScheduleSave();
+    hideOverlay('lineSignInOverlay');
+    if(currentLine===line) renderSchedule();
+  };
+  showOverlay('lineSignInOverlay');
 }
 function showTrace(idx){currentJobIdx=idx;renderTrace();showScreen('traceScreen');}
 
@@ -9863,6 +9888,7 @@ document.getElementById('smUpdateCancelBtn').onclick=function(){hideOverlay('smU
 // New shift + archive
 document.getElementById('confirmNewShiftBtn').onclick=confirmNewShift;
 document.getElementById('cancelNewShiftBtn').onclick=function(){hideOverlay('newShiftOverlay');};
+document.getElementById('lineSignInCancelBtn').onclick=function(){hideOverlay('lineSignInOverlay');};
 document.getElementById('archiveCloseBtn').onclick=function(){hideOverlay('archiveOverlay');};
 </script>
 </body>
