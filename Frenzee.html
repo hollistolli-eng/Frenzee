@@ -686,6 +686,7 @@ if(sessionStorage.getItem(PW_KEY)==='1'){
         <option value="supervisor">Supervisor</option>
         <option value="qa">QA / QC</option>
         <option value="teamleader">Team Leader</option>
+        <option value="prep">Prep</option>
         <option value="labelprinter">Label Printer</option>
       </select>
     </div>
@@ -888,8 +889,8 @@ if(sessionStorage.getItem(PW_KEY)==='1'){
 var STAFF_PINS = {};
 var STAFF_ROLES = {};
 var STAFF_NAMES = {};
-var ROLE_COLORS = {manager:'#0074d9',supervisor:'#9b59b6',qa:'#27ae60',teamleader:'#e67e22',labelprinter:'#8e44ad'};
-var ROLE_LABELS = {manager:'Manager',supervisor:'Supervisor',qa:'QA / QC',teamleader:'Team Leader',labelprinter:'Label Printer'};
+var ROLE_COLORS = {manager:'#0074d9',supervisor:'#9b59b6',qa:'#27ae60',teamleader:'#e67e22',prep:'#16a085',labelprinter:'#8e44ad'};
+var ROLE_LABELS = {manager:'Manager',supervisor:'Supervisor',qa:'QA / QC',teamleader:'Team Leader',prep:'Prep',labelprinter:'Label Printer'};
 var currentUser = null;
 
 function canAccess(role){
@@ -4876,9 +4877,9 @@ var SEED_STAFF=[
   {id:'15',name:'Debbie Daniell',role:'manager',pin:'2201'},
   {id:'16',name:'Heather Storey',role:'supervisor',pin:'3108'},
   {id:'17',name:'Adam Rainbow',role:'supervisor',pin:'2907'},
-  {id:'18',name:'Susan Veamatahau',role:'labelprinter',pin:'1245'},
-  {id:'19',name:'Mia Vaematahau',role:'labelprinter',pin:'1256'},
-  {id:'20',name:'Kirsten Thompson',role:'labelprinter',pin:'1267'}
+  {id:'18',name:'Susan Veamatahau',role:'prep',pin:'1245'},
+  {id:'19',name:'Mia Vaematahau',role:'prep',pin:'1256'},
+  {id:'20',name:'Kirsten Thompson',role:'prep',pin:'1267'}
 ];
 var staffRoster=[]; // populated live from Firestore — [{id,name,role,pin}]
 var _staffSyncStarted=false;
@@ -4899,12 +4900,15 @@ function initStaffSync(){
   });
 }
 initStaffSync();
-var STAFF_DROPDOWN_ORDER=['manager','supervisor','qa','teamleader','labelprinter'];
+var STAFF_DROPDOWN_ORDER=['manager','supervisor','qa','teamleader','prep','labelprinter'];
+// Only Manager/Supervisor/QA open the app in the morning — team leaders and prep
+// staff sign in later via the line/position sign-in prompt, not this screen.
+var OPENING_ROLES=['manager','supervisor','qa'];
 function renderStaffDropdown(){
   var sel=document.getElementById('staffDropdown');
   if(!sel) return;
   var prev=sel.value;
-  var ordered=staffRoster.slice().sort(function(a,b){
+  var ordered=staffRoster.filter(function(s){return OPENING_ROLES.indexOf(s.role)!==-1;}).sort(function(a,b){
     var ra=STAFF_DROPDOWN_ORDER.indexOf(a.role), rb=STAFF_DROPDOWN_ORDER.indexOf(b.role);
     if(ra!==rb) return ra-rb;
     return a.name.localeCompare(b.name);
@@ -5172,6 +5176,7 @@ function doLogin(){
   if (!id){ msg.textContent='Please select your name.'; return; }
   if (pin.length!==4){ msg.textContent='Please enter a 4-digit PIN.'; return; }
   if (STAFF_PINS[id]!==pin){ msg.textContent='Incorrect PIN. Please try again.'; document.getElementById('pinInput').value=''; return; }
+  if (OPENING_ROLES.indexOf(STAFF_ROLES[id])===-1){ msg.textContent='Only Manager, Supervisor or QA can open the app here.'; document.getElementById('pinInput').value=''; return; }
   msg.textContent='';
   currentUser = {id:id, name:STAFF_NAMES[id], role:STAFF_ROLES[id]};
   onLoginSuccess();
