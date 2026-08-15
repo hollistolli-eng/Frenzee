@@ -786,12 +786,12 @@ if(sessionStorage.getItem(PW_KEY)==='1'){
         <option value="4">Lisa Thompson (Supervisor)</option>
         <option value="5">Emma Rodriguez (QA / QC)</option>
         <option value="6">James O'Brien (QA / QC)</option>
-        <option value="7">Tom Baker (Team Leader – Line A)</option>
-        <option value="8">Amy Nguyen (Team Leader – Line B)</option>
-        <option value="9">Chris Patel (Team Leader – Line C)</option>
-        <option value="10">Jade Wilson (Team Leader – Line D)</option>
-        <option value="11">Ryan Murphy (Team Leader – Line E)</option>
-        <option value="12">Priya Sharma (Team Leader – STAT)</option>
+        <option value="7">Tom Baker (Team Leader)</option>
+        <option value="8">Amy Nguyen (Team Leader)</option>
+        <option value="9">Chris Patel (Team Leader)</option>
+        <option value="10">Jade Wilson (Team Leader)</option>
+        <option value="11">Ryan Murphy (Team Leader)</option>
+        <option value="12">Priya Sharma (Team Leader)</option>
         <option value="13">Kevin Hart (Label Printer)</option>
       </select>
       <label>Enter 4-Digit PIN</label>
@@ -843,7 +843,6 @@ if(sessionStorage.getItem(PW_KEY)==='1'){
 var STAFF_PINS = {'1':'1234','2':'2345','3':'3456','4':'4567','5':'5678','6':'6789','7':'7890','8':'8901','9':'9012','10':'0123','11':'1357','12':'2468','13':'3579'};
 var STAFF_ROLES = {'1':'manager','2':'manager','3':'supervisor','4':'supervisor','5':'qa','6':'qa','7':'teamleader','8':'teamleader','9':'teamleader','10':'teamleader','11':'teamleader','12':'teamleader','13':'labelprinter'};
 var STAFF_NAMES = {'1':'Sarah Johnson','2':'David Chen','3':'Mark Williams','4':'Lisa Thompson','5':'Emma Rodriguez','6':"James O'Brien",'7':'Tom Baker','8':'Amy Nguyen','9':'Chris Patel','10':'Jade Wilson','11':'Ryan Murphy','12':'Priya Sharma','13':'Kevin Hart'};
-var STAFF_LINES = {'7':'Line A','8':'Line B','9':'Line C','10':'Line D','11':'Line E','12':'STAT'};
 var ROLE_COLORS = {manager:'#0074d9',supervisor:'#9b59b6',qa:'#27ae60',teamleader:'#e67e22',labelprinter:'#8e44ad'};
 var ROLE_LABELS = {manager:'Manager',supervisor:'Supervisor',qa:'QA / QC',teamleader:'Team Leader',labelprinter:'Label Printer'};
 var currentUser = null;
@@ -3403,7 +3402,7 @@ function getAllTraceRecords(){
       tubNumber:st.tubNumber||'',
       useBy:st.useBy||'',
       verified:st.verified===true?'✅':'—',
-      teamLeader:STAFF_LINES?Object.keys(STAFF_LINES).find(function(k){return STAFF_LINES[k]===line;}):''
+      teamLeader:lineTeamLeaders[line]?lineTeamLeaders[line].name:''
     });
   });
   // Also pull from archives
@@ -4964,7 +4963,7 @@ function doLogin(){
   if (pin.length!==4){ msg.textContent='Please enter a 4-digit PIN.'; return; }
   if (STAFF_PINS[id]!==pin){ msg.textContent='Incorrect PIN. Please try again.'; document.getElementById('pinInput').value=''; return; }
   msg.textContent='';
-  currentUser = {id:id, name:STAFF_NAMES[id], role:STAFF_ROLES[id], line:STAFF_LINES[id]||null};
+  currentUser = {id:id, name:STAFF_NAMES[id], role:STAFF_ROLES[id]};
   onLoginSuccess();
 }
 
@@ -5157,9 +5156,9 @@ function showSchedule(line){
 function maybePromptLineSignIn(line){
   if(!currentUser) return;
   var curLeader=lineTeamLeaders[line];
-  if(currentUser.role==='teamleader'&&currentUser.line===line&&curLeader&&curLeader.name!==currentUser.name){
+  if(currentUser.role==='teamleader'&&curLeader&&curLeader.name!==currentUser.name){
     openLineSignIn(line,'takeover',curLeader);
-  } else if(((currentUser.role==='teamleader'&&currentUser.line===line)||currentUser.role==='supervisor')&&!curLeader){
+  } else if((currentUser.role==='teamleader'||currentUser.role==='supervisor')&&!curLeader){
     openLineSignIn(line,currentUser.role==='supervisor'?'cover':'register',null);
   }
 }
@@ -7680,8 +7679,7 @@ function renderForm067(){
 
   // Helper: get TL name for a line
   function getTL(line){
-    var id=Object.keys(STAFF_LINES).find(function(k){return STAFF_LINES[k]===line;});
-    return id?STAFF_NAMES[id]:'—';
+    return lineTeamLeaders[line]?lineTeamLeaders[line].name:'—';
   }
 
   // Helper: render a Y/N pill
@@ -7948,8 +7946,7 @@ function buildForm067PDFSection(){
   var dateStr=today.toLocaleDateString('en-AU',{day:'2-digit',month:'2-digit',year:'numeric'});
 
   function getTL(line){
-    var id=Object.keys(STAFF_LINES).find(function(k){return STAFF_LINES[k]===line;});
-    return id?STAFF_NAMES[id]:'—';
+    return lineTeamLeaders[line]?lineTeamLeaders[line].name:'—';
   }
   function statusFor(rowKey,formCode,lineKey){
     var auto=getForm067AutoStatus(formCode,lineKey);
