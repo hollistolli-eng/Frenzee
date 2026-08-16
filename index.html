@@ -4174,19 +4174,23 @@ function renderRecipeLib(){
     },50);
   }
 
-  // Search
+  // Search + Add
   var topRow=document.createElement('div');
   topRow.style.cssText='display:flex;gap:8px;margin-bottom:12px;';
   var searchEl=document.createElement('input');
   searchEl.type='text';searchEl.placeholder='🔍 Search by SKU, product name or brand…';
   searchEl.className='field-input';searchEl.style.cssText='flex:1;';
-  topRow.appendChild(searchEl);
+  var addBtn=document.createElement('button');
+  addBtn.style.cssText='background:#27ae60;color:#fff;border:none;border-radius:10px;padding:10px 14px;font-size:0.85rem;font-weight:700;cursor:pointer;white-space:nowrap;';
+  addBtn.textContent='+ Add Recipe';
+  addBtn.onclick=function(){openRecipeEdit(null);};
+  topRow.appendChild(searchEl);topRow.appendChild(addBtn);
   body.appendChild(topRow);
 
   if(!recipeLibrary.length){
     var noRecipes=document.createElement('div');
     noRecipes.style.cssText='text-align:center;color:#bbb;padding:30px;font-size:0.85rem;';
-    noRecipes.innerHTML='<div style="font-size:2.5rem;margin-bottom:8px;">📋</div>No recipes yet.';
+    noRecipes.innerHTML='<div style="font-size:2.5rem;margin-bottom:8px;">📋</div>No recipes yet.<br><span style="font-size:0.75rem;">Tap + Add Recipe to create one.</span>';
     body.appendChild(noRecipes);
     return;
   }
