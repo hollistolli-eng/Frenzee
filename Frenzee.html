@@ -841,6 +841,51 @@ if(sessionStorage.getItem(PW_KEY)==='1'){
   </div>
 </div>
 
+<!-- CREATE WORK ORDER -->
+<div class="overlay" id="workOrderOverlay">
+  <div class="ov-box">
+    <div class="ov-icon">🚨</div>
+    <div class="ov-title">Create Work Order</div>
+    <div class="ov-sub">A line has run out mid-run — order an extra top-up mix.</div>
+    <div class="ov-field">
+      <label>Line</label>
+      <select id="woLine"></select>
+    </div>
+    <div class="ov-field">
+      <label>Mix</label>
+      <select id="woMix"><option value="">-- Select mix --</option></select>
+    </div>
+    <div class="ov-field">
+      <label>Kg Needed</label>
+      <input type="number" step="0.1" min="0.1" class="field-input" id="woKg" placeholder="e.g. 1.2"/>
+    </div>
+    <div class="ov-field">
+      <label>Make in Position</label>
+      <select id="woPosition">
+        <option value="1">Position 1 — Chicken Mixes</option>
+        <option value="2">Position 2 — Egg Mixes</option>
+        <option value="3">Position 3 — Sauces, Smaller Mixes & Chicken Cutting</option>
+      </select>
+    </div>
+    <div class="ov-field">
+      <label>Reason</label>
+      <select id="woReasonCat">
+        <option value="Ran out">Ran out</option>
+        <option value="Dropped / wasted">Dropped / wasted</option>
+        <option value="Under-portioned">Under-portioned</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+    <div class="ov-field">
+      <label>Notes (optional)</label>
+      <textarea id="woReasonNotes" rows="2" placeholder="Any extra detail…"></textarea>
+    </div>
+    <div style="color:#e74c3c;font-size:0.78rem;min-height:16px;margin-bottom:6px;" id="woMsg"></div>
+    <button class="ov-btn" id="woConfirmBtn">🚨 Create Work Order</button>
+    <button class="ov-btn grey" id="woCancelBtn">Cancel</button>
+  </div>
+</div>
+
 <!-- PREP MIX COMPLETE — PRINT LABELS PROMPT -->
 <div class="overlay" id="prepLabelPromptOverlay">
   <div class="ov-box">
@@ -954,6 +999,7 @@ var lineTeamLeaders={}; // {lineName: {name, time}} — who registered as runnin
 var prepPositionLeaders={}; // {position(1/2/3): {name, time, role}} — who registered as running each prep position today
 var prepTransferLog=[]; // [{mixName, mixCode, fromPosition, toPosition, fromLeader, toLeader, time}]
 var prepQtyAdjustLog=[]; // [{mixCode, position, oldKg, newKg, oldTubs, newTubs, reason, by, time}]
+var workOrders=[]; // [{id, line, mixCode, mixName, kgNeeded, position, reasonCat, reasonNotes, requestedBy, requestedTime, status:'open'|'complete', completedBy, completedTime}]
 var ingredientState={}, currentOverrideIngId=null, currentTxJobIdx=null;
 
 // ingredientState keyed by line+jobIdx+ingId — each line team leader scans independently
@@ -2266,10 +2312,12 @@ function renderPrepMixCard(body,job,position,color){
   var card=document.createElement('div');
   card.style.cssText='background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 4px 18px rgba(15,46,28,0.07);margin-bottom:10px;border-left:5px solid '+(isDone?'#27ae60':isStarted?color:'#ccc')+';cursor:pointer;user-select:none;';
 
+  var linkedWO=job.workOrderId?workOrders.find(function(w){return w.id===job.workOrderId;}):null;
   var hdr=document.createElement('div');
   hdr.style.cssText='display:flex;align-items:center;gap:10px;padding:12px 14px;';
   hdr.innerHTML=
     '<div style="flex:1;">'+
+      (linkedWO&&linkedWO.status==='open'?'<div style="font-size:0.72rem;font-weight:800;background:#e74c3c;color:#fff;padding:3px 8px;border-radius:5px;display:inline-block;margin-bottom:5px;">🚨 WORK ORDER — '+linkedWO.line+' needs this to finish</div>':'')+
       '<div style="font-weight:900;font-size:1rem;color:#222;">'+job.mixCode+'</div>'+
       '<div style="font-size:0.76rem;color:#888;margin-top:1px;">'+job.mixName+'</div>'+
       '<div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap;">'+
@@ -2460,6 +2508,10 @@ function renderPrepMixCard(body,job,position,color){
         var lastDay=calcMixExpiry(j.mixCode,ubds);
         r.lastDay=lastDay?new Date(lastDay).toLocaleDateString('en-AU'):'';
         r.status='complete';
+        if(j.workOrderId){
+          var wo=workOrders.find(function(w){return w.id===j.workOrderId;});
+          if(wo){wo.status='complete';wo.completedBy=currentUser?currentUser.name:'';wo.completedTime=nowTime();}
+        }
         lsScheduleSave();
         renderPrepWork(p);
         promptPrintLabels(j,r,lastDay);
@@ -2697,6 +2749,96 @@ function submitPrepTransfer(toPosition){
   renderPrepRoom();
   if(currentPrepPosition===fromPosition||currentPrepPosition===toPosition) renderPrepWork(currentPrepPosition);
   _prepTransferCtx=null;
+}
+
+// ── Work Orders — supervisor tops up a mix a line has run out of ────────
+function guessMixPosition(mix){
+  var text=((mix&&mix.mixCategory)||'')+' '+((mix&&mix.mixName)||'');
+  if(text.toLowerCase().indexOf('egg')!==-1) return 2;
+  return 1;
+}
+function openWorkOrderForm(){
+  var lineSel=document.getElementById('woLine');
+  lineSel.innerHTML=LINES.map(function(l){return '<option value="'+l+'">'+l+'</option>';}).join('');
+  var mixSel=document.getElementById('woMix');
+  var sortedMixes=mixLibrary.slice().sort(function(a,b){return a.mixCode.localeCompare(b.mixCode);});
+  mixSel.innerHTML='<option value="">-- Select mix --</option>'+
+    sortedMixes.map(function(m){return '<option value="'+m.mixCode+'">'+m.mixCode+' — '+m.mixName+'</option>';}).join('');
+  mixSel.onchange=function(){
+    var mix=getMixByCode(mixSel.value);
+    if(mix) document.getElementById('woPosition').value=String(guessMixPosition(mix));
+  };
+  document.getElementById('woKg').value='';
+  document.getElementById('woPosition').value='1';
+  document.getElementById('woReasonCat').value='Ran out';
+  document.getElementById('woReasonNotes').value='';
+  document.getElementById('woMsg').textContent='';
+  showOverlay('workOrderOverlay');
+}
+function submitWorkOrder(){
+  var line=document.getElementById('woLine').value;
+  var mixCode=document.getElementById('woMix').value;
+  var kg=parseFloat(document.getElementById('woKg').value);
+  var position=parseInt(document.getElementById('woPosition').value);
+  var reasonCat=document.getElementById('woReasonCat').value;
+  var reasonNotes=document.getElementById('woReasonNotes').value.trim();
+  var msgEl=document.getElementById('woMsg');
+  if(!mixCode){msgEl.textContent='Please select a mix.';return;}
+  if(isNaN(kg)||kg<=0){msgEl.textContent='Please enter how many kg are needed.';return;}
+  var mix=getMixByCode(mixCode);
+  var woId='WO-'+Date.now();
+  prepSchedule.push({
+    mixCode:mixCode,mixName:mix?mix.mixName:mixCode,position:position,
+    tubsRequired:1,shelfLife:mix?mix.shelfLifeDays:2,totalKgRequired:kg,
+    adHoc:true,workOrderId:woId
+  });
+  workOrders.push({
+    id:woId,line:line,mixCode:mixCode,mixName:mix?mix.mixName:mixCode,kgNeeded:kg,position:position,
+    reasonCat:reasonCat,reasonNotes:reasonNotes,
+    requestedBy:currentUser?currentUser.name:'Supervisor',requestedTime:nowTime(),status:'open'
+  });
+  lsScheduleSave();
+  hideOverlay('workOrderOverlay');
+  showToast('🚨 Work order created — '+mixCode+' → Position '+position);
+  renderSupervisorDash();
+}
+function renderWorkOrdersCard(container){
+  var open=workOrders.filter(function(w){return w.status==='open';});
+  var wrap=document.createElement('div');
+  wrap.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:10px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #e74c3c;';
+  var hdr=document.createElement('div');
+  hdr.style.cssText='display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;';
+  hdr.innerHTML='<div style="font-weight:800;font-size:0.9rem;">🚨 Work Orders'+(open.length?' — <span style="color:#e74c3c;">'+open.length+' open</span>':'<span style="color:#2ecc40;"> — All Clear ✅</span>')+'</div>';
+  wrap.appendChild(hdr);
+
+  var createBtn=document.createElement('button');
+  createBtn.style.cssText='width:100%;background:#e74c3c;color:#fff;border:none;border-radius:10px;padding:11px;font-size:0.88rem;font-weight:700;cursor:pointer;margin-bottom:10px;';
+  createBtn.textContent='🚨 Create Work Order';
+  createBtn.onclick=openWorkOrderForm;
+  wrap.appendChild(createBtn);
+
+  if(!workOrders.length){
+    var none=document.createElement('div');
+    none.style.cssText='text-align:center;color:#bbb;font-size:0.82rem;padding:6px 0;';
+    none.textContent='No work orders yet today.';
+    wrap.appendChild(none);
+  } else {
+    workOrders.slice().reverse().forEach(function(w){
+      var leader=prepPositionLeaders[w.position];
+      var row=document.createElement('div');
+      row.style.cssText='background:'+(w.status==='open'?'#fff9f9':'#f0fdf4')+';border:1.5px solid '+(w.status==='open'?'#e74c3c':'#2ecc40')+';border-radius:10px;padding:10px 12px;margin-bottom:8px;';
+      row.innerHTML=
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">'+
+          '<div><div style="font-weight:800;font-size:0.85rem;">'+w.mixCode+' · '+w.kgNeeded+'kg — for '+w.line+'</div>'+
+          '<div style="font-size:0.74rem;color:#888;margin-top:2px;">'+w.reasonCat+(w.reasonNotes?' — '+w.reasonNotes:'')+'</div>'+
+          '<div style="font-size:0.72rem;color:#888;margin-top:2px;">Requested by '+w.requestedBy+' · '+w.requestedTime+' · Position '+w.position+(leader?' ('+leader.name+' signed in)':' (no one signed in)')+'</div></div>'+
+          '<span style="font-size:0.72rem;font-weight:700;padding:3px 9px;border-radius:7px;white-space:nowrap;background:'+(w.status==='open'?'#e74c3c':'#2ecc40')+';color:#fff;">'+(w.status==='open'?'OPEN':'✅ DONE')+'</span>'+
+        '</div>'+
+        (w.status==='complete'?'<div style="font-size:0.72rem;color:#27ae60;font-weight:600;margin-top:4px;">Made by '+w.completedBy+' at '+w.completedTime+'</div>':'');
+      wrap.appendChild(row);
+    });
+  }
+  container.appendChild(wrap);
 }
 
 // ── Supervisor override: adjust a mix's kg/tubs live during production ──
@@ -6998,6 +7140,26 @@ function renderMgr(){
       prepMgrCard.appendChild(aRow);
     });
   }
+
+  var woMgrOpen=workOrders.filter(function(w){return w.status==='open';});
+  var woHdr=document.createElement('div');
+  woHdr.style.cssText='font-size:0.78rem;font-weight:700;color:#555;margin-top:12px;margin-bottom:6px;';
+  woHdr.textContent='🚨 Work Orders ('+woMgrOpen.length+' open, '+workOrders.length+' total)';
+  prepMgrCard.appendChild(woHdr);
+  if(!workOrders.length){
+    var noWO=document.createElement('div');
+    noWO.style.cssText='font-size:0.78rem;color:#bbb;padding:4px 0;';
+    noWO.textContent='None today.';
+    prepMgrCard.appendChild(noWO);
+  } else {
+    workOrders.slice().reverse().forEach(function(w){
+      var wRow=document.createElement('div');
+      wRow.style.cssText='background:'+(w.status==='open'?'#fff9f9':'#f0fdf4')+';border-left:3px solid '+(w.status==='open'?'#e74c3c':'#2ecc40')+';border-radius:6px;padding:6px 9px;margin-bottom:5px;font-size:0.76rem;color:'+(w.status==='open'?'#c0392b':'#1a7a2a')+';';
+      wRow.innerHTML='<b>'+w.mixCode+'</b> · '+w.kgNeeded+'kg for '+w.line+' (Position '+w.position+') — '+(w.status==='open'?'⏳ OPEN':'✅ Done by '+w.completedBy)+'<br>'+
+        '<span style="color:#888;">'+w.reasonCat+' — requested by '+w.requestedBy+' ('+w.requestedTime+')</span>';
+      prepMgrCard.appendChild(wRow);
+    });
+  }
   linesEl.appendChild(prepMgrCard);
 
   // ── Archive card ──────────────────────────────────────────────────
@@ -9181,6 +9343,9 @@ function renderSupervisorDash(){
   sum.innerHTML='<div class="sum-tile"><div class="sum-val" style="color:#e74c3c;">'+pending+'</div><div class="sum-lbl">Awaiting Sign-off</div></div><div class="sum-tile"><div class="sum-val" style="color:#2ecc40;">'+signed+'</div><div class="sum-lbl">Signed Off</div></div><div class="sum-tile"><div class="sum-val" style="color:#0074d9;">'+form093Records.filter(function(r){return r.status==='in-progress';}).length+'</div><div class="sum-lbl">In Progress</div></div>';
   body.appendChild(sum);
 
+  // ── Work Orders section ─────────────────────────────────────────────
+  renderWorkOrdersCard(body);
+
   // ── Mix Count section ─────────────────────────────────────────────
   var mcDiv=document.createElement('div');
   renderMixCount(mcDiv);
@@ -9482,6 +9647,7 @@ function lsSave(){
       prepPositionLeaders: prepPositionLeaders,
       prepTransferLog: prepTransferLog,
       prepQtyAdjustLog: prepQtyAdjustLog,
+      workOrders: workOrders,
       mixCountWeights: mixCountWeights,
       stockCountData: stockCountData,
       issueLog: issueLog,
@@ -9551,6 +9717,7 @@ function lsLoad(){
     prepPositionLeaders = snap.prepPositionLeaders || {};
     prepTransferLog = snap.prepTransferLog || [];
     prepQtyAdjustLog = snap.prepQtyAdjustLog || [];
+    workOrders = snap.workOrders || [];
     mixCountWeights  = snap.mixCountWeights  || {};
     stockCountData   = snap.stockCountData   || {};
     issueLog         = snap.issueLog         || [];
@@ -9614,7 +9781,7 @@ function confirmNewShift(){
   // Trigger the end-of-shift email/download flow
   openEndOfShiftReport(function(){
     // After report flow, wipe state
-    scheduleData={};scheduleChanges=[];lineTeamLeaders={};prepPositionLeaders={};prepTransferLog=[];prepQtyAdjustLog=[];mixCountWeights={};stockCountData={};form067Manual={};
+    scheduleData={};scheduleChanges=[];lineTeamLeaders={};prepPositionLeaders={};prepTransferLog=[];prepQtyAdjustLog=[];workOrders=[];mixCountWeights={};stockCountData={};form067Manual={};
     toolUsageForm={date:"",day:"",startCount:"",startCompletedBy:"",startSignature:"",entries:[],endCount:"",endCompletedBy:"",endSignature:"",allAccountedFor:"",comments:"",prodMgrName:"",prodMgrSig:"",prodMgrDate:"",qaName:"",qaSig:"",qaDate:"",status:"in-progress"};
     toolboxRegisterForm={checked:{},missingReasons:{},comments:'',prodMgrName:'',prodMgrSig:'',prodMgrDate:'',qaName:'',qaSig:'',qaDate:'',status:'in-progress'};
     toolboxChangesLog=[];
@@ -10281,6 +10448,8 @@ document.getElementById('prepTransferCancelBtn').onclick=function(){hideOverlay(
 document.getElementById('prepLabelPromptCancelBtn').onclick=function(){hideOverlay('prepLabelPromptOverlay');};
 document.getElementById('prepAdjustConfirmBtn').onclick=submitPrepAdjust;
 document.getElementById('prepAdjustCancelBtn').onclick=function(){hideOverlay('prepAdjustOverlay');_prepAdjustCtx=null;};
+document.getElementById('woConfirmBtn').onclick=submitWorkOrder;
+document.getElementById('woCancelBtn').onclick=function(){hideOverlay('workOrderOverlay');};
 document.getElementById('staffEditCancelBtn').onclick=function(){hideOverlay('staffEditOverlay');};
 document.getElementById('prepRoomCloseBtn').onclick=function(){hidePanel('prepRoomPanel');};
 document.getElementById('prepWorkCloseBtn').onclick=function(){hidePanel('prepWorkPanel');showPanel('prepRoomPanel');renderPrepRoom();};
