@@ -4174,18 +4174,17 @@ function renderRecipeLib(){
     },50);
   }
 
-  // Search + Add
-  var topRow=document.createElement('div');
-  topRow.style.cssText='display:flex;gap:8px;margin-bottom:12px;';
+  // Search (full width, own row so it never gets crowded)
   var searchEl=document.createElement('input');
-  searchEl.type='text';searchEl.placeholder='🔍 Search by SKU, product name or brand…';
-  searchEl.className='field-input';searchEl.style.cssText='flex:1;';
+  searchEl.type='text';searchEl.placeholder='🔍 Search any recipe by SKU, product name or brand…';
+  searchEl.className='field-input';searchEl.style.cssText='width:100%;margin-bottom:8px;';
+  body.appendChild(searchEl);
+
   var addBtn=document.createElement('button');
-  addBtn.style.cssText='background:#27ae60;color:#fff;border:none;border-radius:10px;padding:10px 14px;font-size:0.85rem;font-weight:700;cursor:pointer;white-space:nowrap;';
+  addBtn.style.cssText='background:#27ae60;color:#fff;border:none;border-radius:10px;padding:10px 14px;font-size:0.85rem;font-weight:700;cursor:pointer;width:100%;margin-bottom:12px;';
   addBtn.textContent='+ Add Recipe';
   addBtn.onclick=function(){openRecipeEdit(null);};
-  topRow.appendChild(searchEl);topRow.appendChild(addBtn);
-  body.appendChild(topRow);
+  body.appendChild(addBtn);
 
   if(!recipeLibrary.length){
     var noRecipes=document.createElement('div');
