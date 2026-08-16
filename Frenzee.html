@@ -966,6 +966,9 @@ var currentUser = null;
 
 function canAccess(role){
   if (!currentUser) return false;
+  // Heather Storey (id 16) trains everyone on the app — full access to every
+  // screen regardless of her Supervisor role. One-off, her account only.
+  if (currentUser.id==='16') return true;
   var r = currentUser.role;
   if (role==='manager') return r==='manager';
   if (role==='supervisor') return r==='manager'||r==='supervisor';
