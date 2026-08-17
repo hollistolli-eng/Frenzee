@@ -598,6 +598,18 @@ if(sessionStorage.getItem(PW_KEY)==='1'){
   </div>
 </div>
 
+<!-- QUICK RECIPE DELETE (from card, no need to open full edit form) -->
+<div class="overlay" id="recipeDeleteConfirmOverlay">
+  <div class="ov-box">
+    <div class="ov-icon">🗑️</div>
+    <div class="ov-title">Delete Recipe</div>
+    <div class="ov-sub" id="rdcSub"></div>
+    <div class="ov-field"><label>Manager or QA PIN</label><input type="password" id="rdc-pin"/><div class="ov-err" id="rdc-err">❌ Incorrect PIN — Manager or QA access only.</div></div>
+    <button class="ov-btn red" id="rdc-confirmBtn">🗑️ Delete Recipe</button>
+    <button class="ov-btn grey" id="rdc-cancelBtn">Cancel</button>
+  </div>
+</div>
+
 <!-- ALLERGEN CLEAN VERIFY OVERLAY -->
 <div class="overlay" id="allergenVerifyOverlay">
   <div class="ov-box">
@@ -4158,22 +4170,6 @@ function renderRecipeLib(){
     '<div style="font-size:0.82rem;color:#555;line-height:1.5;">'+recipeLibrary.length+' recipe'+(recipeLibrary.length!==1?'s':'')+' loaded. Recipes auto-match to jobs on the line by SKU.</div>';
   body.appendChild(infoCard);
 
-  if(recipeLibrary.length){
-    var clearCard=document.createElement('div');
-    clearCard.style.cssText='background:#fff;border-radius:16px;padding:14px;margin-bottom:14px;box-shadow:0 4px 18px rgba(15,46,28,0.07);display:flex;align-items:center;justify-content:space-between;gap:10px;';
-    clearCard.innerHTML=
-      '<div style="font-size:0.75rem;color:#888;">Removes every recipe from the library.</div>'+
-      '<button id="rl-clearBtn" style="background:#e74c3c;color:#fff;border:none;border-radius:10px;padding:9px 14px;font-size:0.82rem;font-weight:700;cursor:pointer;white-space:nowrap;">🗑️ Clear All</button>';
-    body.appendChild(clearCard);
-    setTimeout(function(){
-      var clearBtn=document.getElementById('rl-clearBtn');
-      if(clearBtn) clearBtn.onclick=function(){
-        if(!confirm('Clear all '+recipeLibrary.length+' recipes? This cannot be undone.')) return;
-        recipeLibrary=[];fbClearCollection('recipes');lsScheduleSave();showToast('🗑️ All recipes cleared');renderRecipeLib();
-      };
-    },50);
-  }
-
   // Search (full width, own row so it never gets crowded)
   var searchEl=document.createElement('input');
   searchEl.type='text';searchEl.placeholder='🔍 Search any recipe by SKU, product name or brand…';
@@ -4216,10 +4212,12 @@ function renderRecipeLib(){
         '<div style="display:flex;flex-direction:column;gap:5px;">'+
           '<button data-recipeview="'+recipe.sku+'" style="background:#f0fdf4;color:#27ae60;border:1.5px solid #27ae60;border-radius:8px;padding:5px 10px;font-size:0.72rem;font-weight:700;cursor:pointer;">View</button>'+
           '<button data-recipeedit="'+recipe.sku+'" style="background:#f0f4ff;color:#0074d9;border:1.5px solid #0074d9;border-radius:8px;padding:5px 10px;font-size:0.72rem;font-weight:700;cursor:pointer;">✏️ Edit</button>'+
+          '<button data-recipedel="'+recipe.sku+'" style="background:#fff0f0;color:#e74c3c;border:1.5px solid #e74c3c;border-radius:8px;padding:5px 10px;font-size:0.72rem;font-weight:700;cursor:pointer;">🗑️ Delete</button>'+
         '</div>'+
       '</div>';
     card.querySelector('[data-recipeview]').onclick=(function(sku){return function(){viewRecipe(sku);};})(recipe.sku);
     card.querySelector('[data-recipeedit]').onclick=(function(sku){return function(){openRecipeEdit(sku);};})(recipe.sku);
+    card.querySelector('[data-recipedel]').onclick=(function(sku,name){return function(e){e.stopPropagation();openRecipeDeleteConfirm(sku,name);};})(recipe.sku,recipe.productName);
     return card;
   }
 
@@ -4828,6 +4826,16 @@ function submitRecipeSave(){
   renderRecipeLib();
 }
 
+function deleteRecipeBySku(sku){
+  var who=currentUser?currentUser.name:'Manager';
+  var recipe=recipeLibrary.find(function(r){return r.sku===sku;});
+  if(recipe) recipeChangesLog.push({type:'delete',sku:recipe.sku,productName:recipe.productName,by:who,time:nowTime()});
+  recipeLibrary=recipeLibrary.filter(function(r){return r.sku!==sku;});
+  fbDb.collection('recipes').doc(sku).delete().catch(function(e){console.error('Firestore recipe delete failed:',e);showToast('⚠️ Deleted locally, but sync to other devices failed — check connection.');});
+  lsScheduleSave();
+  showToast('🗑️ Recipe deleted');
+  renderRecipeLib();
+}
 function submitRecipeDelete(){
   var pin=document.getElementById('re-pin').value;
   document.getElementById('re-err').style.display='none';
@@ -4835,15 +4843,29 @@ function submitRecipeDelete(){
     return STAFF_PINS[id]===pin&&(STAFF_ROLES[id]==='manager'||STAFF_ROLES[id]==='qa');
   });
   if(!isOk){document.getElementById('re-err').style.display='block';return;}
-  var who=currentUser?currentUser.name:'Manager';
-  var recipe=recipeLibrary.find(function(r){return r.sku===_recipeEditSku;});
-  if(recipe) recipeChangesLog.push({type:'delete',sku:recipe.sku,productName:recipe.productName,by:who,time:nowTime()});
-  recipeLibrary=recipeLibrary.filter(function(r){return r.sku!==_recipeEditSku;});
-  fbDb.collection('recipes').doc(_recipeEditSku).delete().catch(function(e){console.error('Firestore recipe delete failed:',e);showToast('⚠️ Deleted locally, but sync to other devices failed — check connection.');});
-  lsScheduleSave();
+  deleteRecipeBySku(_recipeEditSku);
   hideOverlay('recipeEditOverlay');
-  showToast('🗑️ Recipe deleted');
-  renderRecipeLib();
+}
+
+// ── Quick delete straight from the recipe card ──────────────────────────
+var _rdcSku=null;
+function openRecipeDeleteConfirm(sku,name){
+  _rdcSku=sku;
+  document.getElementById('rdcSub').textContent='Delete '+sku+' — '+name+'? This cannot be undone.';
+  document.getElementById('rdc-pin').value='';
+  document.getElementById('rdc-err').style.display='none';
+  showOverlay('recipeDeleteConfirmOverlay');
+}
+function submitRecipeQuickDelete(){
+  var pin=document.getElementById('rdc-pin').value;
+  document.getElementById('rdc-err').style.display='none';
+  var isOk=Object.keys(STAFF_PINS).some(function(id){
+    return STAFF_PINS[id]===pin&&(STAFF_ROLES[id]==='manager'||STAFF_ROLES[id]==='qa');
+  });
+  if(!isOk){document.getElementById('rdc-err').style.display='block';return;}
+  deleteRecipeBySku(_rdcSku);
+  hideOverlay('recipeDeleteConfirmOverlay');
+  _rdcSku=null;
 }
 
 // ── SharePoint Traceability Links ─────────────────────────────────────
@@ -10444,6 +10466,8 @@ document.getElementById('recipeViewCloseBtn').onclick=function(){hideOverlay('re
 document.getElementById('re-saveBtn').onclick=submitRecipeSave;
 document.getElementById('re-deleteBtn').onclick=submitRecipeDelete;
 document.getElementById('re-cancelBtn').onclick=function(){hideOverlay('recipeEditOverlay');};
+document.getElementById('rdc-confirmBtn').onclick=submitRecipeQuickDelete;
+document.getElementById('rdc-cancelBtn').onclick=function(){hideOverlay('recipeDeleteConfirmOverlay');_rdcSku=null;};
 document.getElementById('re-addIngBtn').onclick=function(){_recipeEditIngredients.push({name:'',code:'',minWeight:'',targetWeight:'',maxWeight:'',allergens:'',supplier:'',scoopLabel:''});renderRecipeIngredientRows();};
 document.getElementById('re-addStepBtn').onclick=function(){_recipeEditMethod.push({text:'',detail:'',photo:'',highlight:false});renderRecipeMethodRows();};
 document.getElementById('re-addPkgBtn').onclick=function(){_recipeEditPackaging.push({name:'',code:'',supplier:''});renderRecipePackagingRows();};
