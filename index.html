@@ -1028,6 +1028,7 @@ function ingInit(ingId){
 var overrideLog=[], transferLog=[], form093Records=[], lcRecords=[], dmgLogs=[];
 var dmgRows=[], dmgIdCtr=0, messages=[], msgIdCtr=0, issueLog=[], currentIssueSeverity='low';
 var mgrDrillLine=null, mgrRefreshInterval=null, supRefreshInterval=null, effRefreshInterval=null, effSelectedLine='all';
+var mgrExpandedLines={}, mgrExpandedSchedMgmt={};
 var labelQueue=[], labelHistory=[], labelQueueIdCtr=0;
 // ── NEW: Schedule management state ────────────────────────────────────
 var scheduleChanges=[]; // audit trail: {id, type:'add'|'remove'|'move', line, jobName, details, auth, time}
@@ -6846,7 +6847,11 @@ function renderQaLCList(container){
 }
 
 // ── Manager Dashboard ──────────────────────────────────────────────────
-function openManager(){showPanel('mgrPanel');renderMgr();mgrRefreshInterval=setInterval(function(){if(mgrDrillLine)renderDrilldown(mgrDrillLine);else renderMgr();},8000);}
+function openManager(){showPanel('mgrPanel');renderMgr();mgrRefreshInterval=setInterval(function(){
+  var ae=document.activeElement;
+  if(ae&&document.getElementById('mgrPanel').contains(ae)&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'||ae.tagName==='SELECT'))return; // don't wipe out a field the manager is actively using
+  if(mgrDrillLine)renderDrilldown(mgrDrillLine);else renderMgr();
+},8000);}
 function closeManager(){hidePanel('mgrPanel');clearInterval(mgrRefreshInterval);mgrDrillLine=null;}
 function closeDrilldown(){mgrDrillLine=null;document.getElementById('mgrDrilldown').style.display='none';document.getElementById('mgrLines').style.display='block';document.getElementById('mgrSummary').style.display='grid';}
 function renderMgr(){
@@ -6888,6 +6893,9 @@ function renderMgr(){
       card.className='mgr-lc';
       card.style.cssText='border-left:5px solid '+bc+';cursor:pointer;';
 
+      // Persist expand/collapse across the 8s auto-refresh so a manager mid-read isn't yanked back to the summary view
+      var isOpen=!!mgrExpandedLines[line];
+
       // Header row — always visible
       var hdrRow=document.createElement('div');
       hdrRow.innerHTML=
@@ -6900,7 +6908,7 @@ function renderMgr(){
           '</div>'+
           '<div style="text-align:right;display:flex;align-items:center;gap:10px;">'+
             '<div><div style="font-size:1.2rem;font-weight:900;">'+pl+'%</div><div style="font-size:0.68rem;color:#aaa;">'+dn+'/'+jobs.length+'</div></div>'+
-            '<span class="mgr-chevron" style="font-size:0.85rem;color:#aaa;transition:transform 0.2s;display:inline-block;">▶</span>'+
+            '<span class="mgr-chevron" style="font-size:0.85rem;color:#aaa;transition:transform 0.2s;display:inline-block;'+(isOpen?'transform:rotate(90deg);':'')+'">▶</span>'+
           '</div>'+
         '</div>'+
         '<div style="height:7px;border-radius:4px;background:#eee;overflow:hidden;">'+
@@ -6917,7 +6925,7 @@ function renderMgr(){
 
       // Expandable detail section
       var detail=document.createElement('div');
-      detail.style.cssText='display:none;margin-top:12px;padding-top:12px;border-top:1.5px solid #f0f0f0;';
+      detail.style.cssText='display:'+(isOpen?'block':'none')+';margin-top:12px;padding-top:12px;border-top:1.5px solid #f0f0f0;';
 
       // Job list
       jobs.forEach(function(job){
@@ -6942,14 +6950,16 @@ function renderMgr(){
       // Schedule management for this line — collapsible
       var smToggleBtn=document.createElement('button');
       smToggleBtn.style.cssText='background:#f9f9f9;border:1.5px solid #ddd;border-radius:10px;padding:9px 14px;font-size:0.8rem;font-weight:700;color:#555;cursor:pointer;width:100%;text-align:left;margin-top:8px;';
-      smToggleBtn.innerHTML='📋 Schedule Management <span style="color:#aaa;font-weight:400;float:right;">▶</span>';
-      var smInline=document.createElement('div');
-      smInline.style.display='none';
-      var smOpen=false;
+      var smOpen=!!mgrExpandedSchedMgmt[line];
       var smBuilt=false;
+      smToggleBtn.innerHTML='📋 Schedule Management <span style="color:#aaa;font-weight:400;float:right;">'+(smOpen?'▼':'▶')+'</span>';
+      var smInline=document.createElement('div');
+      smInline.style.display=smOpen?'block':'none';
+      if(smOpen){renderSchedMgmt(smInline,line);smBuilt=true;}
       smToggleBtn.onclick=function(e){
         e.stopPropagation();
         smOpen=!smOpen;
+        mgrExpandedSchedMgmt[line]=smOpen;
         smToggleBtn.innerHTML='📋 Schedule Management <span style="color:#aaa;font-weight:400;float:right;">'+(smOpen?'▼':'▶')+'</span>';
         if(smOpen){
           if(!smBuilt){renderSchedMgmt(smInline,line);smBuilt=true;}
@@ -6964,9 +6974,9 @@ function renderMgr(){
       card.appendChild(detail);
 
       // Toggle expand/collapse
-      var isOpen=false;
       card.onclick=function(){
         isOpen=!isOpen;
+        mgrExpandedLines[line]=isOpen;
         detail.style.display=isOpen?'block':'none';
         var chev=card.querySelector('.mgr-chevron');
         if(chev) chev.style.transform=isOpen?'rotate(90deg)':'rotate(0deg)';
