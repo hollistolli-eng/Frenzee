@@ -5433,7 +5433,19 @@ function showScreen(id){
 }
 function showOverlay(id){document.getElementById(id).classList.add('show');}
 function hideOverlay(id){document.getElementById(id).classList.remove('show');}
-function showPanel(id){document.getElementById(id).classList.add('show');}
+function showPanel(id){
+  // Panels share the same fixed position and z-index, so an already-open panel must be
+  // closed before the next one opens — otherwise it silently stacks underneath and the
+  // click that opened it looks like it did nothing.
+  document.querySelectorAll('.mgr-panel.show').forEach(function(p){
+    if(p.id===id) return;
+    p.classList.remove('show');
+    if(p.id==='mgrPanel'){clearInterval(mgrRefreshInterval);mgrDrillLine=null;}
+    else if(p.id==='supervisorPanel'){clearInterval(supRefreshInterval);}
+    else if(p.id==='effPanel'){clearInterval(effRefreshInterval);}
+  });
+  document.getElementById(id).classList.add('show');
+}
 function hidePanel(id){document.getElementById(id).classList.remove('show');}
 function showScanPop(icon,title,sub,ok){document.getElementById('ovIcon').textContent=icon;document.getElementById('ovTitle').textContent=title;document.getElementById('ovSub').textContent=sub;document.getElementById('ovBtn').className=ok?'ov-btn':'ov-btn red';showOverlay('scanOverlay');}
 function fmtDate(d){if(!d)return '—';var p=d.split('-');return p[2]+'/'+p[1]+'/'+p[0];}
