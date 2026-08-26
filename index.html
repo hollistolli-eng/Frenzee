@@ -2769,9 +2769,10 @@ function submitPrepTransfer(toPosition){
 
 // ── Work Orders — supervisor tops up a mix a line has run out of ────────
 function guessMixPosition(mix){
-  var text=((mix&&mix.mixCategory)||'')+' '+((mix&&mix.mixName)||'');
-  if(text.toLowerCase().indexOf('egg')!==-1) return 2;
-  return 1;
+  var text=(((mix&&mix.mixCategory)||'')+' '+((mix&&mix.mixName)||'')).toLowerCase();
+  if(text.indexOf('egg')!==-1) return 2;
+  if(text.indexOf('tuna')!==-1||text.indexOf('fish')!==-1) return 3;
+  return 1; // chicken and everything else defaults to Position 1
 }
 function openWorkOrderForm(){
   var lineSel=document.getElementById('woLine');
