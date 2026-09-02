@@ -2527,7 +2527,7 @@ function renderPrepMixCard(body,job,position,color){
         r.status='complete';
         if(j.workOrderId){
           var wo=workOrders.find(function(w){return w.id===j.workOrderId;});
-          if(wo){wo.status='complete';wo.completedBy=currentUser?currentUser.name:'';wo.completedTime=nowTime();}
+          if(wo){wo.status='complete';wo.completedBy=currentUser?currentUser.name:'';wo.completedTime=nowTime();fbSaveWorkOrder(wo);}
         }
         lsScheduleSave();
         renderPrepWork(p);
@@ -2805,16 +2805,20 @@ function submitWorkOrder(){
   if(isNaN(kg)||kg<=0){msgEl.textContent='Please enter how many kg are needed.';return;}
   var mix=getMixByCode(mixCode);
   var woId='WO-'+Date.now();
-  prepSchedule.push({
+  var prepJob={
     mixCode:mixCode,mixName:mix?mix.mixName:mixCode,position:position,
     tubsRequired:1,shelfLife:mix?mix.shelfLifeDays:2,totalKgRequired:kg,
     adHoc:true,workOrderId:woId
-  });
-  workOrders.push({
+  };
+  prepSchedule.push(prepJob);
+  var newWO={
     id:woId,line:line,mixCode:mixCode,mixName:mix?mix.mixName:mixCode,kgNeeded:kg,position:position,
     reasonCat:reasonCat,reasonNotes:reasonNotes,
-    requestedBy:currentUser?currentUser.name:'Supervisor',requestedTime:nowTime(),status:'open'
-  });
+    requestedBy:currentUser?currentUser.name:'Supervisor',requestedTime:nowTime(),status:'open',
+    prepJob:prepJob
+  };
+  workOrders.push(newWO);
+  fbSaveWorkOrder(newWO);
   lsScheduleSave();
   hideOverlay('workOrderOverlay');
   showToast('🚨 Work order created — '+mixCode+' → Position '+position);
@@ -5281,6 +5285,65 @@ var PREP_POSITION_LABELS={
   2:'Position 2 — Egg Mixes',
   3:'Position 3 — Sauces, Smaller Mixes & Chicken Cutting'
 };
+
+// ── Work Order alert tone — Prep Room devices are separate hardware from
+// the Supervisor's, so a new work order needs an audible cue, not just a
+// silent screen update the prep worker might not be looking at.
+function playWorkOrderAlert(){
+  try{
+    var Ctx=window.AudioContext||window.webkitAudioContext;
+    if(!Ctx) return;
+    var ctx=new Ctx();
+    [880,1046.5,1318.5].forEach(function(freq,i){
+      var osc=ctx.createOscillator(), gain=ctx.createGain();
+      osc.type='sine'; osc.frequency.value=freq;
+      osc.connect(gain); gain.connect(ctx.destination);
+      var start=ctx.currentTime+i*0.16;
+      gain.gain.setValueAtTime(0,start);
+      gain.gain.linearRampToValueAtTime(0.35,start+0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001,start+0.15);
+      osc.start(start); osc.stop(start+0.16);
+    });
+  } catch(e){ console.warn('Work order alert tone failed:',e); }
+}
+
+// ── Work Orders — synced live via Firestore so a work order raised on the
+// Supervisor's device actually reaches the separate Prep Room device it's
+// aimed at, instead of sitting only in this browser's localStorage.
+var _workOrderSyncStarted=false;
+var _workOrderKnownIds=null; // null until first snapshot, so we never alert on the initial load
+function initWorkOrderSync(){
+  if(_workOrderSyncStarted) return;
+  _workOrderSyncStarted=true;
+  fbReady.then(function(){
+    fbDb.collection('workorders').onSnapshot(function(snap){
+      var incoming=snap.docs.map(function(d){return d.data();});
+      var wasKnown=_workOrderKnownIds;
+      var newIds=incoming.map(function(w){return w.id;});
+      if(wasKnown){
+        var newlyOpened=incoming.filter(function(w){return w.status==='open'&&wasKnown.indexOf(w.id)===-1;});
+        if(newlyOpened.length){
+          var onPrepScreen=document.getElementById('prepRoomPanel').classList.contains('show')||document.getElementById('prepWorkPanel').classList.contains('show');
+          var relevant=newlyOpened.some(function(w){return currentPrepPosition===null||currentPrepPosition===w.position;});
+          if(onPrepScreen&&relevant) playWorkOrderAlert();
+          newlyOpened.forEach(function(w){
+            if(w.prepJob&&!prepSchedule.some(function(j){return j.workOrderId===w.id;})) prepSchedule.push(w.prepJob);
+          });
+        }
+      }
+      _workOrderKnownIds=newIds;
+      workOrders=incoming;
+      if(document.getElementById('prepRoomPanel').classList.contains('show')) renderPrepRoom();
+      if(document.getElementById('prepWorkPanel').classList.contains('show')&&currentPrepPosition) renderPrepWork(currentPrepPosition);
+      if(document.getElementById('supervisorPanel').classList.contains('show')) renderSupervisorDash();
+      if(document.getElementById('mgrPanel').classList.contains('show')) renderMgr();
+    }, function(err){console.error('Firestore work orders listener failed:',err);});
+  });
+}
+initWorkOrderSync();
+function fbSaveWorkOrder(w){
+  fbDb.collection('workorders').doc(w.id).set(w).catch(function(e){console.error('Firestore work order save failed:',e);showToast('⚠️ Saved locally, but sync to Prep Room failed — check connection.');});
+}
 
 // ── End of Day Stock Count master data ────────────────────────────────
 var STOCK_COUNT_ITEMS={
@@ -9833,7 +9896,7 @@ function confirmNewShift(){
   // Trigger the end-of-shift email/download flow
   openEndOfShiftReport(function(){
     // After report flow, wipe state
-    scheduleData={};scheduleChanges=[];lineTeamLeaders={};prepPositionLeaders={};prepTransferLog=[];prepQtyAdjustLog=[];workOrders=[];mixCountWeights={};stockCountData={};form067Manual={};
+    scheduleData={};scheduleChanges=[];lineTeamLeaders={};prepPositionLeaders={};prepTransferLog=[];prepQtyAdjustLog=[];workOrders=[];_workOrderKnownIds=null;fbClearCollection('workorders');mixCountWeights={};stockCountData={};form067Manual={};
     toolUsageForm={date:"",day:"",startCount:"",startCompletedBy:"",startSignature:"",entries:[],endCount:"",endCompletedBy:"",endSignature:"",allAccountedFor:"",comments:"",prodMgrName:"",prodMgrSig:"",prodMgrDate:"",qaName:"",qaSig:"",qaDate:"",status:"in-progress"};
     toolboxRegisterForm={checked:{},missingReasons:{},comments:'',prodMgrName:'',prodMgrSig:'',prodMgrDate:'',qaName:'',qaSig:'',qaDate:'',status:'in-progress'};
     toolboxChangesLog=[];
