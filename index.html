@@ -804,6 +804,24 @@ if(sessionStorage.getItem(PW_KEY)==='1'){
   <div class="mgr-body" id="prepWorkBody"></div>
 </div>
 
+<!-- METAL DETECTION — MACHINE SELECT PANEL -->
+<div class="mgr-panel" id="metalRoomPanel">
+  <div class="mgr-hdr">
+    <div class="mgr-hdr-title"><span style="color:#2ecc40;">FRENZ</span><span style="color:#0074d9;">EE</span> <span style="font-size:0.8rem;color:#888;">Metal Detection</span></div>
+    <button class="mgr-close" id="metalRoomCloseBtn">✕ Close</button>
+  </div>
+  <div class="mgr-body" id="metalRoomBody"></div>
+</div>
+
+<!-- METAL DETECTION — MACHINE WORK PANEL -->
+<div class="mgr-panel" id="metalWorkPanel">
+  <div class="mgr-hdr">
+    <div class="mgr-hdr-title"><span style="color:#2ecc40;">FRENZ</span><span style="color:#0074d9;">EE</span> <span style="font-size:0.8rem;color:#888;" id="metalWorkTitle">Metal Detection</span></div>
+    <button class="mgr-close" id="metalWorkCloseBtn">✕ Back</button>
+  </div>
+  <div class="mgr-body" id="metalWorkBody"></div>
+</div>
+
 <!-- PREP MIX RECORD OVERLAY -->
 <div class="overlay" id="prepMixOverlay">
   <div class="ov-box" style="max-width:460px;">
@@ -2127,6 +2145,185 @@ var LOOSE_ITEMS_BY_LINE={
 //   prodMgrName, prodMgrSig, prodMgrDate, qaName, qaSig, qaDate, status}
 var looseItemsData={};
 
+// ── Metal Detection — product → detector program number lookup ─────────
+// Transcribed from FORM005.0 Metal Detection Records (QA-911-F-005.0, Version 040).
+// program is a string since some entries use "Machine 1 #NN" rather than a plain number.
+var METAL_PROGRAMS=[
+  {program:'34',brand:'WW',code:'971066',desc:'WW Chicken Mayo & Lettuce SW 190g'},
+  {program:'37',brand:'WW',code:'971065',desc:'WW Chicken Avocado & Spinach SW 219g'},
+  {program:'39',brand:'WW',code:'970950',desc:'WW Ham Cheese & Tomato SW 198g'},
+  {program:'54',brand:'WW',code:'970951',desc:'WW Egg Bacon SW 177g'},
+  {program:'38',brand:'WW',code:'971069',desc:'WW Egg Lettuce SW 190g'},
+  {program:'40',brand:'WW',code:'971106',desc:'WW Tuna & Cucumber SW 182g'},
+  {program:'81',brand:'WW',code:'971155',desc:'WW BBQ Pulled Beef Wrap 189g'},
+  {program:'45',brand:'WW',code:'971064',desc:'WW Classic Triple SW 242g'},
+  {program:'32',brand:'WW',code:'970790',desc:'WW Egg & Spinach Pot 102g'},
+  {program:'33',brand:'WW',code:'971068',desc:'WW Cheese Salad SW 176g'},
+  {program:'82',brand:'WW',code:'971153',desc:'WW Chicken Ham & Swiss Low Carb SW 205g'},
+  {program:'36',brand:'WW',code:'970967',desc:'WW Ham & Sweet Mustard Pickle SW 137g'},
+  {program:'35',brand:'WW',code:'970968',desc:'WW Curried Egg SW 156g'},
+  {program:'42',brand:'WW',code:'970957',desc:'WW Chicken Caesar Wrap 204g'},
+  {program:'85',brand:'WW',code:'971157',desc:'WW Fajita Chicken Wrap 197g'},
+  {program:'41',brand:'WW',code:'970959',desc:'WW Sweet Chilli Chicken Wrap 209g'},
+  {program:'43',brand:'WW',code:'971156',desc:'WW Triple Chicken Wrap 253g'},
+  {program:'13',brand:'WW',code:'971052',desc:'WW Berry Crunch Yoghurt Pot 195g'},
+  {program:'44',brand:'WW',code:'971053',desc:'WW Chicken Schnitzel SW 231g'},
+  {program:'12',brand:'WW',code:'971107',desc:'WW Butter Chicken Multigrain SW 211g'},
+  {program:'61',brand:'WW',code:'971109',desc:'WW Roast Beef & Tomato Low Carb SW 199g'},
+  {program:'90',brand:'DNATA',code:'970910',desc:'DNATA Chicken Caesar Wrap 174g'},
+  {program:'91',brand:'DNATA',code:'970909',desc:'DNATA Homestyle Sandwich 177g'},
+  {program:'66',brand:'BP',code:'971083',desc:'Toasted Ham & cheese on a butter croissant 126g'},
+  {program:'58',brand:'BP',code:'971075',desc:'Select Salad & cheese with aioli SW 194g'},
+  {program:'63',brand:'BP',code:'971070',desc:'Classic Ham, cheese & tomato SW 157g'},
+  {program:'60',brand:'BP',code:'971076',desc:'Hearty Sweet chilli schnitzel with tasty cheese SW 204g'},
+  {program:'46',brand:'BP',code:'971073',desc:'Select Corned beef & cheese with mustard pickle SW 152g'},
+  {program:'49',brand:'BP',code:'971078',desc:'Hearty Chicken, bacon & cheese SW 198g'},
+  {program:'50',brand:'BP',code:'971074',desc:'Select Chicken & avocado on multigrain SW 185g'},
+  {program:'65',brand:'BP',code:'971080',desc:'Select southern style chicken with peri peri mayo Wrap 169g'},
+  {program:'62',brand:'BP',code:'971072',desc:'Classic (Veg) Egg & mayo with chives SW 158g'},
+  {program:'68',brand:'BP',code:'971077',desc:'Hearty Triple decker SW 230g'},
+  {program:'52',brand:'BP',code:'971081',desc:'Select Chicken Caesar in tortilla wrap 165g'},
+  {program:'30',brand:'BP',code:'971099',desc:'Hearty Chicken triple decker SW 219g'},
+  {program:'31',brand:'BP',code:'971102',desc:'Select Sweet chilli chicken slaw Wrap 175g'},
+  {program:'51',brand:'BP',code:'972021',desc:'BP Classic Chicken & Cucumber SW 177g'},
+  {program:'92',brand:'EG',code:'971118',desc:'GO FRESH Chicken Caesar Wrap 170g'},
+  {program:'93',brand:'EG',code:'971117',desc:'GO FRESH Sweet Chilli Wrap 170g'},
+  {program:'50',brand:'EG',code:'971113',desc:'GO FRESH Chicken Avo Lettuce SW 181g'},
+  {program:'96',brand:'EG',code:'971115',desc:'GO FRESH Chicken Schnitzel SW 192g'},
+  {program:'97',brand:'EG',code:'971111',desc:'GO FRESH Ham Cheese Tomato SW 163g'},
+  {program:'98',brand:'EG',code:'971110',desc:'GO FRESH Egg & Lettuce SW 162g'},
+  {program:'99',brand:'EG',code:'971112',desc:'GO FRESH Chicken Mayo Lettuce SW 159g'},
+  {program:'45',brand:'EG',code:'971116',desc:'GO FRESH Classic Triple SW 238g'},
+  {program:'94',brand:'EG',code:'971152',desc:'GO FRESH Cheese & Salad SW 175g'},
+  {program:'18',brand:'EG',code:'971166',desc:'GO FRESH Egg & Bacon SW 187g'},
+  {program:'13',brand:'EG',code:'971149',desc:'GO FRESH Berry Crunch Yogurt Pot 215g'},
+  {program:'14',brand:'EG',code:'971150',desc:'GO FRESH Mango Crunch Yogurt Pot 215g'},
+  {program:'15',brand:'EG',code:'971151',desc:'GO FRESH Bircher Muesli Pot 212g'},
+  {program:'65',brand:'EG',code:'972027',desc:'GO FRESH Southern Chicken Wrap 170g'},
+  {program:'56',brand:'OTR Frozen',code:'971128 / 990610',desc:'EAT FZN Ham Cheese Croissant 140g'},
+  {program:'10',brand:'OTR Frozen',code:'971129 / 990611',desc:'EAT FZN Corned Beef & Pickle SW 167g'},
+  {program:'59',brand:'OTR Frozen',code:'971130 / 990612',desc:'EAT FZN Chicken & Avocado SW 173g'},
+  {program:'55',brand:'OTR Frozen',code:'971131 / 990613',desc:'EAT FZN Ckn, Avo & Bacon SW 188g'},
+  {program:'8',brand:'OTR Frozen',code:'971132 / 990614',desc:'EAT FZN Sweet Chilli Wrap 190g'},
+  {program:'19',brand:'OTR Frozen',code:'971133 / 990615',desc:'EAT FZN Chicken & Cheese SW 171g'},
+  {program:'24',brand:'OTR Frozen',code:'971134 / 990616',desc:'EAT FZN Ham Cheese Pickle SW 163g'},
+  {program:'70',brand:'OTR Fresh',code:'971144',desc:'EAT Ckn & Cheese Toastie 215g'},
+  {program:'',brand:'OTR Fresh',code:'971145',desc:'EAT Egg & Bacon Toastie 208g'},
+  {program:'72',brand:'OTR Fresh',code:'971143',desc:'EAT Ham Cheese Toastie 201g'},
+  {program:'20',brand:'OTR Fresh',code:'971148',desc:'EAT Ham Cheese Croissant 140g'},
+  {program:'89',brand:'OTR Fresh',code:'971121',desc:'EAT Chicken & Mayo SW 138g'},
+  {program:'16',brand:'OTR Fresh',code:'971123',desc:'EAT Roast Beef & Salad SW 185g'},
+  {program:'87',brand:'OTR Fresh',code:'971124',desc:'EAT Sausage Egg Bacon SW 242g'},
+  {program:'3',brand:'OTR Fresh',code:'971125',desc:'EAT Cheese & Salad SW 192g'},
+  {program:'53',brand:'OTR Fresh',code:'971127',desc:'EAT Egg & Mayo SW 155g'},
+  {program:'88',brand:'OTR Fresh',code:'971135',desc:'EAT Chicken, Avo lettuce SW 177g'},
+  {program:'75',brand:'OTR Fresh',code:'971136',desc:'EAT Chicken Schnitzel SW 258g'},
+  {program:'80',brand:'OTR Fresh',code:'971138',desc:'EAT Triple Mixed Classics SW 254g'},
+  {program:'48',brand:'OTR Fresh',code:'971139',desc:'EAT Egg & Lettuce Wholegrain SW 179g'},
+  {program:'86',brand:'OTR Fresh',code:'971140',desc:'EAT Egg & Lettuce White SW 179g'},
+  {program:'67',brand:'OTR Fresh',code:'971141',desc:'EAT Ham, Cheese Tomato SW 182g'},
+  {program:'74',brand:'OTR Fresh',code:'971142',desc:'EAT Bacon Lettuce Tom SW 187g'},
+  {program:'83',brand:'OTR Fresh',code:'971147',desc:'EAT Tuna Crunch SW 177g'},
+  {program:'79',brand:'OTR Fresh',code:'971119',desc:'EAT Sweet Chilli Ckn Tender Wrap 188g'},
+  {program:'29',brand:'OTR Fresh',code:'971120',desc:'EAT Triple Chicken Wrap 269g'},
+  {program:'25',brand:'OTR Fresh',code:'971122',desc:'EAT Triple Ckn Caesar Wrap 273g'},
+  {program:'77',brand:'OTR Fresh',code:'971137',desc:'EAT Chicken Caesar Wrap 188g'},
+  {program:'78',brand:'OTR Fresh',code:'971146',desc:'EAT Southern Chicken Wrap 193g'},
+  {program:'95',brand:'RISE',code:'971167',desc:'RISE Classic Egg & Lettuce SW 161g'},
+  {program:'1',brand:'RISE',code:'971168',desc:'RISE Double Cheese & Tomato SW 151g'},
+  {program:'2',brand:'RISE',code:'971169',desc:'RISE Cheese, Salad & Relish SW 208g'},
+  {program:'83',brand:'RISE',code:'971170',desc:'RISE Tuna Mayo Crunch SW 183g'},
+  {program:'56',brand:'RISE',code:'971171',desc:'RISE Chicken Mayo & Lettuce SW 173g'},
+  {program:'4',brand:'RISE',code:'971172',desc:'RISE Chicken & Avocado SW 188g'},
+  {program:'5',brand:'RISE',code:'971173',desc:'RISE Chicken Schnitzel SW 229g'},
+  {program:'6',brand:'RISE',code:'971174',desc:'RISE Ham, Cheese & Tomato SW 181g'},
+  {program:'7',brand:'RISE',code:'971175',desc:'RISE Roast Beef & Salad SW 197g'},
+  {program:'11',brand:'RISE',code:'971176',desc:'RISE Sausage, Egg & Bacon SW 207g'},
+  {program:'53',brand:'RISE',code:'971177',desc:'RISE Classic Egg Mayo White SW 153g'},
+  {program:'9',brand:'RISE',code:'971178',desc:'RISE Chicken Mayo SW 173g'},
+  {program:'17',brand:'RISE',code:'971179',desc:'RISE Ham Cheese Mayo SW 157g'},
+  {program:'21',brand:'RISE',code:'971180',desc:'RISE Triple Classic Selection SW 236g'},
+  {program:'23',brand:'RISE',code:'971181',desc:'RISE Triple Chickn Selection SW 226g'},
+  {program:'69',brand:'RISE',code:'971197',desc:'RISE Curried Egg Mayo SW 144g'},
+  {program:'46',brand:'RISE',code:'971198',desc:'RISE Corned Beef Pickle SW 148g'},
+  {program:'26',brand:'RISE',code:'971183',desc:'RISE Breakfast Ham & Egg Wrap 168g'},
+  {program:'27',brand:'RISE',code:'971184',desc:'Chicken & Bacon Caesar Wrap 169g'},
+  {program:'28',brand:'RISE',code:'971185',desc:'RISE Chicken Fajita Wrap 178g'},
+  {program:'57',brand:'RISE',code:'971186',desc:'RISE Ham Cheese, Tomato Wrap 167g'},
+  {program:'73',brand:'RISE',code:'971187',desc:'RISE Mozzarella & Pesto Wrap 157g'},
+  {program:'97',brand:'RISE',code:'971188',desc:'RISE Sweet Chilli Chicken Wrap 179g'},
+  {program:'47',brand:'RISE',code:'971189',desc:'RISE Triple Wraps Selection 240g'},
+  {program:'13',brand:'RISE',code:'971193',desc:'RISE Berry Crunch Yoghurt Pot 215g'},
+  {program:'14',brand:'RISE',code:'971192',desc:'RISE Mango Crunch Yoghurt Pot 215g'},
+  {program:'15',brand:'RISE',code:'971191',desc:'RISE Bircher Muesli Pot 212g'},
+  {program:'32',brand:'RISE',code:'971196',desc:'RISE Egg and Spinach Pot 102g'},
+  {program:'1',brand:'RISE',code:'971200',desc:'RISE Gluten Free Avocado Feta Tomato SW 146g'},
+  {program:'36',brand:'RISE',code:'971202',desc:'RISE Gluten Free Ham Cheese Tom Relish SW 137g'},
+  {program:'99',brand:'RISE',code:'971203',desc:'RISE Gluten Free Chicken Mayo Lettuce SW 159g'},
+  {program:'66',brand:'RISE',code:'971194',desc:'RISE Ham & Cheese Croissant 129g'},
+  {program:'Machine 1 #65',brand:'RISE',code:'971221',desc:'RISE Chicken Schnitzel Baguette 272g'},
+  {program:'Machine 1 #66',brand:'RISE',code:'971222',desc:'RISE Ham & Cheese Baguette 240g'},
+  {program:'Machine 1 #68',brand:'RISE',code:'971223',desc:'RISE Roast Beef Baguette 230g'},
+  {program:'Machine 1 #69',brand:'RISE',code:'971224',desc:'RISE Salad & Cheese Baguette 241g'},
+  {program:'Machine 1 #12',brand:'RISE',code:'972008',desc:'RISE Fresh Ham & Four Cheese Toastie 180g'},
+  {program:'Machine 1 #22',brand:'RISE',code:'972009',desc:'RISE Fresh Four Cheese Toastie 179g'},
+  {program:'Machine 1 #32',brand:'RISE',code:'972010',desc:'RISE Fresh Chicken Pesto Toastie 192g'},
+  {program:'Machine 1 #33',brand:'RISE',code:'972011',desc:'RISE Fresh Chicken & Avo Toastie 221g'},
+  {program:'95',brand:'RISE',code:'971230',desc:'RISE Classic Egg & Lettuce WMeal SW 166g'},
+  {program:'2',brand:'RISE',code:'971231',desc:'RISE Cheese, Salad & Relish WMeal SW 207g'},
+  {program:'4',brand:'RISE',code:'971232',desc:'RISE Chicken & Avocado WMeal SW 193g'},
+  {program:'5',brand:'RISE',code:'971233',desc:'RISE Chicken Schnitzel WMeal SW 234g'},
+  {program:'6',brand:'RISE',code:'971234',desc:'RISE Ham, Cheese & Tomato WMeal SW 190g'},
+  {program:'17',brand:'RISE',code:'971235',desc:'RISE Ham Cheese Mayo WMeal SW 162g'},
+  {program:'66',brand:'FROZEN RISE',code:'972017/990685',desc:'RISE Ham & Cheese Croissant 129g'},
+  {program:'Machine 1 #12',brand:'FROZEN RISE',code:'971160/990625',desc:'RISE FZN Ham & Four Cheese Toastie 180g'},
+  {program:'Machine 1 #22',brand:'FROZEN RISE',code:'971161/990626',desc:'RISE FZN Four Cheese Toastie 179g'},
+  {program:'Machine 1 #32',brand:'FROZEN RISE',code:'971162/990627',desc:'RISE FZN Chckn Pesto Toastie 192g'},
+  {program:'Machine 1 #33',brand:'FROZEN RISE',code:'971163/990628',desc:'RISE FZN Chicken Avo Toastie 221g'},
+  {program:'Machine 1 #100',brand:'FROZEN RISE',code:'971164/990629',desc:'RISE FZN Meat Lover Toastie 195g'},
+  {program:'11',brand:'FROZEN RISE',code:'971209/990648',desc:'RISE FZN Sausage, Egg Bacon SW 207g'},
+  {program:'53',brand:'FROZEN RISE',code:'971210/990649',desc:'RISE FZN Classic Egg Mayo SW 153g'},
+  {program:'9',brand:'FROZEN RISE',code:'971211/990650',desc:'RISE FZN Chicken Mayo SW 173g'},
+  {program:'17',brand:'FROZEN RISE',code:'971212/990651',desc:'RISE FZN Ham Cheese Mayo SW 157g'},
+  {program:'4',brand:'FROZEN RISE',code:'971213/990652',desc:'RISE FZN Chicken & Avo SW 188g'},
+  {program:'20',brand:'FROZEN RISE',code:'971214/990653',desc:'RISE FZN Curried Egg SW 144g'},
+  {program:'36',brand:'FROZEN RISE',code:'971215/990654',desc:'RISE FZN Ham Sweet Pickle SW 134g'},
+  {program:'46',brand:'FROZEN RISE',code:'971216/990655',desc:'RISE FZN Corned Beef Pickle SW 148g'},
+  {program:'36',brand:'FROZEN RISE',code:'971217/990656',desc:'RISE FZN Gluten Free Ham Cheese Tom Relish SW 137g'},
+  {program:'7',brand:'FROZEN RISE',code:'971226/990672',desc:'RISE Roast Beef & Salad SW 197g'},
+  {program:'97',brand:'FROZEN RISE',code:'971218/990657',desc:'RISE Sweet Chilli Chicken Wrap 176g'},
+  {program:'28',brand:'FROZEN RISE',code:'971219/990658',desc:'RISE Chicken Fajita Wrap 178g'},
+  {program:'27',brand:'FROZEN RISE',code:'971220/990659',desc:'RISE Chicken Bacon Caesar Wrap 167g'},
+  {program:'17',brand:'FROZEN RISE',code:'971204/990643',desc:'RISE Ham & Cheese Texas Toastie 159g'},
+  {program:'19',brand:'FROZEN RISE',code:'971205/990644',desc:'RISE Chicken & Cheese Texast Toastie 174g'}
+];
+function findMetalProgram(query){
+  if(!query) return [];
+  var q=query.toLowerCase();
+  return METAL_PROGRAMS.filter(function(p){
+    return p.code.toLowerCase().indexOf(q)!==-1||p.desc.toLowerCase().indexOf(q)!==-1;
+  }).slice(0,8);
+}
+
+// metalForms: keyed by machine number (1,2) → one FORM005.0 record for today.
+function newMetalForm(){
+  return {
+    date:'',operatorNames:['',''],
+    stripsResult:'',unitClean:false,weightCheck:false,securityLevel0:false,challengeTest:false,
+    memStartFe:'',memStartNf:'',memStartSs:'',memStartTotal:'',memStartInitials:'',
+    runs:[],
+    memEndFe:'',memEndNf:'',memEndSs:'',memEndTotal:'',memEndInitials:'',
+    comments:'',
+    prodMgrName:'',prodMgrSig:'',prodMgrDate:'',qaName:'',qaSig:'',qaDate:'',status:'in-progress'
+  };
+}
+var metalForms={1:newMetalForm(),2:newMetalForm()};
+function newMetalRun(){
+  return {program:'',brand:'',code:'',desc:'',timeStart:'',timeEnd:'',
+    startFe:'',startNf:'',startSs:'',endFe:'',endNf:'',endSs:'',
+    actualReject:'',weightReject:'',addlPasses:'',ubdOk:'',totalProducts:'',initials:''};
+}
+
 // ── Allergen Clean Verification state ─────────────────────────────────
 // allergenVerifications: {jobKey: {verifiedBy, pin, initials, time, line}}
 // jobKey = line + '-' + jobIdx
@@ -3016,6 +3213,325 @@ function buildPrepPDFSection(){
       '</tbody></table>';
   });
   html+='<div style="font-size:9px;color:#aaa;">QA-911-F-062.0 | Version 046 | Issue Date: 01/05/26 | Authorised By: National QA</div>';
+  return html;
+}
+
+// ── Metal Detection (FORM005.0) ─────────────────────────────────────────
+function openMetalRoom(){
+  showPanel('metalRoomPanel');
+  renderMetalRoom();
+}
+function renderMetalRoom(){
+  var body=document.getElementById('metalRoomBody');
+  body.innerHTML='';
+  var hdr=document.createElement('div');
+  hdr.style.cssText='background:#f0fdf4;border-radius:18px;padding:14px 16px;margin-bottom:16px;border-left:5px solid #555;';
+  hdr.innerHTML=
+    '<div style="font-size:0.8rem;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">🧲 Metal Detection</div>'+
+    '<div style="font-size:0.82rem;color:#555;">Select a machine to log operators and today\'s runs.</div>';
+  body.appendChild(hdr);
+  [1,2].forEach(function(n){
+    var f=metalForms[n];
+    var runCount=f.runs.length;
+    var operators=f.operatorNames.filter(function(x){return x;}).join(' & ');
+    var card=document.createElement('div');
+    card.style.cssText='background:#fff;border-radius:16px;padding:15px 16px;margin-bottom:10px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid '+(f.status==='complete'?'#2ecc40':'#f39c12')+';cursor:pointer;display:flex;align-items:center;gap:12px;';
+    card.innerHTML=
+      '<div style="font-size:1.6rem;">🧲</div>'+
+      '<div style="flex:1;">'+
+        '<div style="font-weight:800;font-size:0.95rem;">Machine '+n+'</div>'+
+        '<div style="font-size:0.78rem;color:#888;margin-top:2px;">'+(operators?'👤 '+operators:'No operator logged yet')+' · '+runCount+' run'+(runCount===1?'':'s')+' logged'+(f.status==='complete'?' · ✅ Signed off':'')+'</div>'+
+      '</div>'+
+      '<span style="font-size:0.85rem;color:#aaa;">▶</span>';
+    card.onclick=function(){openMetalMachine(n);};
+    body.appendChild(card);
+  });
+}
+function openMetalMachine(n){
+  var f=metalForms[n];
+  if(!f.date){
+    f.date=new Date().toISOString().split('T')[0];
+  }
+  document.getElementById('metalWorkTitle').textContent='Metal — Machine '+n;
+  showPanel('metalWorkPanel');
+  renderMetalWork(n);
+}
+function renderMetalWork(n){
+  var body=document.getElementById('metalWorkBody');
+  body.innerHTML='';
+  var f=metalForms[n];
+  var isSigned=f.status==='complete';
+
+  // ── Header ──────────────────────────────────────────────────────────
+  var hdrCard=document.createElement('div');
+  hdrCard.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border:1.5px solid #222;';
+  hdrCard.innerHTML=
+    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">'+
+    '<div style="background:#222;color:#fff;border-radius:8px;padding:6px 10px;font-size:0.65rem;font-weight:700;text-align:center;line-height:1.4;">Fresh<br>To Go<br>Foods</div>'+
+    '<div style="flex:1;text-align:center;">'+
+      '<div style="font-size:0.7rem;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:0.5px;">Quality Assurance Manual</div>'+
+      '<div style="font-size:0.95rem;font-weight:900;color:#222;">FORM005.0 — METAL DETECTION RECORDS — Machine '+n+'</div>'+
+    '</div></div>'+
+    '<div class="field-row"><div class="field-label">Date</div><input class="field-input" type="date" value="'+f.date+'" id="mt-date" '+(isSigned?'disabled':'')+'/></div>';
+  body.appendChild(hdrCard);
+
+  // ── Operators (no PIN — anyone can run the machine, just logged for the day) ──
+  var opCard=document.createElement('div');
+  opCard.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #0074d9;';
+  var opOptions='<option value="">-- Select name --</option>'+staffRoster.slice().sort(function(a,b){return a.name.localeCompare(b.name);}).map(function(s){return '<option value="'+s.name+'">'+s.name+'</option>';}).join('');
+  opCard.innerHTML=
+    '<div style="font-size:0.75rem;font-weight:700;color:#0074d9;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">👤 Operator Name/s — no PIN needed, just logged for today</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'+
+      '<div class="field-row"><div class="field-label">Operator 1</div><select class="field-input" id="mt-op0" '+(isSigned?'disabled':'')+'>'+opOptions.replace('value="'+f.operatorNames[0]+'"','value="'+f.operatorNames[0]+'" selected')+'</select></div>'+
+      '<div class="field-row"><div class="field-label">Operator 2 (optional)</div><select class="field-input" id="mt-op1" '+(isSigned?'disabled':'')+'>'+opOptions.replace('value="'+f.operatorNames[1]+'"','value="'+f.operatorNames[1]+'" selected')+'</select></div>'+
+    '</div>';
+  body.appendChild(opCard);
+
+  // ── Start-up tests ───────────────────────────────────────────────────
+  var suCard=document.createElement('div');
+  suCard.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #27ae60;';
+  function chip(field,label){
+    var on=f[field];
+    return '<button data-mtchip="'+field+'" '+(isSigned?'disabled':'')+' style="border:1.5px solid '+(on?'#27ae60':'#ddd')+';background:'+(on?'#f0fdf4':'#fff')+';color:'+(on?'#27ae60':'#888')+';border-radius:8px;padding:8px 10px;font-size:0.78rem;font-weight:700;cursor:pointer;text-align:left;">'+(on?'✅ ':'⬜ ')+label+'</button>';
+  }
+  suCard.innerHTML=
+    '<div style="font-size:0.75rem;font-weight:700;color:#27ae60;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">🌅 Start-Up Tests</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">'+
+      chip('unitClean','Unit clean and fully operational')+
+      chip('weightCheck','5-point weight check with 1000g test weight')+
+      chip('securityLevel0','Security setting confirmed at Level 0')+
+      chip('challengeTest','Challenge test passed (Fe/NF/SS test strips)')+
+    '</div>'+
+    '<div style="font-size:0.78rem;color:#555;margin-bottom:8px;font-weight:700;">Memory Test — Start of Day (test strips must fully reject 3× each)</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:8px;">'+
+      '<div class="field-row"><div class="field-label">Fe Pass/Fail</div><input class="field-input" type="text" maxlength="1" value="'+f.memStartFe+'" id="mt-memStartFe" placeholder="P/F" '+(isSigned?'disabled':'')+'/></div>'+
+      '<div class="field-row"><div class="field-label">NF Pass/Fail</div><input class="field-input" type="text" maxlength="1" value="'+f.memStartNf+'" id="mt-memStartNf" placeholder="P/F" '+(isSigned?'disabled':'')+'/></div>'+
+      '<div class="field-row"><div class="field-label">SS Pass/Fail</div><input class="field-input" type="text" maxlength="1" value="'+f.memStartSs+'" id="mt-memStartSs" placeholder="P/F" '+(isSigned?'disabled':'')+'/></div>'+
+      '<div class="field-row"><div class="field-label">Total Products</div><input class="field-input" type="number" min="0" value="'+f.memStartTotal+'" id="mt-memStartTotal" '+(isSigned?'disabled':'')+'/></div>'+
+      '<div class="field-row"><div class="field-label">Initials</div><input class="field-input" type="text" value="'+f.memStartInitials+'" id="mt-memStartInitials" '+(isSigned?'disabled':'')+'/></div>'+
+    '</div>';
+  body.appendChild(suCard);
+
+  // ── Runs table ───────────────────────────────────────────────────────
+  var runsCard=document.createElement('div');
+  runsCard.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #f39c12;';
+  var runsHTML='<div style="font-size:0.75rem;font-weight:700;color:#b8860b;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">📦 Runs Through the Detector</div>';
+  f.runs.forEach(function(run,i){
+    runsHTML+='<div style="border:1.5px solid #f0f0f0;border-radius:12px;padding:10px 12px;margin-bottom:8px;">'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'+
+        '<div style="flex:1;position:relative;">'+
+          '<input class="field-input" type="text" placeholder="Search product by code or name…" value="'+(run.desc?run.brand+' — '+run.desc:'')+'" data-mtrunsearch="'+i+'" '+(isSigned?'disabled':'')+' autocomplete="off"/>'+
+          '<div data-mtrunresults="'+i+'" style="position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid #ddd;border-radius:8px;margin-top:2px;max-height:200px;overflow-y:auto;z-index:20;display:none;box-shadow:0 6px 18px rgba(0,0,0,0.12);"></div>'+
+        '</div>'+
+        (isSigned?'':'<button data-mtrundel="'+i+'" style="background:#fff0f0;color:#e74c3c;border:none;border-radius:8px;padding:8px 10px;font-size:0.78rem;font-weight:700;cursor:pointer;">✕</button>')+
+      '</div>'+
+      (run.program?'<div style="font-size:0.78rem;color:#555;margin-bottom:8px;">Program <strong>'+run.program+'</strong> · Code '+run.code+'</div>':'')+
+      '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-bottom:7px;">'+
+        inpRun(i,'timeStart','Time Start','text','HH:MM',isSigned)+
+        inpRun(i,'timeEnd','Time End','text','HH:MM',isSigned)+
+      '</div>'+
+      '<div style="font-size:0.7rem;font-weight:700;color:#888;margin-bottom:4px;">START OF RUN — Pass (P) / Fail (F)</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:7px;">'+
+        inpRun(i,'startFe','Fe','text','P/F',isSigned)+inpRun(i,'startNf','NF','text','P/F',isSigned)+inpRun(i,'startSs','SS','text','P/F',isSigned)+
+      '</div>'+
+      '<div style="font-size:0.7rem;font-weight:700;color:#888;margin-bottom:4px;">END OF RUN — Pass (P) / Fail (F)</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:7px;">'+
+        inpRun(i,'endFe','Fe','text','P/F',isSigned)+inpRun(i,'endNf','NF','text','P/F',isSigned)+inpRun(i,'endSs','SS','text','P/F',isSigned)+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-bottom:7px;">'+
+        inpRun(i,'actualReject','Actual No. Reject Metal Products','number','',isSigned)+
+        inpRun(i,'weightReject','No. Weight Rejected Products','number','',isSigned)+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-bottom:7px;">'+
+        inpRun(i,'addlPasses','Additional Passes Through (x3)','text','',isSigned)+
+        inpRun(i,'ubdOk','UBD ok? Y/N','text','Y/N',isSigned)+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px;">'+
+        inpRun(i,'totalProducts','Total No. of Products','number','',isSigned)+
+        inpRun(i,'initials','Initials of Operator','text','',isSigned)+
+      '</div>'+
+    '</div>';
+  });
+  runsCard.innerHTML=runsHTML;
+  body.appendChild(runsCard);
+  if(!isSigned){
+    var addRunBtn=document.createElement('button');
+    addRunBtn.style.cssText='width:100%;background:#fff8e1;color:#b8860b;border:1.5px dashed #f39c12;border-radius:10px;padding:10px;font-size:0.82rem;font-weight:700;cursor:pointer;margin-bottom:12px;';
+    addRunBtn.textContent='+ Add Run';
+    addRunBtn.onclick=function(){f.runs.push(newMetalRun());lsScheduleSave();renderMetalWork(n);};
+    body.appendChild(addRunBtn);
+  }
+
+  // ── Memory test — end of day ─────────────────────────────────────────
+  var meCard=document.createElement('div');
+  meCard.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #e74c3c;';
+  meCard.innerHTML=
+    '<div style="font-size:0.75rem;font-weight:700;color:#e74c3c;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">🌙 Memory Test — End of Day</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:8px;margin-bottom:10px;">'+
+      '<div class="field-row"><div class="field-label">Fe Pass/Fail</div><input class="field-input" type="text" maxlength="1" value="'+f.memEndFe+'" id="mt-memEndFe" placeholder="P/F" '+(isSigned?'disabled':'')+'/></div>'+
+      '<div class="field-row"><div class="field-label">NF Pass/Fail</div><input class="field-input" type="text" maxlength="1" value="'+f.memEndNf+'" id="mt-memEndNf" placeholder="P/F" '+(isSigned?'disabled':'')+'/></div>'+
+      '<div class="field-row"><div class="field-label">SS Pass/Fail</div><input class="field-input" type="text" maxlength="1" value="'+f.memEndSs+'" id="mt-memEndSs" placeholder="P/F" '+(isSigned?'disabled':'')+'/></div>'+
+      '<div class="field-row"><div class="field-label">Total Products</div><input class="field-input" type="number" min="0" value="'+f.memEndTotal+'" id="mt-memEndTotal" '+(isSigned?'disabled':'')+'/></div>'+
+      '<div class="field-row"><div class="field-label">Initials</div><input class="field-input" type="text" value="'+f.memEndInitials+'" id="mt-memEndInitials" '+(isSigned?'disabled':'')+'/></div>'+
+    '</div>'+
+    '<div class="field-row"><div class="field-label">Comments / Corrective Actions</div><textarea class="field-input" rows="2" id="mt-comments" style="resize:none;" '+(isSigned?'disabled':'')+'>'+f.comments+'</textarea></div>';
+  body.appendChild(meCard);
+
+  // ── Wire header/operator/startup/memory field saves ──────────────────
+  if(!isSigned){
+    [['mt-date','date'],['mt-op0','__op0'],['mt-op1','__op1'],
+     ['mt-memStartFe','memStartFe'],['mt-memStartNf','memStartNf'],['mt-memStartSs','memStartSs'],['mt-memStartTotal','memStartTotal'],['mt-memStartInitials','memStartInitials'],
+     ['mt-memEndFe','memEndFe'],['mt-memEndNf','memEndNf'],['mt-memEndSs','memEndSs'],['mt-memEndTotal','memEndTotal'],['mt-memEndInitials','memEndInitials'],
+     ['mt-comments','comments']].forEach(function(pair){
+      var el=document.getElementById(pair[0]);
+      if(!el) return;
+      el.addEventListener('change',function(){
+        if(pair[1]==='__op0') f.operatorNames[0]=el.value;
+        else if(pair[1]==='__op1') f.operatorNames[1]=el.value;
+        else f[pair[1]]=el.value;
+        lsScheduleSave();
+      });
+    });
+    body.querySelectorAll('[data-mtchip]').forEach(function(btn){
+      btn.onclick=function(){f[btn.getAttribute('data-mtchip')]=!f[btn.getAttribute('data-mtchip')];lsScheduleSave();renderMetalWork(n);};
+    });
+    body.querySelectorAll('[data-mtrundel]').forEach(function(btn){
+      btn.onclick=function(){f.runs.splice(parseInt(btn.getAttribute('data-mtrundel')),1);lsScheduleSave();renderMetalWork(n);};
+    });
+    body.querySelectorAll('[data-mtrow]').forEach(function(el){
+      el.addEventListener('change',function(){
+        f.runs[parseInt(el.getAttribute('data-mtrow'))][el.getAttribute('data-mtfield')]=el.value;
+        lsScheduleSave();
+      });
+    });
+    body.querySelectorAll('[data-mtrunsearch]').forEach(function(el){
+      var idx=parseInt(el.getAttribute('data-mtrunsearch'));
+      var results=body.querySelector('[data-mtrunresults="'+idx+'"]');
+      el.addEventListener('input',function(){
+        var matches=findMetalProgram(el.value);
+        if(!matches.length){results.style.display='none';return;}
+        results.innerHTML=matches.map(function(m,mi){return '<div data-mtpick="'+idx+'" data-mtpickidx="'+mi+'" style="padding:8px 10px;font-size:0.78rem;cursor:pointer;border-bottom:1px solid #f5f5f5;"><strong>'+m.program+'</strong> · '+m.brand+' — '+m.desc+' <span style="color:#aaa;">('+m.code+')</span></div>';}).join('');
+        results.style.display='block';
+        results.querySelectorAll('[data-mtpick]').forEach(function(opt){
+          opt.onclick=function(){
+            var picked=matches[parseInt(opt.getAttribute('data-mtpickidx'))];
+            var run=f.runs[idx];
+            run.program=picked.program;run.brand=picked.brand;run.code=picked.code;run.desc=picked.desc;
+            lsScheduleSave();renderMetalWork(n);
+          };
+        });
+      });
+      el.addEventListener('blur',function(){setTimeout(function(){results.style.display='none';},200);});
+    });
+  }
+
+  // ── Sign-off section ─────────────────────────────────────────────────
+  var signCard=document.createElement('div');
+  signCard.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:10px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #9b59b6;';
+  if(isSigned){
+    signCard.innerHTML=
+      '<div style="background:#f0fdf4;border:1.5px solid #2ecc40;border-radius:8px;padding:10px 12px;font-size:0.85rem;color:#1a7a2a;font-weight:700;margin-bottom:10px;">✅ Signed Off — FORM005.0 Complete</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'+
+        '<div><div style="font-size:0.72rem;font-weight:700;color:#aaa;text-transform:uppercase;margin-bottom:4px;">Production Super / Mgr</div>'+
+          '<div style="font-size:0.85rem;font-weight:700;">'+f.prodMgrName+'</div>'+
+          '<div style="font-size:0.78rem;color:#888;">Sig: '+f.prodMgrSig+' · '+f.prodMgrDate+'</div></div>'+
+        '<div><div style="font-size:0.72rem;font-weight:700;color:#aaa;text-transform:uppercase;margin-bottom:4px;">Site QA / QC</div>'+
+          '<div style="font-size:0.85rem;font-weight:700;">'+f.qaName+'</div>'+
+          '<div style="font-size:0.78rem;color:#888;">Sig: '+f.qaSig+' · '+f.qaDate+'</div></div>'+
+      '</div>';
+  } else {
+    signCard.innerHTML=
+      '<div style="font-size:0.75rem;font-weight:700;color:#9b59b6;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">✍️ Sign Off — Both Required</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">'+
+        '<div><div style="font-size:0.72rem;font-weight:700;color:#555;margin-bottom:6px;">Production Super / Mgr</div>'+
+          '<div class="field-row" style="margin-bottom:6px;"><div class="field-label">Name</div><input class="field-input" type="text" id="mt-prodMgrName" value="'+f.prodMgrName+'" placeholder="Full name"/></div>'+
+          '<div class="field-row" style="margin-bottom:6px;"><div class="field-label">Signature</div><input class="field-input" type="text" id="mt-prodMgrSig" value="'+f.prodMgrSig+'" placeholder="Signature"/></div>'+
+          '<div class="field-row"><div class="field-label">Date</div><input class="field-input" type="date" id="mt-prodMgrDate" value="'+f.prodMgrDate+'"/></div>'+
+        '</div>'+
+        '<div><div style="font-size:0.72rem;font-weight:700;color:#555;margin-bottom:6px;">Site QA / QC</div>'+
+          '<div class="field-row" style="margin-bottom:6px;"><div class="field-label">Name</div><input class="field-input" type="text" id="mt-qaName" value="'+f.qaName+'" placeholder="Full name"/></div>'+
+          '<div class="field-row" style="margin-bottom:6px;"><div class="field-label">Signature</div><input class="field-input" type="text" id="mt-qaSig" value="'+f.qaSig+'" placeholder="Signature"/></div>'+
+          '<div class="field-row"><div class="field-label">Date</div><input class="field-input" type="date" id="mt-qaDate" value="'+f.qaDate+'"/></div>'+
+        '</div>'+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">'+
+        '<div class="field-row"><div class="field-label">Supervisor PIN</div><input class="field-input" type="password" id="mt-supPin"/></div>'+
+        '<div class="field-row"><div class="field-label">QA PIN</div><input class="field-input" type="password" id="mt-qaPin"/></div>'+
+      '</div>'+
+      '<div style="color:#e74c3c;font-size:0.78rem;font-weight:700;display:none;margin-bottom:8px;" id="mt-signErr">❌ Incorrect PIN(s) — both Supervisor and QA PIN required.</div>'+
+      '<button id="mt-signBtn" style="background:#9b59b6;color:#fff;border:none;border-radius:10px;padding:12px;font-size:0.95rem;font-weight:700;cursor:pointer;width:100%;">✅ Sign Off FORM005.0 — Machine '+n+'</button>';
+
+    setTimeout(function(){
+      var btn=document.getElementById('mt-signBtn');
+      if(!btn) return;
+      btn.onclick=function(){
+        var pmName=document.getElementById('mt-prodMgrName').value.trim();
+        var pmSig=document.getElementById('mt-prodMgrSig').value.trim();
+        var pmDate=document.getElementById('mt-prodMgrDate').value;
+        var qaName=document.getElementById('mt-qaName').value.trim();
+        var qaSig=document.getElementById('mt-qaSig').value.trim();
+        var qaDate=document.getElementById('mt-qaDate').value;
+        var supPin=document.getElementById('mt-supPin').value;
+        var qaPin=document.getElementById('mt-qaPin').value;
+        var errEl=document.getElementById('mt-signErr');
+        var supOk=Object.keys(STAFF_PINS).some(function(id){return STAFF_PINS[id]===supPin&&(STAFF_ROLES[id]==='supervisor'||STAFF_ROLES[id]==='manager');});
+        var qaOk=Object.keys(STAFF_PINS).some(function(id){return STAFF_PINS[id]===qaPin&&(STAFF_ROLES[id]==='qa'||STAFF_ROLES[id]==='manager');});
+        if(!supOk||!qaOk){errEl.style.display='block';return;}
+        if(!pmName||!pmSig||!qaName||!qaSig){showToast('Please fill in all name and signature fields.');return;}
+        errEl.style.display='none';
+        f.prodMgrName=pmName;f.prodMgrSig=pmSig;f.prodMgrDate=pmDate||new Date().toISOString().split('T')[0];
+        f.qaName=qaName;f.qaSig=qaSig;f.qaDate=qaDate||new Date().toISOString().split('T')[0];
+        f.status='complete';
+        lsScheduleSave();
+        showToast('✅ FORM005.0 signed off — Machine '+n);
+        renderMetalWork(n);
+        updateMetalForm067Status();
+      };
+    },50);
+  }
+  body.appendChild(signCard);
+
+  // ── Legal footer ─────────────────────────────────────────────────────
+  var footer=document.createElement('div');
+  footer.className='legal-footer';
+  footer.style.marginBottom='20px';
+  footer.innerHTML='<span>QA-911-F-005.0</span><span>Page 1 of 11</span><span>Version No: 040</span><span>Issue Date: 24/09/26</span><span>Authorised By: QA Coordinator</span>';
+  body.appendChild(footer);
+
+  function inpRun(i,field,label,type,ph,disabled){
+    var run=f.runs[i];
+    return '<div class="field-row"><div class="field-label">'+label+'</div><input class="field-input" type="'+type+'" value="'+(run[field]||'')+'" placeholder="'+(ph||'')+'" data-mtrow="'+i+'" data-mtfield="'+field+'" '+(disabled?'disabled':'')+'/></div>';
+  }
+}
+// Both machines must be signed off before FORM067's Metal Detection row shows complete.
+function updateMetalForm067Status(){
+  var m1=metalForms[1],m2=metalForms[2];
+  if(m1.status==='complete'&&m2.status==='complete'){
+    form067Manual['met-detect']={issued:'Y',completed:'Y',prodInitial:m1.prodMgrName+' / '+m2.prodMgrName,qaInitial:m1.qaName+' / '+m2.qaName};
+  }
+  lsScheduleSave();
+}
+function buildMetalPDFSection(){
+  var any=[1,2].some(function(n){return metalForms[n].runs.length||metalForms[n].operatorNames.some(function(x){return x;});});
+  if(!any) return '';
+  var html='';
+  [1,2].forEach(function(n){
+    var f=metalForms[n];
+    if(!f.runs.length&&!f.operatorNames.some(function(x){return x;})) return;
+    html+='<h2 class="blue">FORM005.0 — Metal Detection Records — Machine '+n+'</h2>'+
+      '<div style="font-size:10px;color:#888;margin-bottom:8px;">Date: '+f.date+' &nbsp;·&nbsp; Operators: '+f.operatorNames.filter(function(x){return x;}).join(' & ')+'</div>'+
+      '<table><thead><tr><th>Program</th><th>Brand</th><th>Product</th><th>Time Start</th><th>Time End</th><th>Start P/F (Fe/NF/SS)</th><th>End P/F (Fe/NF/SS)</th><th>Rejects</th><th>Total</th><th>Initials</th></tr></thead><tbody>'+
+      (f.runs.map(function(r){
+        return '<tr><td>'+(r.program||'—')+'</td><td>'+(r.brand||'—')+'</td><td>'+(r.desc||'—')+'</td><td>'+(r.timeStart||'—')+'</td><td>'+(r.timeEnd||'—')+'</td>'+
+          '<td>'+(r.startFe||'—')+'/'+(r.startNf||'—')+'/'+(r.startSs||'—')+'</td><td>'+(r.endFe||'—')+'/'+(r.endNf||'—')+'/'+(r.endSs||'—')+'</td>'+
+          '<td>'+(r.actualReject||'0')+'</td><td>'+(r.totalProducts||'—')+'</td><td>'+(r.initials||'—')+'</td></tr>';
+      }).join('')||'<tr><td colspan="10" style="color:#bbb;text-align:center;">No runs logged</td></tr>')+
+      '</tbody></table>'+
+      '<table><thead><tr><th>Production Super / Mgr</th><th>Signature</th><th>Date</th><th>Site QA / QC</th><th>Signature</th><th>Date</th></tr></thead><tbody>'+
+      '<tr><td>'+(f.prodMgrName||'—')+'</td><td>'+(f.prodMgrSig||'—')+'</td><td>'+(f.prodMgrDate||'—')+'</td><td>'+(f.qaName||'—')+'</td><td>'+(f.qaSig||'—')+'</td><td>'+(f.qaDate||'—')+'</td></tr>'+
+      '</tbody></table>';
+  });
+  html+='<div style="font-size:9px;color:#aaa;">QA-911-F-005.0 | Version No: 040 | Issue Date: 24/09/26 | Authorised By: QA Coordinator</div>';
   return html;
 }
 
@@ -5743,7 +6259,7 @@ function updateHeader(){
 function doLogout(){
   currentUser=null;
   document.getElementById('hdrRight').innerHTML='<div style="font-size:0.78rem;color:#aaa;">☀️ Shift starts 6:00 AM</div>';
-  ['mgrPanel','supervisorPanel','effPanel','labelPanel','form093Panel','damagesPanel','qaPanel','form067Panel','formMgmtPanel','toolUsagePanel','toolboxRegPanel','startupSafetyPanel','eggCountPanel','looseItemsPanel','sharepointPanel','recipeLibPanel','traceAnalyticsPanel','mixLibPanel','prepRoomPanel','prepWorkPanel','staffMgmtPanel'].forEach(function(id){hidePanel(id);});
+  ['mgrPanel','supervisorPanel','effPanel','labelPanel','form093Panel','damagesPanel','qaPanel','form067Panel','formMgmtPanel','toolUsagePanel','toolboxRegPanel','startupSafetyPanel','eggCountPanel','looseItemsPanel','sharepointPanel','recipeLibPanel','traceAnalyticsPanel','mixLibPanel','prepRoomPanel','prepWorkPanel','metalRoomPanel','metalWorkPanel','staffMgmtPanel'].forEach(function(id){hidePanel(id);});
   document.getElementById('staffDropdown').value='';
   document.getElementById('pinInput').value='';
   document.getElementById('loginMsg').textContent='';
@@ -5769,7 +6285,8 @@ var FZ_ICONS={
   folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/>',
   link:'<path d="M9 15 15 9"/><path d="M11 6l1.5-1.5a3.5 3.5 0 1 1 5 5L16 11"/><path d="M13 18l-1.5 1.5a3.5 3.5 0 1 1-5-5L8 13"/>',
   menu:'<path d="M4 6h16M4 12h16M4 18h16"/>',
-  users:'<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'
+  users:'<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  magnet:'<path d="M6 15V9a6 6 0 0 1 12 0v6"/><path d="M6 15a0 0 0 0 0 0 0"/><path d="M6 9H2v6a4 4 0 0 0 4 4h0a4 4 0 0 0 4-4V9"/><path d="M18 9h4v6a4 4 0 0 1-4 4h0a4 4 0 0 1-4-4V9"/><path d="M6 12h4M14 12h4"/>'
 };
 function fzIcon(name,size){
   return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:'+(size||18)+'px;height:'+(size||18)+'px;display:block;">'+(FZ_ICONS[name]||'')+'</svg>';
@@ -5790,6 +6307,7 @@ function updateSidebar(){
   if(canAccess('manager')) html+=fzNavBtn('grid','Dashboard','sb-mgr');
   html+=fzNavBtn('layers','Production Lines','sb-lines');
   html+=fzNavBtn('flask','Prep Room','sb-prep');
+  html+=fzNavBtn('magnet','Metal','sb-metal');
   if(canAccess('manager')){
     html+='<div class="fz-navlabel">Library</div>';
     html+=fzNavBtn('clipboard','Recipe Library','sb-recipes');
@@ -5821,6 +6339,7 @@ function updateSidebar(){
   wire('sb-mgr',openManager);
   wire('sb-lines',showLines);
   wire('sb-prep',openPrepRoom);
+  wire('sb-metal',openMetalRoom);
   wire('sb-recipes',openRecipeLib);
   wire('sb-mixes',openMixLib);
   wire('sb-forms',openFormMgmt);
@@ -6022,6 +6541,20 @@ function renderLines(){
     '<div class="lp"><div class="lp-fill" style="width:'+(prepTotal?Math.round((prepDone/prepTotal)*100):0)+'%;background:#9b59b6;"></div></div>';
   prepCard.onclick=function(){openPrepRoom();};
   grid.appendChild(prepCard);
+
+  // ── Metal Detection card ──────────────────────────────────────────
+  var metalCard=document.createElement('div');
+  metalCard.className='line-card';
+  metalCard.style.cssText='border-left:4px solid #555;background:linear-gradient(135deg,#f2f2f2 0%,#fff 100%);';
+  var metalRuns=(metalForms[1].runs.length)+(metalForms[2].runs.length);
+  var metalSigned=metalForms[1].status==='complete'&&metalForms[2].status==='complete';
+  metalCard.innerHTML=
+    '<div class="line-num" style="color:#555;font-size:1rem;">🧲</div>'+
+    '<div class="line-lbl" style="color:#555;">Metal</div>'+
+    '<div class="line-cnt">'+(metalRuns?metalRuns+' run'+(metalRuns===1?'':'s')+' logged':'No runs yet')+(metalSigned?' · ✅':'')+'</div>'+
+    '<div class="lp"><div class="lp-fill" style="width:'+(metalSigned?100:0)+'%;background:#555;"></div></div>';
+  metalCard.onclick=function(){openMetalRoom();};
+  grid.appendChild(metalCard);
 }
 
 // ── Schedule ───────────────────────────────────────────────────────────
@@ -9966,6 +10499,7 @@ function lsSave(){
       startupSafetyForm: startupSafetyForm,
       eggCountForm: eggCountForm,
       looseItemsData: looseItemsData,
+      metalForms: metalForms,
       allergenVerifications: allergenVerifications,
       skipReasons: skipReasons,
       formChangesLog: formChangesLog,
@@ -10032,6 +10566,7 @@ function lsLoad(){
     if(snap.startupSafetyForm) startupSafetyForm=snap.startupSafetyForm;
     if(snap.eggCountForm) eggCountForm=snap.eggCountForm;
     if(snap.looseItemsData) looseItemsData=snap.looseItemsData;
+    if(snap.metalForms) metalForms=snap.metalForms;
     if(snap.allergenVerifications) allergenVerifications=snap.allergenVerifications;
     if(snap.skipReasons) skipReasons=snap.skipReasons;
     formChangesLog   = snap.formChangesLog   || [];
@@ -10127,6 +10662,7 @@ function confirmNewShift(){
     startupSafetyForm={date:'',results:{},comments:{},inspectorName:'',inspectorSig:'',nonConformances:[],prodMgrName:'',prodMgrSig:'',prodMgrDate:'',qaName:'',qaSig:'',qaDate:'',status:'in-progress'};
     eggCountForm={date:'',entries:{}};
     looseItemsData={};
+    metalForms={1:newMetalForm(),2:newMetalForm()};
     prepRecords=[];
     prepSchedule=[];
     allergenVerifications={};
@@ -10535,6 +11071,9 @@ function buildEosPDF(){
   // Inject REG003.0 Toolbox Register
   var tbPDF=buildToolboxRegPDFSection();
   if(tbPDF) html=html.replace('</body></html>', tbPDF+'</body></html>');
+  // Inject FORM005.0 Metal Detection Records
+  var mtPDF=buildMetalPDFSection();
+  if(mtPDF) html=html.replace('</body></html>', mtPDF+'</body></html>');
   // Inject skip reasons
   if(skipReasons.length){
     var srHTML='<h2 class="orange">⏭️ Skipped Jobs Log</h2>'+
@@ -10814,6 +11353,8 @@ document.getElementById('woCancelBtn').onclick=function(){hideOverlay('workOrder
 document.getElementById('staffEditCancelBtn').onclick=function(){hideOverlay('staffEditOverlay');};
 document.getElementById('prepRoomCloseBtn').onclick=function(){hidePanel('prepRoomPanel');};
 document.getElementById('prepWorkCloseBtn').onclick=function(){hidePanel('prepWorkPanel');showPanel('prepRoomPanel');renderPrepRoom();};
+document.getElementById('metalRoomCloseBtn').onclick=function(){hidePanel('metalRoomPanel');};
+document.getElementById('metalWorkCloseBtn').onclick=function(){hidePanel('metalWorkPanel');showPanel('metalRoomPanel');renderMetalRoom();};
 document.getElementById('pmOverlayCancelBtn').onclick=function(){hideOverlay('prepMixOverlay');};
 document.getElementById('sub-approveBtn').onclick=submitSubstitution;
 document.getElementById('sub-cancelBtn').onclick=function(){hideOverlay('substituteOverlay');};
