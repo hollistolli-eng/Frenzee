@@ -2297,32 +2297,36 @@ var METAL_PROGRAMS=[
   {program:'17',brand:'FROZEN RISE',code:'971204/990643',desc:'RISE Ham & Cheese Texas Toastie 159g'},
   {program:'19',brand:'FROZEN RISE',code:'971205/990644',desc:'RISE Chicken & Cheese Texast Toastie 174g'}
 ];
-function findMetalProgram(query){
-  if(!query) return [];
-  var q=query.toLowerCase();
-  return METAL_PROGRAMS.filter(function(p){
-    return p.code.toLowerCase().indexOf(q)!==-1||p.desc.toLowerCase().indexOf(q)!==-1;
-  }).slice(0,8);
-}
+var metalExpandedRow={};
+var metalRunFilterText={1:'',2:''};
 
 // metalForms: keyed by machine number (1,2) → one FORM005.0 record for today.
+// The paper form pre-lists every SKU the detector is programmed for — the operator
+// fills in a line as that SKU is actually run through, rather than adding ad-hoc rows.
+// So each machine's runs table starts seeded with one row per METAL_PROGRAMS entry.
+function newMetalRunsTable(){
+  return METAL_PROGRAMS.map(function(p){
+    return {program:p.program,brand:p.brand,code:p.code,desc:p.desc,
+      timeStart:'',timeEnd:'',startFe:'',startNf:'',startSs:'',endFe:'',endNf:'',endSs:'',
+      actualReject:'',weightReject:'',addlPasses:'',ubdOk:'',totalProducts:'',initials:''};
+  });
+}
+function metalRunHasData(r){
+  return !!(r.timeStart||r.timeEnd||r.startFe||r.startNf||r.startSs||r.endFe||r.endNf||r.endSs||
+    r.actualReject||r.weightReject||r.addlPasses||r.ubdOk||r.totalProducts||r.initials);
+}
 function newMetalForm(){
   return {
     date:'',operatorNames:['',''],
     stripsResult:'',unitClean:false,weightCheck:false,securityLevel0:false,challengeTest:false,
     memStartFe:'',memStartNf:'',memStartSs:'',memStartTotal:'',memStartInitials:'',
-    runs:[],
+    runs:newMetalRunsTable(),
     memEndFe:'',memEndNf:'',memEndSs:'',memEndTotal:'',memEndInitials:'',
     comments:'',
     prodMgrName:'',prodMgrSig:'',prodMgrDate:'',qaName:'',qaSig:'',qaDate:'',status:'in-progress'
   };
 }
 var metalForms={1:newMetalForm(),2:newMetalForm()};
-function newMetalRun(){
-  return {program:'',brand:'',code:'',desc:'',timeStart:'',timeEnd:'',
-    startFe:'',startNf:'',startSs:'',endFe:'',endNf:'',endSs:'',
-    actualReject:'',weightReject:'',addlPasses:'',ubdOk:'',totalProducts:'',initials:''};
-}
 
 // ── Allergen Clean Verification state ─────────────────────────────────
 // allergenVerifications: {jobKey: {verifiedBy, pin, initials, time, line}}
@@ -3232,7 +3236,7 @@ function renderMetalRoom(){
   body.appendChild(hdr);
   [1,2].forEach(function(n){
     var f=metalForms[n];
-    var runCount=f.runs.length;
+    var runCount=f.runs.filter(metalRunHasData).length;
     var operators=f.operatorNames.filter(function(x){return x;}).join(' & ');
     var card=document.createElement('div');
     card.style.cssText='background:#fff;border-radius:16px;padding:15px 16px;margin-bottom:10px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid '+(f.status==='complete'?'#2ecc40':'#f39c12')+';cursor:pointer;display:flex;align-items:center;gap:12px;';
@@ -3308,59 +3312,82 @@ function renderMetalWork(n){
       '<div class="field-row"><div class="field-label">NF Pass/Fail</div><input class="field-input" type="text" maxlength="1" value="'+f.memStartNf+'" id="mt-memStartNf" placeholder="P/F" '+(isSigned?'disabled':'')+'/></div>'+
       '<div class="field-row"><div class="field-label">SS Pass/Fail</div><input class="field-input" type="text" maxlength="1" value="'+f.memStartSs+'" id="mt-memStartSs" placeholder="P/F" '+(isSigned?'disabled':'')+'/></div>'+
       '<div class="field-row"><div class="field-label">Total Products</div><input class="field-input" type="number" min="0" value="'+f.memStartTotal+'" id="mt-memStartTotal" '+(isSigned?'disabled':'')+'/></div>'+
-      '<div class="field-row"><div class="field-label">Initials</div><input class="field-input" type="text" value="'+f.memStartInitials+'" id="mt-memStartInitials" '+(isSigned?'disabled':'')+'/></div>'+
+      '<div class="field-row"><div class="field-label">Initials</div>'+initialsInputHTML('mt-memStartInitials',f.memStartInitials,f.operatorNames,isSigned)+'</div>'+
     '</div>';
   body.appendChild(suCard);
 
-  // ── Runs table ───────────────────────────────────────────────────────
+  // ── Runs table — every programmed SKU is pre-listed (matching the paper
+  // form); the operator finds the line for whatever's running and fills it
+  // in, rather than adding ad-hoc entries. ────────────────────────────────
   var runsCard=document.createElement('div');
   runsCard.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #f39c12;';
-  var runsHTML='<div style="font-size:0.75rem;font-weight:700;color:#b8860b;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">📦 Runs Through the Detector</div>';
-  f.runs.forEach(function(run,i){
-    runsHTML+='<div style="border:1.5px solid #f0f0f0;border-radius:12px;padding:10px 12px;margin-bottom:8px;">'+
-      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'+
-        '<div style="flex:1;position:relative;">'+
-          '<input class="field-input" type="text" placeholder="Search product by code or name…" value="'+(run.desc?run.brand+' — '+run.desc:'')+'" data-mtrunsearch="'+i+'" '+(isSigned?'disabled':'')+' autocomplete="off"/>'+
-          '<div data-mtrunresults="'+i+'" style="position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid #ddd;border-radius:8px;margin-top:2px;max-height:200px;overflow-y:auto;z-index:20;display:none;box-shadow:0 6px 18px rgba(0,0,0,0.12);"></div>'+
-        '</div>'+
-        (isSigned?'':'<button data-mtrundel="'+i+'" style="background:#fff0f0;color:#e74c3c;border:none;border-radius:8px;padding:8px 10px;font-size:0.78rem;font-weight:700;cursor:pointer;">✕</button>')+
-      '</div>'+
-      (run.program?'<div style="font-size:0.78rem;color:#555;margin-bottom:8px;">Program <strong>'+run.program+'</strong> · Code '+run.code+'</div>':'')+
-      '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-bottom:7px;">'+
-        inpRun(i,'timeStart','Time Start','text','HH:MM',isSigned)+
-        inpRun(i,'timeEnd','Time End','text','HH:MM',isSigned)+
-      '</div>'+
-      '<div style="font-size:0.7rem;font-weight:700;color:#888;margin-bottom:4px;">START OF RUN — Pass (P) / Fail (F)</div>'+
-      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:7px;">'+
-        inpRun(i,'startFe','Fe','text','P/F',isSigned)+inpRun(i,'startNf','NF','text','P/F',isSigned)+inpRun(i,'startSs','SS','text','P/F',isSigned)+
-      '</div>'+
-      '<div style="font-size:0.7rem;font-weight:700;color:#888;margin-bottom:4px;">END OF RUN — Pass (P) / Fail (F)</div>'+
-      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:7px;">'+
-        inpRun(i,'endFe','Fe','text','P/F',isSigned)+inpRun(i,'endNf','NF','text','P/F',isSigned)+inpRun(i,'endSs','SS','text','P/F',isSigned)+
-      '</div>'+
-      '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-bottom:7px;">'+
-        inpRun(i,'actualReject','Actual No. Reject Metal Products','number','',isSigned)+
-        inpRun(i,'weightReject','No. Weight Rejected Products','number','',isSigned)+
-      '</div>'+
-      '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-bottom:7px;">'+
-        inpRun(i,'addlPasses','Additional Passes Through (x3)','text','',isSigned)+
-        inpRun(i,'ubdOk','UBD ok? Y/N','text','Y/N',isSigned)+
-      '</div>'+
-      '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px;">'+
-        inpRun(i,'totalProducts','Total No. of Products','number','',isSigned)+
-        inpRun(i,'initials','Initials of Operator','text','',isSigned)+
-      '</div>'+
-    '</div>';
+  var filledCount=f.runs.filter(metalRunHasData).length;
+  var filterText=(metalRunFilterText[n]||'');
+  var ft=filterText.toLowerCase();
+  var visibleIdxs=[];
+  f.runs.forEach(function(r,i){
+    if(!ft||r.code.toLowerCase().indexOf(ft)!==-1||r.desc.toLowerCase().indexOf(ft)!==-1||r.brand.toLowerCase().indexOf(ft)!==-1||String(r.program).toLowerCase().indexOf(ft)!==-1) visibleIdxs.push(i);
   });
+  var groups=[],groupMap={};
+  visibleIdxs.forEach(function(i){
+    var b=f.runs[i].brand;
+    if(!groupMap[b]){groupMap[b]={brand:b,idxs:[]};groups.push(groupMap[b]);}
+    groupMap[b].idxs.push(i);
+  });
+  var runsHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'+
+      '<div style="font-size:0.75rem;font-weight:700;color:#b8860b;text-transform:uppercase;letter-spacing:1px;">📦 Runs Through the Detector</div>'+
+      '<div style="font-size:0.72rem;color:#888;">'+filledCount+' of '+f.runs.length+' lines filled in</div>'+
+    '</div>'+
+    '<input class="field-input" type="text" id="mt-runfilter" placeholder="Find a SKU by code, name or program no…" value="'+filterText+'" style="margin-bottom:10px;" autocomplete="off"/>';
+  groups.forEach(function(g){
+    runsHTML+='<div style="font-size:0.7rem;font-weight:800;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin:10px 0 5px;">'+g.brand+'</div>';
+    g.idxs.forEach(function(i){
+      var run=f.runs[i];
+      var hasData=metalRunHasData(run);
+      var expanded=!!metalExpandedRow[n+'-'+i];
+      runsHTML+='<div style="border:1.5px solid '+(hasData?'#d4edda':'#f0f0f0')+';border-radius:10px;margin-bottom:6px;overflow:hidden;background:'+(hasData?'#f9fff9':'#fff')+';">'+
+        '<div data-mtrowtoggle="'+i+'" style="display:flex;align-items:center;gap:8px;padding:9px 11px;cursor:pointer;">'+
+          '<div style="font-size:0.85rem;">'+(hasData?'✅':'⬜')+'</div>'+
+          '<div style="flex:1;min-width:0;">'+
+            '<div style="font-size:0.78rem;font-weight:700;color:#222;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Program '+(run.program||'—')+' · '+run.desc+'</div>'+
+            '<div style="font-size:0.68rem;color:#aaa;">'+run.code+'</div>'+
+          '</div>'+
+          '<span style="color:#aaa;font-size:0.8rem;">'+(expanded?'▲':'▼')+'</span>'+
+        '</div>';
+      if(expanded){
+        runsHTML+='<div style="padding:0 11px 11px;">'+
+          '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-bottom:7px;">'+
+            inpRun(i,'timeStart','Time Start','text','HH:MM',isSigned)+
+            inpRun(i,'timeEnd','Time End','text','HH:MM',isSigned)+
+          '</div>'+
+          '<div style="font-size:0.7rem;font-weight:700;color:#888;margin-bottom:4px;">START OF RUN — Pass (P) / Fail (F)</div>'+
+          '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:7px;">'+
+            inpRun(i,'startFe','Fe','text','P/F',isSigned)+inpRun(i,'startNf','NF','text','P/F',isSigned)+inpRun(i,'startSs','SS','text','P/F',isSigned)+
+          '</div>'+
+          '<div style="font-size:0.7rem;font-weight:700;color:#888;margin-bottom:4px;">END OF RUN — Pass (P) / Fail (F)</div>'+
+          '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:7px;">'+
+            inpRun(i,'endFe','Fe','text','P/F',isSigned)+inpRun(i,'endNf','NF','text','P/F',isSigned)+inpRun(i,'endSs','SS','text','P/F',isSigned)+
+          '</div>'+
+          '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-bottom:7px;">'+
+            inpRun(i,'actualReject','Actual No. Reject Metal Products','number','',isSigned)+
+            inpRun(i,'weightReject','No. Weight Rejected Products','number','',isSigned)+
+          '</div>'+
+          '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-bottom:7px;">'+
+            inpRun(i,'addlPasses','Additional Passes Through (x3)','text','',isSigned)+
+            inpRun(i,'ubdOk','UBD ok? Y/N','text','Y/N',isSigned)+
+          '</div>'+
+          '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px;">'+
+            inpRun(i,'totalProducts','Total No. of Products','number','',isSigned)+
+            inpRun(i,'initials','Initials of Operator','text','',isSigned)+
+          '</div>'+
+        '</div>';
+      }
+      runsHTML+='</div>';
+    });
+  });
+  if(!groups.length) runsHTML+='<div style="text-align:center;color:#bbb;padding:20px;font-size:0.8rem;">No SKUs match "'+filterText+'".</div>';
   runsCard.innerHTML=runsHTML;
   body.appendChild(runsCard);
-  if(!isSigned){
-    var addRunBtn=document.createElement('button');
-    addRunBtn.style.cssText='width:100%;background:#fff8e1;color:#b8860b;border:1.5px dashed #f39c12;border-radius:10px;padding:10px;font-size:0.82rem;font-weight:700;cursor:pointer;margin-bottom:12px;';
-    addRunBtn.textContent='+ Add Run';
-    addRunBtn.onclick=function(){f.runs.push(newMetalRun());lsScheduleSave();renderMetalWork(n);};
-    body.appendChild(addRunBtn);
-  }
 
   // ── Memory test — end of day ─────────────────────────────────────────
   var meCard=document.createElement('div');
@@ -3372,7 +3399,7 @@ function renderMetalWork(n){
       '<div class="field-row"><div class="field-label">NF Pass/Fail</div><input class="field-input" type="text" maxlength="1" value="'+f.memEndNf+'" id="mt-memEndNf" placeholder="P/F" '+(isSigned?'disabled':'')+'/></div>'+
       '<div class="field-row"><div class="field-label">SS Pass/Fail</div><input class="field-input" type="text" maxlength="1" value="'+f.memEndSs+'" id="mt-memEndSs" placeholder="P/F" '+(isSigned?'disabled':'')+'/></div>'+
       '<div class="field-row"><div class="field-label">Total Products</div><input class="field-input" type="number" min="0" value="'+f.memEndTotal+'" id="mt-memEndTotal" '+(isSigned?'disabled':'')+'/></div>'+
-      '<div class="field-row"><div class="field-label">Initials</div><input class="field-input" type="text" value="'+f.memEndInitials+'" id="mt-memEndInitials" '+(isSigned?'disabled':'')+'/></div>'+
+      '<div class="field-row"><div class="field-label">Initials</div>'+initialsInputHTML('mt-memEndInitials',f.memEndInitials,f.operatorNames,isSigned)+'</div>'+
     '</div>'+
     '<div class="field-row"><div class="field-label">Comments / Corrective Actions</div><textarea class="field-input" rows="2" id="mt-comments" style="resize:none;" '+(isSigned?'disabled':'')+'>'+f.comments+'</textarea></div>';
   body.appendChild(meCard);
@@ -3395,34 +3422,27 @@ function renderMetalWork(n){
     body.querySelectorAll('[data-mtchip]').forEach(function(btn){
       btn.onclick=function(){f[btn.getAttribute('data-mtchip')]=!f[btn.getAttribute('data-mtchip')];lsScheduleSave();renderMetalWork(n);};
     });
-    body.querySelectorAll('[data-mtrundel]').forEach(function(btn){
-      btn.onclick=function(){f.runs.splice(parseInt(btn.getAttribute('data-mtrundel')),1);lsScheduleSave();renderMetalWork(n);};
-    });
     body.querySelectorAll('[data-mtrow]').forEach(function(el){
       el.addEventListener('change',function(){
         f.runs[parseInt(el.getAttribute('data-mtrow'))][el.getAttribute('data-mtfield')]=el.value;
         lsScheduleSave();
       });
     });
-    body.querySelectorAll('[data-mtrunsearch]').forEach(function(el){
-      var idx=parseInt(el.getAttribute('data-mtrunsearch'));
-      var results=body.querySelector('[data-mtrunresults="'+idx+'"]');
-      el.addEventListener('input',function(){
-        var matches=findMetalProgram(el.value);
-        if(!matches.length){results.style.display='none';return;}
-        results.innerHTML=matches.map(function(m,mi){return '<div data-mtpick="'+idx+'" data-mtpickidx="'+mi+'" style="padding:8px 10px;font-size:0.78rem;cursor:pointer;border-bottom:1px solid #f5f5f5;"><strong>'+m.program+'</strong> · '+m.brand+' — '+m.desc+' <span style="color:#aaa;">('+m.code+')</span></div>';}).join('');
-        results.style.display='block';
-        results.querySelectorAll('[data-mtpick]').forEach(function(opt){
-          opt.onclick=function(){
-            var picked=matches[parseInt(opt.getAttribute('data-mtpickidx'))];
-            var run=f.runs[idx];
-            run.program=picked.program;run.brand=picked.brand;run.code=picked.code;run.desc=picked.desc;
-            lsScheduleSave();renderMetalWork(n);
-          };
-        });
-      });
-      el.addEventListener('blur',function(){setTimeout(function(){results.style.display='none';},200);});
+    body.querySelectorAll('[data-mtrowtoggle]').forEach(function(el){
+      el.onclick=function(){
+        var key=n+'-'+el.getAttribute('data-mtrowtoggle');
+        metalExpandedRow[key]=!metalExpandedRow[key];
+        renderMetalWork(n);
+      };
     });
+    var filterEl=document.getElementById('mt-runfilter');
+    if(filterEl){
+      filterEl.addEventListener('input',function(){
+        metalRunFilterText[n]=filterEl.value;
+        renderMetalWork(n);
+      });
+      setTimeout(function(){filterEl.focus();filterEl.setSelectionRange(filterEl.value.length,filterEl.value.length);},0);
+    }
   }
 
   // ── Sign-off section ─────────────────────────────────────────────────
@@ -3500,6 +3520,14 @@ function renderMetalWork(n){
 
   function inpRun(i,field,label,type,ph,disabled){
     var run=f.runs[i];
+    if(field==='initials'){
+      var listId='mt-initials-'+n+'-'+i;
+      var opts=f.operatorNames.filter(Boolean).map(nameInitials).filter(function(v,idx,arr){return v&&arr.indexOf(v)===idx;});
+      return '<div class="field-row"><div class="field-label">'+label+'</div>'+
+        '<input class="field-input" type="text" list="'+listId+'" value="'+(run[field]||'')+'" placeholder="Init. — or type a supervisor\'s" data-mtrow="'+i+'" data-mtfield="'+field+'" '+(disabled?'disabled':'')+'/>'+
+        '<datalist id="'+listId+'">'+opts.map(function(o){return '<option value="'+o+'">';}).join('')+'</datalist>'+
+      '</div>';
+    }
     return '<div class="field-row"><div class="field-label">'+label+'</div><input class="field-input" type="'+type+'" value="'+(run[field]||'')+'" placeholder="'+(ph||'')+'" data-mtrow="'+i+'" data-mtfield="'+field+'" '+(disabled?'disabled':'')+'/></div>';
   }
 }
@@ -3512,16 +3540,17 @@ function updateMetalForm067Status(){
   lsScheduleSave();
 }
 function buildMetalPDFSection(){
-  var any=[1,2].some(function(n){return metalForms[n].runs.length||metalForms[n].operatorNames.some(function(x){return x;});});
+  var any=[1,2].some(function(n){return metalForms[n].runs.some(metalRunHasData)||metalForms[n].operatorNames.some(function(x){return x;});});
   if(!any) return '';
   var html='';
   [1,2].forEach(function(n){
     var f=metalForms[n];
-    if(!f.runs.length&&!f.operatorNames.some(function(x){return x;})) return;
+    var filledRuns=f.runs.filter(metalRunHasData);
+    if(!filledRuns.length&&!f.operatorNames.some(function(x){return x;})) return;
     html+='<h2 class="blue">FORM005.0 — Metal Detection Records — Machine '+n+'</h2>'+
       '<div style="font-size:10px;color:#888;margin-bottom:8px;">Date: '+f.date+' &nbsp;·&nbsp; Operators: '+f.operatorNames.filter(function(x){return x;}).join(' & ')+'</div>'+
       '<table><thead><tr><th>Program</th><th>Brand</th><th>Product</th><th>Time Start</th><th>Time End</th><th>Start P/F (Fe/NF/SS)</th><th>End P/F (Fe/NF/SS)</th><th>Rejects</th><th>Total</th><th>Initials</th></tr></thead><tbody>'+
-      (f.runs.map(function(r){
+      (filledRuns.map(function(r){
         return '<tr><td>'+(r.program||'—')+'</td><td>'+(r.brand||'—')+'</td><td>'+(r.desc||'—')+'</td><td>'+(r.timeStart||'—')+'</td><td>'+(r.timeEnd||'—')+'</td>'+
           '<td>'+(r.startFe||'—')+'/'+(r.startNf||'—')+'/'+(r.startSs||'—')+'</td><td>'+(r.endFe||'—')+'/'+(r.endNf||'—')+'/'+(r.endSs||'—')+'</td>'+
           '<td>'+(r.actualReject||'0')+'</td><td>'+(r.totalProducts||'—')+'</td><td>'+(r.initials||'—')+'</td></tr>';
@@ -6193,6 +6222,21 @@ function showScanPop(icon,title,sub,ok){document.getElementById('ovIcon').textCo
 function fmtDate(d){if(!d)return '—';var p=d.split('-');return p[2]+'/'+p[1]+'/'+p[0];}
 function norm(k){return k.toLowerCase().replace(/\s+/g,'');}
 function nowTime(){return new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'});}
+// Initials from a full name, e.g. "Renae Curtis" -> "RC" — used to suggest who's
+// signed in wherever an Initials field appears, while still allowing free text
+// (e.g. a supervisor stepping in to initial a line themselves).
+function nameInitials(name){
+  if(!name) return '';
+  return name.trim().split(/\s+/).map(function(w){return w.charAt(0).toUpperCase();}).join('');
+}
+// Builds an <input list="..."> + matching <datalist> so an Initials field offers
+// the given names' initials as suggestions but still accepts anything typed.
+function initialsInputHTML(id,value,names,disabled){
+  var listId=id+'-dl';
+  var opts=names.filter(Boolean).map(nameInitials).filter(function(v,idx,arr){return v&&arr.indexOf(v)===idx;});
+  return '<input class="field-input" type="text" id="'+id+'" list="'+listId+'" value="'+(value||'')+'" placeholder="Init." '+(disabled?'disabled':'')+'/>'+
+    '<datalist id="'+listId+'">'+opts.map(function(o){return '<option value="'+o+'">';}).join('')+'</datalist>';
+}
 
 // ── LOGIN ──────────────────────────────────────────────────────────────
 document.getElementById('loginBtn').addEventListener('click', doLogin);
@@ -6546,7 +6590,7 @@ function renderLines(){
   var metalCard=document.createElement('div');
   metalCard.className='line-card';
   metalCard.style.cssText='border-left:4px solid #555;background:linear-gradient(135deg,#f2f2f2 0%,#fff 100%);';
-  var metalRuns=(metalForms[1].runs.length)+(metalForms[2].runs.length);
+  var metalRuns=metalForms[1].runs.filter(metalRunHasData).length+metalForms[2].runs.filter(metalRunHasData).length;
   var metalSigned=metalForms[1].status==='complete'&&metalForms[2].status==='complete';
   metalCard.innerHTML=
     '<div class="line-num" style="color:#555;font-size:1rem;">🧲</div>'+
