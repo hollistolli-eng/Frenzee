@@ -2299,6 +2299,8 @@ var METAL_PROGRAMS=[
 ];
 var metalExpandedRow={};
 var metalRunFilterText={1:'',2:''};
+var metalFoldersOpen={};
+var METAL_FOLDER_ICONS={'WW':'🛒','DNATA':'🛫','BP':'⛽','EG':'🥗','OTR Frozen':'🧊','OTR Fresh':'🥪','RISE':'🥐','FROZEN RISE':'❄️'};
 
 // metalForms: keyed by machine number (1,2) → one FORM005.0 record for today.
 // The paper form pre-lists every SKU the detector is programmed for — the operator
@@ -3339,51 +3341,65 @@ function renderMetalWork(n){
       '<div style="font-size:0.72rem;color:#888;">'+filledCount+' of '+f.runs.length+' lines filled in</div>'+
     '</div>'+
     '<input class="field-input" type="text" id="mt-runfilter" placeholder="Find a SKU by code, name or program no…" value="'+filterText+'" style="margin-bottom:10px;" autocomplete="off"/>';
+  var searchingRuns=!!ft;
   groups.forEach(function(g){
-    runsHTML+='<div style="font-size:0.7rem;font-weight:800;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin:10px 0 5px;">'+g.brand+'</div>';
-    g.idxs.forEach(function(i){
-      var run=f.runs[i];
-      var hasData=metalRunHasData(run);
-      var expanded=!!metalExpandedRow[n+'-'+i];
-      runsHTML+='<div style="border:1.5px solid '+(hasData?'#d4edda':'#f0f0f0')+';border-radius:10px;margin-bottom:6px;overflow:hidden;background:'+(hasData?'#f9fff9':'#fff')+';">'+
-        '<div data-mtrowtoggle="'+i+'" style="display:flex;align-items:center;gap:8px;padding:9px 11px;cursor:pointer;">'+
-          '<div style="font-size:0.85rem;">'+(hasData?'✅':'⬜')+'</div>'+
-          '<div style="flex:1;min-width:0;">'+
-            '<div style="font-size:0.78rem;font-weight:700;color:#222;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Program '+(run.program||'—')+' · '+run.desc+'</div>'+
-            '<div style="font-size:0.68rem;color:#aaa;">'+run.code+'</div>'+
-          '</div>'+
-          '<span style="color:#aaa;font-size:0.8rem;">'+(expanded?'▲':'▼')+'</span>'+
-        '</div>';
-      if(expanded){
-        runsHTML+='<div style="padding:0 11px 11px;">'+
-          '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-bottom:7px;">'+
-            inpRun(i,'timeStart','Time Start','text','HH:MM',isSigned)+
-            inpRun(i,'timeEnd','Time End','text','HH:MM',isSigned)+
-          '</div>'+
-          '<div style="font-size:0.7rem;font-weight:700;color:#888;margin-bottom:4px;">START OF RUN — Pass (P) / Fail (F)</div>'+
-          '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:7px;">'+
-            inpRun(i,'startFe','Fe','text','P/F',isSigned)+inpRun(i,'startNf','NF','text','P/F',isSigned)+inpRun(i,'startSs','SS','text','P/F',isSigned)+
-          '</div>'+
-          '<div style="font-size:0.7rem;font-weight:700;color:#888;margin-bottom:4px;">END OF RUN — Pass (P) / Fail (F)</div>'+
-          '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:7px;">'+
-            inpRun(i,'endFe','Fe','text','P/F',isSigned)+inpRun(i,'endNf','NF','text','P/F',isSigned)+inpRun(i,'endSs','SS','text','P/F',isSigned)+
-          '</div>'+
-          '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-bottom:7px;">'+
-            inpRun(i,'actualReject','Actual No. Reject Metal Products','number','',isSigned)+
-            inpRun(i,'weightReject','No. Weight Rejected Products','number','',isSigned)+
-          '</div>'+
-          '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-bottom:7px;">'+
-            inpRun(i,'addlPasses','Additional Passes Through (x3)','text','',isSigned)+
-            inpRun(i,'ubdOk','UBD ok? Y/N','text','Y/N',isSigned)+
-          '</div>'+
-          '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px;">'+
-            inpRun(i,'totalProducts','Total No. of Products','number','',isSigned)+
-            inpRun(i,'initials','Initials of Operator','text','',isSigned)+
-          '</div>'+
-        '</div>';
-      }
-      runsHTML+='</div>';
-    });
+    var folderKey=n+'-'+g.brand;
+    var folderOpen=searchingRuns||!!metalFoldersOpen[folderKey];
+    var folderFilled=g.idxs.filter(function(i){return metalRunHasData(f.runs[i]);}).length;
+    runsHTML+='<div style="margin-bottom:8px;">'+
+      '<div data-mtfolder="'+folderKey+'" style="display:flex;align-items:center;gap:8px;background:#fafafa;border:1px solid #eee;border-radius:10px;padding:10px 12px;cursor:pointer;">'+
+        '<div style="font-size:1rem;">'+(METAL_FOLDER_ICONS[g.brand]||'📁')+'</div>'+
+        '<div style="flex:1;font-weight:800;font-size:0.8rem;color:#444;">'+g.brand+'</div>'+
+        '<span style="font-size:0.65rem;font-weight:700;background:'+(folderFilled?'#f0fdf4':'#eee')+';color:'+(folderFilled?'#27ae60':'#555')+';padding:3px 8px;border-radius:5px;">'+folderFilled+'/'+g.idxs.length+'</span>'+
+        '<span style="font-size:0.8rem;color:#aaa;transition:transform 0.15s;'+(folderOpen?'transform:rotate(90deg);':'')+'">▶</span>'+
+      '</div>'+
+      '<div style="padding:'+(folderOpen?'8px 0 0':'0')+';display:'+(folderOpen?'block':'none')+';">';
+    if(folderOpen){
+      g.idxs.forEach(function(i){
+        var run=f.runs[i];
+        var hasData=metalRunHasData(run);
+        var expanded=!!metalExpandedRow[n+'-'+i];
+        runsHTML+='<div style="border:1.5px solid '+(hasData?'#d4edda':'#f0f0f0')+';border-radius:10px;margin-bottom:6px;overflow:hidden;background:'+(hasData?'#f9fff9':'#fff')+';">'+
+          '<div data-mtrowtoggle="'+i+'" style="display:flex;align-items:center;gap:8px;padding:9px 11px;cursor:pointer;">'+
+            '<div style="font-size:0.85rem;">'+(hasData?'✅':'⬜')+'</div>'+
+            '<div style="flex:1;min-width:0;">'+
+              '<div style="font-size:0.78rem;font-weight:700;color:#222;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Program '+(run.program||'—')+' · '+run.desc+'</div>'+
+              '<div style="font-size:0.68rem;color:#aaa;">'+run.code+'</div>'+
+            '</div>'+
+            '<span style="color:#aaa;font-size:0.8rem;">'+(expanded?'▲':'▼')+'</span>'+
+          '</div>';
+        if(expanded){
+          runsHTML+='<div style="padding:0 11px 11px;">'+
+            '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-bottom:7px;">'+
+              inpRun(i,'timeStart','Time Start','text','HH:MM',isSigned)+
+              inpRun(i,'timeEnd','Time End','text','HH:MM',isSigned)+
+            '</div>'+
+            '<div style="font-size:0.7rem;font-weight:700;color:#888;margin-bottom:4px;">START OF RUN — Pass (P) / Fail (F)</div>'+
+            '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:7px;">'+
+              inpRun(i,'startFe','Fe','text','P/F',isSigned)+inpRun(i,'startNf','NF','text','P/F',isSigned)+inpRun(i,'startSs','SS','text','P/F',isSigned)+
+            '</div>'+
+            '<div style="font-size:0.7rem;font-weight:700;color:#888;margin-bottom:4px;">END OF RUN — Pass (P) / Fail (F)</div>'+
+            '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:7px;">'+
+              inpRun(i,'endFe','Fe','text','P/F',isSigned)+inpRun(i,'endNf','NF','text','P/F',isSigned)+inpRun(i,'endSs','SS','text','P/F',isSigned)+
+            '</div>'+
+            '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-bottom:7px;">'+
+              inpRun(i,'actualReject','Actual No. Reject Metal Products','number','',isSigned)+
+              inpRun(i,'weightReject','No. Weight Rejected Products','number','',isSigned)+
+            '</div>'+
+            '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-bottom:7px;">'+
+              inpRun(i,'addlPasses','Additional Passes Through (x3)','text','',isSigned)+
+              inpRun(i,'ubdOk','UBD ok? Y/N','text','Y/N',isSigned)+
+            '</div>'+
+            '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px;">'+
+              inpRun(i,'totalProducts','Total No. of Products','number','',isSigned)+
+              inpRun(i,'initials','Initials of Operator','text','',isSigned)+
+            '</div>'+
+          '</div>';
+        }
+        runsHTML+='</div>';
+      });
+    }
+    runsHTML+='</div></div>';
   });
   if(!groups.length) runsHTML+='<div style="text-align:center;color:#bbb;padding:20px;font-size:0.8rem;">No SKUs match "'+filterText+'".</div>';
   runsCard.innerHTML=runsHTML;
@@ -3432,6 +3448,13 @@ function renderMetalWork(n){
       el.onclick=function(){
         var key=n+'-'+el.getAttribute('data-mtrowtoggle');
         metalExpandedRow[key]=!metalExpandedRow[key];
+        renderMetalWork(n);
+      };
+    });
+    body.querySelectorAll('[data-mtfolder]').forEach(function(el){
+      el.onclick=function(){
+        var key=el.getAttribute('data-mtfolder');
+        metalFoldersOpen[key]=!metalFoldersOpen[key];
         renderMetalWork(n);
       };
     });
