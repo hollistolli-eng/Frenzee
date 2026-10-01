@@ -61,6 +61,11 @@ header{background:#fff;padding:14px 22px;display:flex;align-items:center;justify
   body.fz-logged-in header .hbtn{display:none;}
   body.fz-logged-in header .logo{display:none;}
   body.fz-logged-in header{justify-content:flex-end;}
+  /* Floor roles (Team Leader / Prep) — no persistent sidebar even on desktop */
+  body.fz-logged-in.fz-floor-role{padding-left:0;}
+  body.fz-logged-in.fz-floor-role #fzSidebar{display:none;}
+  body.fz-logged-in.fz-floor-role .mgr-panel{left:0;}
+  body.fz-logged-in.fz-floor-role .fz-hamburger{display:flex;}
 }
 /* LOGIN */
 .login-wrap{display:flex;justify-content:center;align-items:flex-start;padding-top:40px;}
@@ -1002,7 +1007,15 @@ function canAccess(role){
   if (role==='manager') return r==='manager';
   if (role==='supervisor') return r==='manager'||r==='supervisor';
   if (role==='qa') return r==='manager'||r==='supervisor'||r==='qa';
+  if (role==='labelprinter') return r==='manager'||r==='supervisor'||r==='labelprinter';
   return true;
+}
+// Floor roles (Team Leader running a line, Prep worker) get no persistent nav —
+// just their task screen, same minimal footprint on desktop as on mobile.
+function isFloorRole(){
+  if(!currentUser) return false;
+  if(currentUser.id==='16') return false;
+  return currentUser.role==='teamleader'||currentUser.role==='prep';
 }
 function isSupervisorPin(pin){
   var ids = Object.keys(STAFF_PINS);
@@ -5692,6 +5705,7 @@ function onLoginSuccess(){
 
 function updateHeader(){
   document.body.classList.add('fz-logged-in');
+  document.body.classList.toggle('fz-floor-role', isFloorRole());
   updateSidebar();
   var hdr = document.getElementById('hdrRight');
   hdr.innerHTML =
@@ -5734,6 +5748,7 @@ function doLogout(){
   document.getElementById('pinInput').value='';
   document.getElementById('loginMsg').textContent='';
   document.body.classList.remove('fz-logged-in');
+  document.body.classList.remove('fz-floor-role');
   document.getElementById('fzSidebar').innerHTML='';
   showScreen('loginScreen');
 }
@@ -5769,7 +5784,7 @@ function fzNavBtn(icon,label,id){
 }
 function updateSidebar(){
   var sb=document.getElementById('fzSidebar');
-  if(!currentUser){sb.innerHTML='';return;}
+  if(!currentUser||isFloorRole()){sb.innerHTML='';return;}
   var html='<div class="fz-logo"><span class="g">FRENZ</span><span class="b">EE</span></div>';
   html+='<div class="fz-navlabel">Menu</div>';
   if(canAccess('manager')) html+=fzNavBtn('grid','Dashboard','sb-mgr');
