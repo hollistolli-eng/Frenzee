@@ -3323,86 +3323,16 @@ function renderMetalWork(n){
   // in, rather than adding ad-hoc entries. ────────────────────────────────
   var runsCard=document.createElement('div');
   runsCard.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #f39c12;';
-  var filledCount=f.runs.filter(metalRunHasData).length;
-  var filterText=(metalRunFilterText[n]||'');
-  var ft=filterText.toLowerCase();
-  var visibleIdxs=[];
-  f.runs.forEach(function(r,i){
-    if(!ft||r.code.toLowerCase().indexOf(ft)!==-1||r.desc.toLowerCase().indexOf(ft)!==-1||r.brand.toLowerCase().indexOf(ft)!==-1||String(r.program).toLowerCase().indexOf(ft)!==-1) visibleIdxs.push(i);
-  });
-  var groups=[],groupMap={};
-  visibleIdxs.forEach(function(i){
-    var b=f.runs[i].brand;
-    if(!groupMap[b]){groupMap[b]={brand:b,idxs:[]};groups.push(groupMap[b]);}
-    groupMap[b].idxs.push(i);
-  });
-  var runsHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'+
+  runsCard.innerHTML=
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'+
       '<div style="font-size:0.75rem;font-weight:700;color:#b8860b;text-transform:uppercase;letter-spacing:1px;">📦 Runs Through the Detector</div>'+
-      '<div style="font-size:0.72rem;color:#888;">'+filledCount+' of '+f.runs.length+' lines filled in</div>'+
+      '<div id="mt-filledcount" style="font-size:0.72rem;color:#888;"></div>'+
     '</div>'+
-    '<input class="field-input" type="text" id="mt-runfilter" placeholder="Find a SKU by code, name or program no…" value="'+filterText+'" style="margin-bottom:10px;" autocomplete="off"/>';
-  var searchingRuns=!!ft;
-  groups.forEach(function(g){
-    var folderKey=n+'-'+g.brand;
-    var folderOpen=searchingRuns||!!metalFoldersOpen[folderKey];
-    var folderFilled=g.idxs.filter(function(i){return metalRunHasData(f.runs[i]);}).length;
-    runsHTML+='<div style="margin-bottom:8px;">'+
-      '<div data-mtfolder="'+folderKey+'" style="display:flex;align-items:center;gap:8px;background:#fafafa;border:1px solid #eee;border-radius:10px;padding:10px 12px;cursor:pointer;">'+
-        '<div style="font-size:1rem;">'+(METAL_FOLDER_ICONS[g.brand]||'📁')+'</div>'+
-        '<div style="flex:1;font-weight:800;font-size:0.8rem;color:#444;">'+g.brand+'</div>'+
-        '<span style="font-size:0.65rem;font-weight:700;background:'+(folderFilled?'#f0fdf4':'#eee')+';color:'+(folderFilled?'#27ae60':'#555')+';padding:3px 8px;border-radius:5px;">'+folderFilled+'/'+g.idxs.length+'</span>'+
-        '<span style="font-size:0.8rem;color:#aaa;transition:transform 0.15s;'+(folderOpen?'transform:rotate(90deg);':'')+'">▶</span>'+
-      '</div>'+
-      '<div style="padding:'+(folderOpen?'8px 0 0':'0')+';display:'+(folderOpen?'block':'none')+';">';
-    if(folderOpen){
-      g.idxs.forEach(function(i){
-        var run=f.runs[i];
-        var hasData=metalRunHasData(run);
-        var expanded=!!metalExpandedRow[n+'-'+i];
-        runsHTML+='<div style="border:1.5px solid '+(hasData?'#d4edda':'#f0f0f0')+';border-radius:10px;margin-bottom:6px;overflow:hidden;background:'+(hasData?'#f9fff9':'#fff')+';">'+
-          '<div data-mtrowtoggle="'+i+'" style="display:flex;align-items:center;gap:8px;padding:9px 11px;cursor:pointer;">'+
-            '<div style="font-size:0.85rem;">'+(hasData?'✅':'⬜')+'</div>'+
-            '<div style="flex:1;min-width:0;">'+
-              '<div style="font-size:0.78rem;font-weight:700;color:#222;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Program '+(run.program||'—')+' · '+run.desc+'</div>'+
-              '<div style="font-size:0.68rem;color:#aaa;">'+run.code+'</div>'+
-            '</div>'+
-            '<span style="color:#aaa;font-size:0.8rem;">'+(expanded?'▲':'▼')+'</span>'+
-          '</div>';
-        if(expanded){
-          runsHTML+='<div style="padding:0 11px 11px;">'+
-            '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-bottom:7px;">'+
-              inpRun(i,'timeStart','Time Start','text','HH:MM',isSigned)+
-              inpRun(i,'timeEnd','Time End','text','HH:MM',isSigned)+
-            '</div>'+
-            '<div style="font-size:0.7rem;font-weight:700;color:#888;margin-bottom:4px;">START OF RUN — Pass (P) / Fail (F)</div>'+
-            '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:7px;">'+
-              inpRun(i,'startFe','Fe','text','P/F',isSigned)+inpRun(i,'startNf','NF','text','P/F',isSigned)+inpRun(i,'startSs','SS','text','P/F',isSigned)+
-            '</div>'+
-            '<div style="font-size:0.7rem;font-weight:700;color:#888;margin-bottom:4px;">END OF RUN — Pass (P) / Fail (F)</div>'+
-            '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:7px;">'+
-              inpRun(i,'endFe','Fe','text','P/F',isSigned)+inpRun(i,'endNf','NF','text','P/F',isSigned)+inpRun(i,'endSs','SS','text','P/F',isSigned)+
-            '</div>'+
-            '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-bottom:7px;">'+
-              inpRun(i,'actualReject','Actual No. Reject Metal Products','number','',isSigned)+
-              inpRun(i,'weightReject','No. Weight Rejected Products','number','',isSigned)+
-            '</div>'+
-            '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-bottom:7px;">'+
-              inpRun(i,'addlPasses','Additional Passes Through (x3)','text','',isSigned)+
-              inpRun(i,'ubdOk','UBD ok? Y/N','text','Y/N',isSigned)+
-            '</div>'+
-            '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px;">'+
-              inpRun(i,'totalProducts','Total No. of Products','number','',isSigned)+
-              inpRun(i,'initials','Initials of Operator','text','',isSigned)+
-            '</div>'+
-          '</div>';
-        }
-        runsHTML+='</div>';
-      });
-    }
-    runsHTML+='</div></div>';
-  });
-  if(!groups.length) runsHTML+='<div style="text-align:center;color:#bbb;padding:20px;font-size:0.8rem;">No SKUs match "'+filterText+'".</div>';
-  runsCard.innerHTML=runsHTML;
+    '<div style="position:relative;margin-bottom:10px;">'+
+      '<input class="field-input" type="text" id="mt-runfilter" placeholder="Type to find a SKU — e.g. bp chicken, 971066, program 42…" value="'+metalEsc(metalRunFilterText[n]||'')+'" style="padding-right:38px;" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search"/>'+
+      '<button id="mt-runfilter-clear" aria-label="Clear search" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:#eee;border:none;border-radius:50%;width:26px;height:26px;font-size:0.85rem;cursor:pointer;color:#555;display:'+((metalRunFilterText[n]||'')?'block':'none')+';">✕</button>'+
+    '</div>'+
+    '<div id="mt-runs-list"></div>';
   body.appendChild(runsCard);
 
   // ── Memory test — end of day ─────────────────────────────────────────
@@ -3438,34 +3368,32 @@ function renderMetalWork(n){
     body.querySelectorAll('[data-mtchip]').forEach(function(btn){
       btn.onclick=function(){f[btn.getAttribute('data-mtchip')]=!f[btn.getAttribute('data-mtchip')];lsScheduleSave();renderMetalWork(n);};
     });
-    body.querySelectorAll('[data-mtrow]').forEach(function(el){
-      el.addEventListener('change',function(){
-        f.runs[parseInt(el.getAttribute('data-mtrow'))][el.getAttribute('data-mtfield')]=el.value;
-        lsScheduleSave();
-      });
+  }
+  var filterEl=document.getElementById('mt-runfilter');
+  var clearEl=document.getElementById('mt-runfilter-clear');
+  if(filterEl&&!isSigned){
+    filterEl.addEventListener('input',function(){
+      metalRunFilterText[n]=filterEl.value;
+      if(clearEl) clearEl.style.display=filterEl.value?'block':'none';
+      renderMetalRunsList(n);
     });
-    body.querySelectorAll('[data-mtrowtoggle]').forEach(function(el){
-      el.onclick=function(){
-        var key=n+'-'+el.getAttribute('data-mtrowtoggle');
-        metalExpandedRow[key]=!metalExpandedRow[key];
-        renderMetalWork(n);
-      };
+    // Enter opens the top match so the operator can go straight to filling it in.
+    filterEl.addEventListener('keydown',function(e){
+      if(e.key!=='Enter') return;
+      var res=metalSearch(f.runs,filterEl.value);
+      if(res.terms.length&&res.hits.length){
+        metalExpandedRow[n+'-'+res.hits[0]]=true;
+        renderMetalRunsList(n);
+      }
+      e.preventDefault();
     });
-    body.querySelectorAll('[data-mtfolder]').forEach(function(el){
-      el.onclick=function(){
-        var key=el.getAttribute('data-mtfolder');
-        metalFoldersOpen[key]=!metalFoldersOpen[key];
-        renderMetalWork(n);
-      };
-    });
-    var filterEl=document.getElementById('mt-runfilter');
-    if(filterEl){
-      filterEl.addEventListener('input',function(){
-        metalRunFilterText[n]=filterEl.value;
-        renderMetalWork(n);
-      });
-      setTimeout(function(){filterEl.focus();filterEl.setSelectionRange(filterEl.value.length,filterEl.value.length);},0);
-    }
+    if(clearEl) clearEl.onclick=function(){
+      metalRunFilterText[n]='';
+      filterEl.value='';
+      clearEl.style.display='none';
+      renderMetalRunsList(n);
+      filterEl.focus();
+    };
   }
 
   // ── Sign-off section ─────────────────────────────────────────────────
@@ -3541,18 +3469,180 @@ function renderMetalWork(n){
   footer.innerHTML='<span>QA-911-F-005.0</span><span>Page 1 of 11</span><span>Version No: 040</span><span>Issue Date: 24/09/26</span><span>Authorised By: QA Coordinator</span>';
   body.appendChild(footer);
 
-  function inpRun(i,field,label,type,ph,disabled){
+  renderMetalRunsList(n);
+}
+
+function metalInpRun(n,i,field,label,type,ph,disabled){
+  var f=metalForms[n];
+  var run=f.runs[i];
+  if(field==='initials'){
+    var listId='mt-initials-'+n+'-'+i;
+    var opts=f.operatorNames.filter(Boolean).map(nameInitials).filter(function(v,idx,arr){return v&&arr.indexOf(v)===idx;});
+    return '<div class="field-row"><div class="field-label">'+label+'</div>'+
+      '<input class="field-input" type="text" list="'+listId+'" value="'+(run[field]||'')+'" placeholder="Init. — or type a supervisor\'s" data-mtrow="'+i+'" data-mtfield="'+field+'" '+(disabled?'disabled':'')+'/>'+
+      '<datalist id="'+listId+'">'+opts.map(function(o){return '<option value="'+o+'">';}).join('')+'</datalist>'+
+    '</div>';
+  }
+  return '<div class="field-row"><div class="field-label">'+label+'</div><input class="field-input" type="'+type+'" value="'+(run[field]||'')+'" placeholder="'+(ph||'')+'" data-mtrow="'+i+'" data-mtfield="'+field+'" '+(disabled?'disabled':'')+'/></div>';
+}
+
+function metalEsc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+// Escapes text and wraps every occurrence of any search term in <mark>.
+function metalHighlight(text,terms){
+  text=String(text);
+  if(!terms.length) return metalEsc(text);
+  var low=text.toLowerCase(),ranges=[];
+  terms.forEach(function(t){
+    var from=0,at;
+    while((at=low.indexOf(t,from))!==-1){ranges.push([at,at+t.length]);from=at+t.length;}
+  });
+  if(!ranges.length) return metalEsc(text);
+  ranges.sort(function(a,b){return a[0]-b[0];});
+  var merged=[ranges[0].slice()];
+  ranges.slice(1).forEach(function(r){
+    var last=merged[merged.length-1];
+    if(r[0]<=last[1]) last[1]=Math.max(last[1],r[1]); else merged.push(r.slice());
+  });
+  var out='',pos=0;
+  merged.forEach(function(r){
+    out+=metalEsc(text.slice(pos,r[0]))+'<mark style="background:#ffe58a;color:inherit;border-radius:3px;padding:0 1px;">'+metalEsc(text.slice(r[0],r[1]))+'</mark>';
+    pos=r[1];
+  });
+  return out+metalEsc(text.slice(pos));
+}
+// Every space-separated word must match somewhere in brand / code / program / name,
+// so "bp" then "bp chicken" keeps narrowing. Matches at the start of a word rank first.
+function metalSearch(runs,query){
+  var terms=query.toLowerCase().split(/\s+/).filter(Boolean);
+  if(!terms.length) return {terms:terms,hits:runs.map(function(r,i){return i;})};
+  var scored=[];
+  runs.forEach(function(r,i){
+    var hay=(r.brand+' '+r.program+' '+r.code+' '+r.desc).toLowerCase();
+    var score=0;
+    for(var k=0;k<terms.length;k++){
+      var at=hay.indexOf(terms[k]);
+      if(at===-1) return;
+      score+=(at===0||/[\s\/\-#(]/.test(hay.charAt(at-1)))?0:1;
+    }
+    scored.push({i:i,score:score});
+  });
+  scored.sort(function(a,b){return a.score-b.score||a.i-b.i;});
+  return {terms:terms,hits:scored.map(function(s){return s.i;})};
+}
+
+function renderMetalRunsList(n){
+  var f=metalForms[n];
+  var isSigned=f.status==='complete';
+  var host=document.getElementById('mt-runs-list');
+  if(!host) return;
+  var filterText=metalRunFilterText[n]||'';
+  var res=metalSearch(f.runs,filterText);
+  var terms=res.terms,searching=terms.length>0;
+  var html='';
+
+  function rowHTML(i){
     var run=f.runs[i];
-    if(field==='initials'){
-      var listId='mt-initials-'+n+'-'+i;
-      var opts=f.operatorNames.filter(Boolean).map(nameInitials).filter(function(v,idx,arr){return v&&arr.indexOf(v)===idx;});
-      return '<div class="field-row"><div class="field-label">'+label+'</div>'+
-        '<input class="field-input" type="text" list="'+listId+'" value="'+(run[field]||'')+'" placeholder="Init. — or type a supervisor\'s" data-mtrow="'+i+'" data-mtfield="'+field+'" '+(disabled?'disabled':'')+'/>'+
-        '<datalist id="'+listId+'">'+opts.map(function(o){return '<option value="'+o+'">';}).join('')+'</datalist>'+
+    var hasData=metalRunHasData(run);
+    var expanded=!!metalExpandedRow[n+'-'+i]||(searching&&res.hits.length===1);
+    var h='<div style="border:1.5px solid '+(hasData?'#d4edda':'#f0f0f0')+';border-radius:10px;margin-bottom:6px;overflow:hidden;background:'+(hasData?'#f9fff9':'#fff')+';">'+
+      '<div data-mtrowtoggle="'+i+'" style="display:flex;align-items:center;gap:8px;padding:10px 11px;cursor:pointer;">'+
+        '<div style="font-size:0.85rem;">'+(hasData?'✅':'⬜')+'</div>'+
+        '<div style="flex:1;min-width:0;">'+
+          '<div style="font-size:0.8rem;font-weight:700;color:#222;">'+
+            (searching?'<span style="font-size:0.62rem;font-weight:800;background:#eee;color:#555;padding:2px 6px;border-radius:4px;margin-right:6px;vertical-align:middle;">'+metalHighlight(run.brand,terms)+'</span>':'')+
+            metalHighlight(run.desc,terms)+
+          '</div>'+
+          '<div style="font-size:0.7rem;color:#888;margin-top:2px;">Program <strong style="color:#222;">'+metalHighlight(run.program||'—',terms)+'</strong> · '+metalHighlight(run.code,terms)+'</div>'+
+        '</div>'+
+        '<span style="color:#aaa;font-size:0.8rem;">'+(expanded?'▲':'▼')+'</span>'+
+      '</div>';
+    if(expanded){
+      h+='<div style="padding:0 11px 11px;">'+
+        '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-bottom:7px;">'+
+          metalInpRun(n,i,'timeStart','Time Start','text','HH:MM',isSigned)+
+          metalInpRun(n,i,'timeEnd','Time End','text','HH:MM',isSigned)+
+        '</div>'+
+        '<div style="font-size:0.7rem;font-weight:700;color:#888;margin-bottom:4px;">START OF RUN — Pass (P) / Fail (F)</div>'+
+        '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:7px;">'+
+          metalInpRun(n,i,'startFe','Fe','text','P/F',isSigned)+metalInpRun(n,i,'startNf','NF','text','P/F',isSigned)+metalInpRun(n,i,'startSs','SS','text','P/F',isSigned)+
+        '</div>'+
+        '<div style="font-size:0.7rem;font-weight:700;color:#888;margin-bottom:4px;">END OF RUN — Pass (P) / Fail (F)</div>'+
+        '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:7px;">'+
+          metalInpRun(n,i,'endFe','Fe','text','P/F',isSigned)+metalInpRun(n,i,'endNf','NF','text','P/F',isSigned)+metalInpRun(n,i,'endSs','SS','text','P/F',isSigned)+
+        '</div>'+
+        '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-bottom:7px;">'+
+          metalInpRun(n,i,'actualReject','Actual No. Reject Metal Products','number','',isSigned)+
+          metalInpRun(n,i,'weightReject','No. Weight Rejected Products','number','',isSigned)+
+        '</div>'+
+        '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-bottom:7px;">'+
+          metalInpRun(n,i,'addlPasses','Additional Passes Through (x3)','text','',isSigned)+
+          metalInpRun(n,i,'ubdOk','UBD ok? Y/N','text','Y/N',isSigned)+
+        '</div>'+
+        '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px;">'+
+          metalInpRun(n,i,'totalProducts','Total No. of Products','number','',isSigned)+
+          metalInpRun(n,i,'initials','Initials of Operator','text','',isSigned)+
+        '</div>'+
       '</div>';
     }
-    return '<div class="field-row"><div class="field-label">'+label+'</div><input class="field-input" type="'+type+'" value="'+(run[field]||'')+'" placeholder="'+(ph||'')+'" data-mtrow="'+i+'" data-mtfield="'+field+'" '+(disabled?'disabled':'')+'/></div>';
+    return h+'</div>';
   }
+
+  if(searching){
+    html+='<div style="font-size:0.72rem;color:#888;margin:2px 2px 8px;">'+res.hits.length+' match'+(res.hits.length===1?'':'es')+'</div>';
+    res.hits.forEach(function(i){html+=rowHTML(i);});
+    if(!res.hits.length) html+='<div style="text-align:center;color:#bbb;padding:20px;font-size:0.8rem;">No SKUs match "'+metalEsc(filterText)+'".</div>';
+  } else {
+    var groups=[],groupMap={};
+    res.hits.forEach(function(i){
+      var b=f.runs[i].brand;
+      if(!groupMap[b]){groupMap[b]={brand:b,idxs:[]};groups.push(groupMap[b]);}
+      groupMap[b].idxs.push(i);
+    });
+    groups.forEach(function(g){
+      var folderKey=n+'-'+g.brand;
+      var folderOpen=!!metalFoldersOpen[folderKey];
+      var folderFilled=g.idxs.filter(function(i){return metalRunHasData(f.runs[i]);}).length;
+      html+='<div style="margin-bottom:8px;">'+
+        '<div data-mtfolder="'+folderKey+'" style="display:flex;align-items:center;gap:8px;background:#fafafa;border:1px solid #eee;border-radius:10px;padding:10px 12px;cursor:pointer;">'+
+          '<div style="font-size:1rem;">'+(METAL_FOLDER_ICONS[g.brand]||'📁')+'</div>'+
+          '<div style="flex:1;font-weight:800;font-size:0.8rem;color:#444;">'+g.brand+'</div>'+
+          '<span style="font-size:0.65rem;font-weight:700;background:'+(folderFilled?'#f0fdf4':'#eee')+';color:'+(folderFilled?'#27ae60':'#555')+';padding:3px 8px;border-radius:5px;">'+folderFilled+'/'+g.idxs.length+'</span>'+
+          '<span style="font-size:0.8rem;color:#aaa;transition:transform 0.15s;'+(folderOpen?'transform:rotate(90deg);':'')+'">▶</span>'+
+        '</div>'+
+        '<div style="padding:'+(folderOpen?'8px 0 0':'0')+';display:'+(folderOpen?'block':'none')+';">';
+      if(folderOpen) g.idxs.forEach(function(i){html+=rowHTML(i);});
+      html+='</div></div>';
+    });
+  }
+  host.innerHTML=html;
+
+  var countEl=document.getElementById('mt-filledcount');
+  if(countEl) countEl.textContent=f.runs.filter(metalRunHasData).length+' of '+f.runs.length+' lines filled in';
+
+  if(isSigned) return;
+  host.querySelectorAll('[data-mtrow]').forEach(function(el){
+    el.addEventListener('change',function(){
+      f.runs[parseInt(el.getAttribute('data-mtrow'))][el.getAttribute('data-mtfield')]=el.value;
+      lsScheduleSave();
+      var c=document.getElementById('mt-filledcount');
+      if(c) c.textContent=f.runs.filter(metalRunHasData).length+' of '+f.runs.length+' lines filled in';
+    });
+  });
+  host.querySelectorAll('[data-mtrowtoggle]').forEach(function(el){
+    el.onclick=function(){
+      var key=n+'-'+el.getAttribute('data-mtrowtoggle');
+      var wasOpen=!!metalExpandedRow[key]||(searching&&res.hits.length===1);
+      metalExpandedRow[key]=!wasOpen;
+      renderMetalRunsList(n);
+    };
+  });
+  host.querySelectorAll('[data-mtfolder]').forEach(function(el){
+    el.onclick=function(){
+      var key=el.getAttribute('data-mtfolder');
+      metalFoldersOpen[key]=!metalFoldersOpen[key];
+      renderMetalRunsList(n);
+    };
+  });
 }
 // Both machines must be signed off before FORM067's Metal Detection row shows complete.
 function updateMetalForm067Status(){
