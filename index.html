@@ -3517,7 +3517,9 @@ function metalSearch(runs,query){
   if(!terms.length) return {terms:terms,hits:runs.map(function(r,i){return i;})};
   var scored=[];
   runs.forEach(function(r,i){
-    var hay=(r.brand+' '+r.program+' '+r.code+' '+r.desc).toLowerCase();
+    // Frozen lines are tagged "fzn / frz / frozen" so any of those finds them all —
+    // some frozen products (e.g. FROZEN RISE croissant) have no "FZN" in their name.
+    var hay=(r.brand+' '+r.program+' '+r.code+' '+r.desc+(/frozen/i.test(r.brand)?' fzn frz frozen':'')).toLowerCase();
     var score=0;
     for(var k=0;k<terms.length;k++){
       var at=hay.indexOf(terms[k]);
@@ -3538,6 +3540,7 @@ function renderMetalRunsList(n){
   var filterText=metalRunFilterText[n]||'';
   var res=metalSearch(f.runs,filterText);
   var terms=res.terms,searching=terms.length>0;
+  if(terms.some(function(t){return t==='fzn'||t==='frz'||t==='frozen';})) terms=terms.concat(['fzn','frozen']);
   var html='';
 
   function rowHTML(i){
