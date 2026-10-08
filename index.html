@@ -1026,6 +1026,8 @@ function canAccess(role){
   if (role==='supervisor') return r==='manager'||r==='supervisor';
   if (role==='qa') return r==='manager'||r==='supervisor'||r==='qa';
   if (role==='labelprinter') return r==='manager'||r==='supervisor'||r==='labelprinter';
+  // Main Dashboard (live line KPIs): Managers (incl. the Operations Manager) and QA.
+  if (role==='dashboard') return r==='manager'||r==='qa';
   return true;
 }
 // Floor roles (Team Leader running a line, Prep worker) get no persistent nav —
@@ -6394,7 +6396,7 @@ function updateHeader(){
     '<div class="fz-menu-drop" id="fzMenuDrop">'+
       (canAccess('qa')?'<button class="hbtn" style="background:#27ae60;" id="qaBtn">🔬 QA</button>':'')+
       (canAccess('qa')?'<button class="hbtn" style="background:#9b59b6;" id="supBtn">🔍 Supervisor</button>':'')+
-      (canAccess('manager')?'<button class="hbtn" style="background:#0074d9;" id="mgrBtn">📊 Manager</button>':'')+
+      (canAccess('dashboard')?'<button class="hbtn" style="background:#0074d9;" id="mgrBtn">📊 Dashboard</button>':'')+
       (canAccess('labelprinter')?'<button class="hbtn" style="background:#8e44ad;" id="labelPrintBtn">🏷️ Labels</button>':'')+
       (canAccess('supervisor')?'<button class="hbtn" style="background:#e74c3c;" id="newShiftBtn">🌅 New Shift</button>':'')+
       '<button class="hbtn" style="background:#888;" id="logoutBtn">Log Out</button>'+
@@ -6467,7 +6469,7 @@ function updateSidebar(){
   if(!currentUser||isFloorRole()){sb.innerHTML='';return;}
   var html='<div class="fz-logo"><span class="g">FRENZ</span><span class="b">EE</span></div>';
   html+='<div class="fz-navlabel">Menu</div>';
-  if(canAccess('manager')) html+=fzNavBtn('grid','Dashboard','sb-mgr');
+  if(canAccess('dashboard')) html+=fzNavBtn('grid','Dashboard','sb-mgr');
   html+=fzNavBtn('layers','Production Lines','sb-lines');
   html+=fzNavBtn('flask','Prep Room','sb-prep');
   html+=fzNavBtn('magnet','Metal','sb-metal');
