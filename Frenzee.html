@@ -822,6 +822,50 @@ if(sessionStorage.getItem(PW_KEY)==='1'){
   <div class="mgr-body" id="metalWorkBody"></div>
 </div>
 
+<!-- METAL DETECTION — PRODUCT MANAGEMENT (QA) -->
+<div class="mgr-panel" id="metalProductsPanel">
+  <div class="mgr-hdr">
+    <div class="mgr-hdr-title"><span style="color:#2ecc40;">FRENZ</span><span style="color:#0074d9;">EE</span> <span style="font-size:0.8rem;color:#888;">Metal — Products</span></div>
+    <button class="mgr-close" id="metalProductsCloseBtn">✕ Close</button>
+  </div>
+  <div class="mgr-body" id="metalProductsBody"></div>
+</div>
+
+<!-- METAL PRODUCT MANAGEMENT — PIN GATE -->
+<div class="overlay" id="metalGateOverlay">
+  <div class="ov-box" style="max-width:340px;">
+    <div class="ov-icon">🔒</div>
+    <div class="ov-title">Product Management</div>
+    <div class="ov-sub">Enter your own QA or Manager PIN to open the metal detector product list.</div>
+    <div class="ov-field"><label>PIN</label><input type="password" class="field-input" id="mgPin" maxlength="4" inputmode="numeric" placeholder="••••"/></div>
+    <div style="color:#e74c3c;font-size:0.78rem;min-height:16px;margin-bottom:6px;" id="mgMsg"></div>
+    <button class="ov-btn" id="mgOkBtn">Unlock</button>
+    <button class="ov-btn grey" id="mgCancelBtn">Cancel</button>
+  </div>
+</div>
+
+<!-- METAL PRODUCT ADD / EDIT OVERLAY -->
+<div class="overlay" id="metalProductOverlay">
+  <div class="ov-box" style="max-width:420px;">
+    <div class="ov-icon">🧲</div>
+    <div class="ov-title" id="mpTitle">Add New Product</div>
+    <div class="ov-field"><label>Brand</label><input type="text" class="field-input" id="mpBrand" list="mpBrandList" placeholder="e.g. WW, BP, RISE — or a new brand" autocomplete="off"/><datalist id="mpBrandList"></datalist></div>
+    <div class="ov-field"><label>Product Code</label><input type="text" class="field-input" id="mpCode" placeholder="e.g. 971066 (or 971128 / 990610)" autocomplete="off"/></div>
+    <div class="ov-field"><label>Product Name</label><input type="text" class="field-input" id="mpDesc" placeholder="e.g. WW Chicken Mayo &amp; Lettuce SW 190g" autocomplete="off"/></div>
+    <div class="ov-field"><label>Metal Machine Program Code</label><input type="text" class="field-input" id="mpProgram" placeholder="e.g. 34 — or Machine 1 #65" autocomplete="off"/></div>
+    <div class="ov-field"><label>Target Weight (g)</label><input type="number" class="field-input" id="mpTarget" min="1" step="any" inputmode="decimal" placeholder="e.g. 190"/></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="ov-field"><label>Min Weight (g) <span style="font-weight:400;color:#999;">optional</span></label><input type="number" class="field-input" id="mpMin" step="any" inputmode="decimal"/></div>
+      <div class="ov-field"><label>Max Weight (g) <span style="font-weight:400;color:#999;">optional</span></label><input type="number" class="field-input" id="mpMax" step="any" inputmode="decimal"/></div>
+    </div>
+    <div class="ov-field"><label>QA / Manager PIN</label><input type="password" class="field-input" id="mpPin" maxlength="4" inputmode="numeric" placeholder="••••"/></div>
+    <div style="color:#e74c3c;font-size:0.78rem;min-height:16px;margin-bottom:6px;" id="mpMsg"></div>
+    <button class="ov-btn" id="mpSaveBtn">Save</button>
+    <button class="ov-btn red" id="mpDeleteBtn" style="display:none;">Remove Product</button>
+    <button class="ov-btn grey" id="mpCancelBtn">Cancel</button>
+  </div>
+</div>
+
 <!-- PREP MIX RECORD OVERLAY -->
 <div class="overlay" id="prepMixOverlay">
   <div class="ov-box" style="max-width:460px;">
@@ -2308,12 +2352,29 @@ var METAL_FOLDER_ICONS={'WW':'🛒','DNATA':'🛫','BP':'⛽','EG':'🥗','OTR F
 // The paper form pre-lists every SKU the detector is programmed for — the operator
 // fills in a line as that SKU is actually run through, rather than adding ad-hoc rows.
 // So each machine's runs table starts seeded with one row per METAL_PROGRAMS entry.
+// ── Metal product catalog (QA-managed) ─────────────────────────────────
+// Product → detector program number + target weight. Shared across devices via the
+// Firestore 'metalProducts' collection (seeded once from METAL_PROGRAMS); until that
+// loads, or if it can't be reached, the built-in list is used.
+function metalKey(brand,code){
+  return (String(brand||'')+'|'+String(code||'')).toLowerCase().replace(/[^a-z0-9|]+/g,'-');
+}
+var METAL_SEED=METAL_PROGRAMS.map(function(p,i){
+  var m=/(\d+)\s*g\s*$/i.exec(p.desc);
+  return {id:metalKey(p.brand,p.code),brand:p.brand,code:p.code,desc:p.desc,program:p.program,
+    targetWeight:m?parseInt(m[1],10):'',minWeight:'',maxWeight:'',order:(i+1)*10,updatedBy:'',updatedAt:''};
+});
+var metalCatalog=null;       // null until the shared list has loaded
+var metalCatalogError='';    // set if the shared list can't be reached
+function getMetalCatalog(){return metalCatalog||METAL_SEED;}
+function newMetalRunRow(p){
+  return {pid:p.id,program:p.program,brand:p.brand,code:p.code,desc:p.desc,
+    targetWeight:p.targetWeight,minWeight:p.minWeight,maxWeight:p.maxWeight,
+    timeStart:'',timeEnd:'',startFe:'',startNf:'',startSs:'',endFe:'',endNf:'',endSs:'',
+    actualReject:'',weightReject:'',addlPasses:'',ubdOk:'',totalProducts:'',initials:''};
+}
 function newMetalRunsTable(){
-  return METAL_PROGRAMS.map(function(p){
-    return {program:p.program,brand:p.brand,code:p.code,desc:p.desc,
-      timeStart:'',timeEnd:'',startFe:'',startNf:'',startSs:'',endFe:'',endNf:'',endSs:'',
-      actualReject:'',weightReject:'',addlPasses:'',ubdOk:'',totalProducts:'',initials:''};
-  });
+  return getMetalCatalog().map(newMetalRunRow);
 }
 function metalRunHasData(r){
   return !!(r.timeStart||r.timeEnd||r.startFe||r.startNf||r.startSs||r.endFe||r.endNf||r.endSs||
@@ -3254,6 +3315,17 @@ function renderMetalRoom(){
     card.onclick=function(){openMetalMachine(n);};
     body.appendChild(card);
   });
+  {
+    var pm=document.createElement('div');
+    pm.style.cssText='background:#f0f4ff;border-radius:16px;padding:15px 16px;margin-top:6px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #0074d9;cursor:pointer;display:flex;align-items:center;gap:12px;';
+    pm.innerHTML=
+      '<div style="font-size:1.6rem;">🛠️</div>'+
+      '<div style="flex:1;"><div style="font-weight:800;font-size:0.95rem;">Product Management</div>'+
+      '<div style="font-size:0.78rem;color:#888;margin-top:2px;">Add or edit products — program code, product code, target weight · QA PIN required</div></div>'+
+      '<span style="font-size:0.85rem;color:#aaa;">🔒</span>';
+    pm.onclick=function(){openMetalProductsGate('metal');};
+    body.appendChild(pm);
+  }
 }
 function openMetalMachine(n){
   var f=metalForms[n];
@@ -3261,6 +3333,7 @@ function openMetalMachine(n){
     f.date=new Date().toISOString().split('T')[0];
   }
   document.getElementById('metalWorkTitle').textContent='Metal — Machine '+n;
+  currentMetalMachine=n;
   showPanel('metalWorkPanel');
   renderMetalWork(n);
 }
@@ -3557,7 +3630,7 @@ function renderMetalRunsList(n){
             (searching?'<span style="font-size:0.62rem;font-weight:800;background:#eee;color:#555;padding:2px 6px;border-radius:4px;margin-right:6px;vertical-align:middle;">'+metalHighlight(run.brand,terms)+'</span>':'')+
             metalHighlight(run.desc,terms)+
           '</div>'+
-          '<div style="font-size:0.7rem;color:#888;margin-top:2px;">Program <strong style="color:#222;">'+metalHighlight(run.program||'—',terms)+'</strong> · '+metalHighlight(run.code,terms)+'</div>'+
+          '<div style="font-size:0.7rem;color:#888;margin-top:2px;">Program <strong style="color:#222;">'+metalHighlight(run.program||'—',terms)+'</strong> · '+metalHighlight(run.code,terms)+' · '+metalWeightText(run)+'</div>'+
         '</div>'+
         '<span style="color:#aaa;font-size:0.8rem;">'+(expanded?'▲':'▼')+'</span>'+
       '</div>';
@@ -3649,6 +3722,227 @@ function renderMetalRunsList(n){
     };
   });
 }
+// ── Metal product management (QA) ──────────────────────────────────────
+var currentMetalMachine=null;
+var metalProdFilter='';
+// Brings both machines' checklists in line with the product list: new products appear,
+// edited ones update, removed ones disappear unless a run was already recorded against
+// them. A signed-off record is never altered.
+function syncMetalRunsWithCatalog(){
+  var cat=getMetalCatalog();
+  [1,2].forEach(function(n){
+    var f=metalForms[n];
+    if(f.status==='complete') return;
+    var byPid={};
+    f.runs.forEach(function(r){if(!r.pid) r.pid=metalKey(r.brand,r.code);byPid[r.pid]=r;});
+    var next=cat.map(function(p){
+      var r=byPid[p.id];
+      if(!r) return newMetalRunRow(p);
+      r.program=p.program;r.brand=p.brand;r.code=p.code;r.desc=p.desc;
+      r.targetWeight=p.targetWeight;r.minWeight=p.minWeight;r.maxWeight=p.maxWeight;
+      delete byPid[p.id];
+      return r;
+    });
+    Object.keys(byPid).forEach(function(k){if(metalRunHasData(byPid[k])) next.push(byPid[k]);});
+    f.runs=next;
+  });
+  lsScheduleSave();
+  refreshMetalViews();
+}
+function refreshMetalViews(){
+  var work=document.getElementById('metalWorkPanel');
+  if(work&&work.classList.contains('show')&&currentMetalMachine) renderMetalRunsList(currentMetalMachine);
+  var prod=document.getElementById('metalProductsPanel');
+  if(prod&&prod.classList.contains('show')) renderMetalProducts();
+}
+var _metalCatalogSyncStarted=false;
+function initMetalCatalogSync(){
+  if(_metalCatalogSyncStarted) return;
+  _metalCatalogSyncStarted=true;
+  fbReady.then(function(){
+    fbSeedCollectionIfEmpty('metalProducts',METAL_SEED,'id')
+      .catch(function(e){console.error('Firestore metalProducts seed failed:',e);})
+      .then(function(){
+        fbDb.collection('metalProducts').onSnapshot(function(snap){
+          metalCatalogError='';
+          if(snap.empty&&metalCatalog===null) return;
+          metalCatalog=snap.docs.map(function(d){return d.data();}).sort(function(a,b){return (a.order||0)-(b.order||0);});
+          syncMetalRunsWithCatalog();
+        },function(err){
+          console.error('Firestore metalProducts listener failed:',err);
+          metalCatalogError=(err&&err.code==='permission-denied')?'permission':'connection';
+          refreshMetalViews();
+        });
+      });
+  });
+}
+function persistMetalProduct(p){return fbDb.collection('metalProducts').doc(p.id).set(p);}
+function removeMetalProduct(id){return fbDb.collection('metalProducts').doc(id).delete();}
+function metalWeightText(p){
+  if(p.targetWeight===''||p.targetWeight===undefined||p.targetWeight===null) return 'no target weight';
+  var t='Target '+p.targetWeight+'g';
+  if(p.minWeight!==''&&p.minWeight!==undefined&&p.maxWeight!==''&&p.maxWeight!==undefined) t+=' ('+p.minWeight+'–'+p.maxWeight+'g)';
+  return t;
+}
+
+var metalProductsReturnTo='';
+// Whose PIN is this, if it belongs to someone allowed to change the product list (QA / Manager)?
+function metalQaPinHolder(pin){
+  var who=null;
+  Object.keys(STAFF_PINS).forEach(function(sid){
+    if(pin&&STAFF_PINS[sid]===pin&&(STAFF_ROLES[sid]==='qa'||STAFF_ROLES[sid]==='manager'||sid==='16')) who=STAFF_NAMES[sid];
+  });
+  return who;
+}
+// The product list only opens with the person's own QA / Manager PIN, whoever is signed in on the device.
+function openMetalProductsGate(from){
+  var pin=document.getElementById('mgPin'),msg=document.getElementById('mgMsg');
+  pin.value='';msg.textContent='';
+  function unlock(){
+    if(!metalQaPinHolder(pin.value)){msg.textContent='That PIN can\'t open product management — QA or Manager only.';pin.value='';pin.focus();return;}
+    hideOverlay('metalGateOverlay');
+    if(from==='qa') clearInterval(qaRefreshInterval);
+    openMetalProducts(from);
+  }
+  document.getElementById('mgOkBtn').onclick=unlock;
+  pin.onkeydown=function(e){if(e.key==='Enter') unlock();};
+  showOverlay('metalGateOverlay');
+  setTimeout(function(){pin.focus();},50);
+}
+function openMetalProducts(from){
+  currentMetalMachine=null;
+  metalProductsReturnTo=from||'';
+  showPanel('metalProductsPanel');
+  renderMetalProducts();
+}
+function closeMetalProducts(){
+  hidePanel('metalProductsPanel');
+  if(metalProductsReturnTo==='metal'){showPanel('metalRoomPanel');renderMetalRoom();}
+  else if(metalProductsReturnTo==='qa'){openQaDash();}
+}
+function renderMetalProducts(){
+  var body=document.getElementById('metalProductsBody');
+  var hadFocus=document.activeElement&&document.activeElement.id==='mp-filter';
+  body.innerHTML='';
+  var cat=getMetalCatalog();
+  if(metalCatalogError){
+    var warn=document.createElement('div');
+    warn.style.cssText='background:#fff0f0;border-left:5px solid #e74c3c;border-radius:12px;padding:11px 14px;margin-bottom:12px;font-size:0.78rem;color:#c0392b;line-height:1.5;';
+    warn.innerHTML=metalCatalogError==='permission'
+      ?'<strong>The shared product list isn\'t connected yet.</strong> The built-in list is showing, and changes can\'t be saved until the <code>metalProducts</code> collection is allowed in the Firestore rules.'
+      :'<strong>Can\'t reach the shared product list.</strong> The built-in list is showing — check the connection.';
+    body.appendChild(warn);
+  }
+  var hdr=document.createElement('div');
+  hdr.style.cssText='background:#f0f4ff;border-radius:18px;padding:14px 16px;margin-bottom:12px;border-left:5px solid #0074d9;';
+  hdr.innerHTML=
+    '<div style="font-size:0.8rem;font-weight:700;color:#0074d9;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">🛠️ Metal Detector — Product Management</div>'+
+    '<div style="font-size:0.8rem;color:#555;line-height:1.5;">When a new product comes online, add it here with the program code set on the metal machine, its product code and target weight. It appears on both machines\' checklists straight away. QA / Manager PIN required.</div>';
+  body.appendChild(hdr);
+  var addBtn=document.createElement('button');
+  addBtn.style.cssText='background:#27ae60;color:#fff;border:none;border-radius:10px;padding:11px;font-size:0.9rem;font-weight:700;cursor:pointer;width:100%;margin-bottom:12px;';
+  addBtn.textContent='+ Add New Product';
+  addBtn.onclick=function(){openMetalProductEdit(null);};
+  body.appendChild(addBtn);
+  var wrap=document.createElement('div');
+  wrap.style.cssText='position:relative;margin-bottom:10px;';
+  wrap.innerHTML='<input class="field-input" type="text" id="mp-filter" placeholder="Find a product — e.g. bp chicken, 971066, program 42, fzn rise…" value="'+metalEsc(metalProdFilter)+'" autocomplete="off" autocapitalize="off" spellcheck="false"/>';
+  body.appendChild(wrap);
+  var list=document.createElement('div');
+  list.id='mp-list';
+  body.appendChild(list);
+  var fl=document.getElementById('mp-filter');
+  fl.addEventListener('input',function(){metalProdFilter=fl.value;renderMetalProductList();});
+  renderMetalProductList();
+  if(hadFocus){fl.focus();fl.setSelectionRange(fl.value.length,fl.value.length);}
+}
+function renderMetalProductList(){
+  var host=document.getElementById('mp-list');
+  if(!host) return;
+  var cat=getMetalCatalog();
+  var res=metalSearch(cat,metalProdFilter);
+  var terms=res.terms;
+  if(terms.some(function(t){return t==='fzn'||t==='frz'||t==='frozen';})) terms=terms.concat(['fzn','frozen']);
+  var html='<div style="font-size:0.72rem;color:#888;margin:0 2px 8px;">'+res.hits.length+' of '+cat.length+' products</div>';
+  res.hits.forEach(function(i){
+    var p=cat[i];
+    html+='<div style="display:flex;align-items:center;gap:10px;background:#fff;border-radius:12px;padding:10px 12px;margin-bottom:6px;box-shadow:0 2px 10px rgba(15,46,28,0.06);">'+
+      '<div style="flex:1;min-width:0;">'+
+        '<div style="font-size:0.8rem;font-weight:700;color:#222;"><span style="font-size:0.62rem;font-weight:800;background:#eee;color:#555;padding:2px 6px;border-radius:4px;margin-right:6px;vertical-align:middle;">'+metalHighlight(p.brand,terms)+'</span>'+metalHighlight(p.desc,terms)+'</div>'+
+        '<div style="font-size:0.72rem;color:#888;margin-top:2px;">Program <strong style="color:#222;">'+metalHighlight(p.program||'—',terms)+'</strong> · Code '+metalHighlight(p.code,terms)+' · '+metalWeightText(p)+'</div>'+
+        (p.updatedBy?'<div style="font-size:0.66rem;color:#aaa;margin-top:1px;">Last changed by '+metalEsc(p.updatedBy)+(p.updatedAt?' · '+metalEsc(p.updatedAt):'')+'</div>':'')+
+      '</div>'+
+      '<button data-mpedit="'+metalEsc(p.id)+'" style="background:#e8f4fd;color:#0074d9;border:none;border-radius:8px;padding:7px 12px;font-size:0.78rem;font-weight:700;cursor:pointer;">Edit</button>'+
+    '</div>';
+  });
+  if(!res.hits.length) html+='<div style="text-align:center;color:#bbb;padding:20px;font-size:0.82rem;">No products match "'+metalEsc(metalProdFilter)+'".</div>';
+  host.innerHTML=html;
+  host.querySelectorAll('[data-mpedit]').forEach(function(b){
+    b.onclick=function(){openMetalProductEdit(b.getAttribute('data-mpedit'));};
+  });
+}
+function openMetalProductEdit(id){
+  var cat=getMetalCatalog();
+  var existing=id?cat.find(function(p){return p.id===id;}):null;
+  document.getElementById('mpTitle').textContent=existing?'Edit Product':'Add New Product';
+  document.getElementById('mpBrandList').innerHTML=cat.map(function(p){return p.brand;}).filter(function(b,i,a){return a.indexOf(b)===i;}).map(function(b){return '<option value="'+metalEsc(b)+'">';}).join('');
+  document.getElementById('mpBrand').value=existing?existing.brand:'';
+  document.getElementById('mpCode').value=existing?existing.code:'';
+  document.getElementById('mpDesc').value=existing?existing.desc:'';
+  document.getElementById('mpProgram').value=existing?existing.program:'';
+  document.getElementById('mpTarget').value=existing?existing.targetWeight:'';
+  document.getElementById('mpMin').value=existing?existing.minWeight:'';
+  document.getElementById('mpMax').value=existing?existing.maxWeight:'';
+  document.getElementById('mpPin').value='';
+  document.getElementById('mpMsg').textContent='';
+  document.getElementById('mpDeleteBtn').style.display=existing?'block':'none';
+
+  function pinUser(){return metalQaPinHolder(document.getElementById('mpPin').value);}
+  var msg=document.getElementById('mpMsg');
+  document.getElementById('mpSaveBtn').onclick=function(){
+    var brand=document.getElementById('mpBrand').value.trim();
+    var code=document.getElementById('mpCode').value.trim();
+    var desc=document.getElementById('mpDesc').value.trim();
+    var program=document.getElementById('mpProgram').value.trim();
+    var target=parseFloat(document.getElementById('mpTarget').value);
+    var minRaw=document.getElementById('mpMin').value.trim(),maxRaw=document.getElementById('mpMax').value.trim();
+    var min=minRaw===''?'':parseFloat(minRaw),max=maxRaw===''?'':parseFloat(maxRaw);
+    if(!brand||!code||!desc||!program){msg.textContent='Brand, product code, product name and program code are all required.';return;}
+    if(!(target>0)){msg.textContent='Enter the target weight in grams.';return;}
+    if((min!==''&&isNaN(min))||(max!==''&&isNaN(max))){msg.textContent='Min / max weight must be numbers (or left blank).';return;}
+    if((min!==''&&min>target)||(max!==''&&max<target)){msg.textContent='Min must not be above the target, and max must not be below it.';return;}
+    var key=metalKey(brand,code);
+    var clash=cat.find(function(p){return metalKey(p.brand,p.code)===key&&(!existing||p.id!==existing.id);});
+    if(clash){msg.textContent='That brand and product code is already in the list.';return;}
+    var who=pinUser();
+    if(!who){msg.textContent='A QA or Manager PIN is required to save.';return;}
+    var maxOrder=cat.reduce(function(m,p){return Math.max(m,p.order||0);},0);
+    var p={id:existing?existing.id:key,brand:brand,code:code,desc:desc,program:program,
+      targetWeight:target,minWeight:min,maxWeight:max,order:existing?(existing.order||maxOrder+10):maxOrder+10,
+      updatedBy:who,updatedAt:new Date().toLocaleString('en-AU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})};
+    persistMetalProduct(p).then(function(){
+      hideOverlay('metalProductOverlay');
+      showToast('✅ '+(existing?'Updated ':'Added ')+desc);
+    }).catch(function(e){
+      console.error('Firestore metal product save failed:',e);
+      msg.textContent=(e&&e.code==='permission-denied')?'Can\'t save yet — the metalProducts collection isn\'t allowed in the Firestore rules.':'Save failed — check the connection.';
+    });
+  };
+  document.getElementById('mpDeleteBtn').onclick=function(){
+    var who=pinUser();
+    if(!who){msg.textContent='A QA or Manager PIN is required to remove a product.';return;}
+    if(!confirm('Remove '+existing.desc+' from the metal detector list? It will disappear from both machines\' checklists (any run already recorded against it is kept).')) return;
+    removeMetalProduct(existing.id).then(function(){
+      hideOverlay('metalProductOverlay');
+      showToast('🗑️ Removed '+existing.desc);
+    }).catch(function(e){
+      console.error('Firestore metal product delete failed:',e);
+      msg.textContent='Remove failed — check the connection.';
+    });
+  };
+  showOverlay('metalProductOverlay');
+}
+
 // Both machines must be signed off before FORM067's Metal Detection row shows complete.
 function updateMetalForm067Status(){
   var m1=metalForms[1],m2=metalForms[2];
@@ -5673,6 +5967,7 @@ function initRecipeSync(){
   });
 }
 initRecipeSync();
+initMetalCatalogSync();
 
 // ── Mix Instructions Library ───────────────────────────────────────────
 // mixLibrary: [{mixCode, mixName, shelfLife, shelfLifeDays, scoopSize, tubYield,
@@ -6509,7 +6804,7 @@ function updateHeader(){
 function doLogout(){
   currentUser=null;
   document.getElementById('hdrRight').innerHTML='<div style="font-size:0.78rem;color:#aaa;">☀️ Shift starts 6:00 AM</div>';
-  ['mgrPanel','supervisorPanel','effPanel','labelPanel','form093Panel','damagesPanel','qaPanel','form067Panel','formMgmtPanel','toolUsagePanel','toolboxRegPanel','startupSafetyPanel','eggCountPanel','looseItemsPanel','sharepointPanel','recipeLibPanel','traceAnalyticsPanel','mixLibPanel','prepRoomPanel','prepWorkPanel','metalRoomPanel','metalWorkPanel','staffMgmtPanel'].forEach(function(id){hidePanel(id);});
+  ['mgrPanel','supervisorPanel','effPanel','labelPanel','form093Panel','damagesPanel','qaPanel','form067Panel','formMgmtPanel','toolUsagePanel','toolboxRegPanel','startupSafetyPanel','eggCountPanel','looseItemsPanel','sharepointPanel','recipeLibPanel','traceAnalyticsPanel','mixLibPanel','prepRoomPanel','prepWorkPanel','metalRoomPanel','metalWorkPanel','metalProductsPanel','staffMgmtPanel'].forEach(function(id){hidePanel(id);});
   document.getElementById('staffDropdown').value='';
   document.getElementById('pinInput').value='';
   document.getElementById('loginMsg').textContent='';
@@ -7850,6 +8145,19 @@ function renderQaDash(){
     if(form.action)card.onclick=form.action;
     body.appendChild(card);
   });
+  var setupHdr=document.createElement('div');
+  setupHdr.style.cssText='font-size:0.75rem;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:1px;margin:16px 2px 8px;';
+  setupHdr.textContent='Product & Equipment Setup';
+  body.appendChild(setupHdr);
+  var mpCard=document.createElement('div');
+  mpCard.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:10px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #0074d9;cursor:pointer;display:flex;align-items:center;gap:12px;';
+  mpCard.innerHTML=
+    '<div style="font-size:1.5rem;">🧲</div>'+
+    '<div style="flex:1;"><div style="font-weight:800;font-size:0.92rem;">Metal Detector — Product Management</div>'+
+    '<div style="font-size:0.76rem;color:#888;margin-top:2px;">Set program codes, product codes and target weights for new products · PIN required</div></div>'+
+    '<div style="font-size:0.78rem;font-weight:700;color:#0074d9;">🔒 Open →</div>';
+  mpCard.onclick=function(){openMetalProductsGate('qa');};
+  body.appendChild(mpCard);
   var note=document.createElement('div');note.style.cssText='font-size:0.7rem;color:#aaa;text-align:right;margin-bottom:20px;margin-top:8px;';note.textContent='Auto-refreshes every 10s · '+new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',second:'2-digit'});body.appendChild(note);
 }
 function renderQaForm093List(container){
@@ -10896,7 +11204,7 @@ function lsLoad(){
     if(snap.startupSafetyForm) startupSafetyForm=snap.startupSafetyForm;
     if(snap.eggCountForm) eggCountForm=snap.eggCountForm;
     if(snap.looseItemsData) looseItemsData=snap.looseItemsData;
-    if(snap.metalForms) metalForms=snap.metalForms;
+    if(snap.metalForms){metalForms=snap.metalForms;syncMetalRunsWithCatalog();}
     if(snap.allergenVerifications) allergenVerifications=snap.allergenVerifications;
     if(snap.skipReasons) skipReasons=snap.skipReasons;
     formChangesLog   = snap.formChangesLog   || [];
@@ -11684,7 +11992,10 @@ document.getElementById('staffEditCancelBtn').onclick=function(){hideOverlay('st
 document.getElementById('prepRoomCloseBtn').onclick=function(){hidePanel('prepRoomPanel');};
 document.getElementById('prepWorkCloseBtn').onclick=function(){hidePanel('prepWorkPanel');showPanel('prepRoomPanel');renderPrepRoom();};
 document.getElementById('metalRoomCloseBtn').onclick=function(){hidePanel('metalRoomPanel');};
-document.getElementById('metalWorkCloseBtn').onclick=function(){hidePanel('metalWorkPanel');showPanel('metalRoomPanel');renderMetalRoom();};
+document.getElementById('metalWorkCloseBtn').onclick=function(){currentMetalMachine=null;hidePanel('metalWorkPanel');showPanel('metalRoomPanel');renderMetalRoom();};
+document.getElementById('metalProductsCloseBtn').onclick=closeMetalProducts;
+document.getElementById('mpCancelBtn').onclick=function(){hideOverlay('metalProductOverlay');};
+document.getElementById('mgCancelBtn').onclick=function(){hideOverlay('metalGateOverlay');};
 document.getElementById('pmOverlayCancelBtn').onclick=function(){hideOverlay('prepMixOverlay');};
 document.getElementById('sub-approveBtn').onclick=submitSubstitution;
 document.getElementById('sub-cancelBtn').onclick=function(){hideOverlay('substituteOverlay');};
