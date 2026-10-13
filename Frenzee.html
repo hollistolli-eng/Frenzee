@@ -7375,7 +7375,7 @@ function buildIngCard(ing,recipe,ph){
   var vi=isOv?'⚠️':isV?'✅':isF?'❌':'○';
   var shelfTag=isMix?'<span style="font-size:0.68rem;color:#e67e22;font-weight:600;">⏱ '+minDays+'-day shelf life</span>':'<span style="font-size:0.68rem;color:#0074d9;font-weight:600;">📅 Min. '+minDays+' days required</span>';
   var shelfHTML='';
-  if(st.useBy){var d=daysUntil(st.useBy);if(st.overridden)shelfHTML='<div class="scan-result warning" style="display:block;">⚠️ Override — '+st.overrideInfo.reason+'</div>';else if(d>=minDays)shelfHTML='<div class="scan-result success" style="display:block;">✅ '+d+' days remaining</div>';else shelfHTML='<div class="scan-result fail" style="display:block;">❌ Only '+d+' day'+(d===1?'':'s')+' — min '+minDays+' required</div>';}
+  if(st.useBy){var d=daysUntil(st.useBy);if(st.overridden)shelfHTML='<div class="scan-result warning" style="display:block;">⚠️ Override — '+st.overrideInfo.reason+'</div>';else if(d>=minDays)shelfHTML='<div class="scan-result success" style="display:block;">✅ '+d+' days remaining</div>';else if(d<0)shelfHTML='<div class="scan-result fail" style="display:block;">❌ Expired '+(-d)+' day'+(d===-1?'':'s')+' ago — min '+minDays+' required</div>';else shelfHTML='<div class="scan-result fail" style="display:block;">❌ Only '+d+' day'+(d===1?'':'s')+' — min '+minDays+' required</div>';}
   var batchHTML=isMix||isBread(ing.name)?'':'<div class="field-row"><div class="field-label">Batch / Lot Code</div><input class="field-input" type="text" value="'+st.batchCode+'" placeholder="Enter batch code" data-ingid="'+ing.id+'" data-field="batchCode"/></div>';
   var barcodeHTML=isMix?
     '<div class="field-row"><div class="field-label">Scan Mix Tub Barcode</div>'+
@@ -7412,6 +7412,12 @@ function buildIngCard(ing,recipe,ph){
 function reRenderIng(ing,recipe){var old=document.getElementById('ing-card-'+ing.id);if(!old)return;var ph=document.createElement('div');old.parentNode.insertBefore(ph,old);old.remove();buildIngCard(ing,recipe,ph);}
 function updateField(id,field,val,type,minDays){
   var _uk=ingKey(id); if(!ingredientState[_uk]) ingredientState[_uk]={}; ingredientState[_uk][field]=val;
+  // While a date is being typed the box passes through years like 0002 / 0020 / 0202. Don't judge or
+  // redraw the card until it's a real year, or the box is rebuilt mid-typing and the rest is lost.
+  if(field==='useBy'){
+    var _yr=parseInt(String(val||'').slice(0,4),10);
+    if(!val||isNaN(_yr)||_yr<2000){ingredientState[_uk].shelfLifeOk=null;return;}
+  }
   if(field==='useBy'&&type&&minDays){ingredientState[_uk].shelfLifeOk=daysUntil(val)>=parseInt(minDays);var job=scheduleData[currentLine][currentJobIdx];var recipe=getJobRecipe(job);var ing=recipe&&recipe.ingredients.find(function(i){return i.id===id;});if(ing){reRenderIng(ing,recipe);updateCompleteBtn(recipe);updateTraceStatus(recipe);}}
   if(field==='tubNumber'||field==='batchCode'){var job=scheduleData[currentLine][currentJobIdx];var recipe=getJobRecipe(job);var ing=recipe&&recipe.ingredients.find(function(i){return i.id===id;});if(ing) reRenderIng(ing,recipe);}
 }
