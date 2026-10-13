@@ -7412,7 +7412,7 @@ function buildIngCard(ing,recipe,ph){
 function reRenderIng(ing,recipe){var old=document.getElementById('ing-card-'+ing.id);if(!old)return;var ph=document.createElement('div');old.parentNode.insertBefore(ph,old);old.remove();buildIngCard(ing,recipe,ph);}
 function updateField(id,field,val,type,minDays){
   var _uk=ingKey(id); if(!ingredientState[_uk]) ingredientState[_uk]={}; ingredientState[_uk][field]=val;
-  if(field==='useBy'&&type&&minDays){ingredientState[id].shelfLifeOk=daysUntil(val)>=parseInt(minDays);var job=scheduleData[currentLine][currentJobIdx];var recipe=getJobRecipe(job);var ing=recipe&&recipe.ingredients.find(function(i){return i.id===id;});if(ing){reRenderIng(ing,recipe);updateCompleteBtn(recipe);updateTraceStatus(recipe);}}
+  if(field==='useBy'&&type&&minDays){ingredientState[_uk].shelfLifeOk=daysUntil(val)>=parseInt(minDays);var job=scheduleData[currentLine][currentJobIdx];var recipe=getJobRecipe(job);var ing=recipe&&recipe.ingredients.find(function(i){return i.id===id;});if(ing){reRenderIng(ing,recipe);updateCompleteBtn(recipe);updateTraceStatus(recipe);}}
   if(field==='tubNumber'||field==='batchCode'){var job=scheduleData[currentLine][currentJobIdx];var recipe=getJobRecipe(job);var ing=recipe&&recipe.ingredients.find(function(i){return i.id===id;});if(ing) reRenderIng(ing,recipe);}
 }
 // A scan button must never invent a result — with nothing scanned or typed it does nothing but ask for one.
@@ -7455,12 +7455,15 @@ function scanBarcode(ingId,correct){
 
   var _sk=ingKey(ingId); if(!ingredientState[_sk]) ingredientState[_sk]={}; ingredientState[_sk].scanned=true;
   ingredientState[_sk].verified=ok;
+  // Each mix has its own shelf life (1–4 days) — judge the scanned tub against that mix's, not a fixed 2 days.
+  var _sj=scheduleData[currentLine][currentJobIdx];var _sr=getJobRecipe(_sj);
+  var _si=_sr&&_sr.ingredients.find(function(i){return i.id===ingId;});
   if(ok){
     if(tubNumber) ingredientState[_sk].tubNumber=tubNumber;
     if(batchCode) ingredientState[_sk].batchCode=batchCode;
     if(parsedUbd&&!ingredientState[_sk].useBy){
       ingredientState[_sk].useBy=parsedUbd;
-      var minDaysVal=getMinDays({type:'mix',mixType:'chicken'});
+      var minDaysVal=getMinDays(_si||{type:'mix',mixType:'chicken'});
       ingredientState[_sk].shelfLifeOk=daysUntil(parsedUbd)>=minDaysVal;
     }
   }
