@@ -7403,11 +7403,18 @@ function updateField(id,field,val,type,minDays){
   if(field==='useBy'&&type&&minDays){ingredientState[id].shelfLifeOk=daysUntil(val)>=parseInt(minDays);var job=scheduleData[currentLine][currentJobIdx];var recipe=getJobRecipe(job);var ing=recipe&&recipe.ingredients.find(function(i){return i.id===id;});if(ing){reRenderIng(ing,recipe);updateCompleteBtn(recipe);updateTraceStatus(recipe);}}
   if(field==='tubNumber'||field==='batchCode'){var job=scheduleData[currentLine][currentJobIdx];var recipe=getJobRecipe(job);var ing=recipe&&recipe.ingredients.find(function(i){return i.id===id;});if(ing) reRenderIng(ing,recipe);}
 }
+// A scan button must never invent a result — with nothing scanned or typed it does nothing but ask for one.
+function needBarcode(input){
+  if(input&&input.value.trim()) return false;
+  showToast('📷 Scan or type the barcode first');
+  if(input) input.focus();
+  return true;
+}
 function scanBarcode(ingId,correct){
   var card=document.getElementById('ing-card-'+ingId);
   var input=card&&card.querySelector('[data-scanid="'+ingId+'"]');
-  var scanned=(input&&input.value.trim())||(Math.random()>0.25?correct+'-20250712-T11':'MIX-WRONG-999');
-  if(input)input.value=scanned;
+  if(needBarcode(input)) return;
+  var scanned=input.value.trim();
 
   // Parse barcode format: CODE-YYYYMMDD-T{tubNum}of{total}
   // e.g. MIX-CHKAV-001-20250712-T11 or MIX-CHKAV-20250712-T11of12
@@ -7524,8 +7531,9 @@ function submitLineClearance(){
 // ── Label & Lid Scans ──────────────────────────────────────────────────
 function scanFirstLabel(){
   var job=scheduleData[currentLine][currentJobIdx];var input=document.getElementById('firstLabelInput');
-  var expected=getLabelBarcode(job.name);var scanned=input.value.trim()||(Math.random()>0.2?expected:'LBL-WRONG-999');
-  input.value=scanned;var ok=scanned===expected;
+  if(needBarcode(input)) return;
+  var expected=getLabelBarcode(job.name);var scanned=input.value.trim();
+  var ok=scanned===expected;
   job.firstLabelScanned=ok;job.firstLabelCode=scanned;
   var r=document.getElementById('firstLabelResult');r.style.display='block';r.className='scan-result '+(ok?'success':'fail');
   r.textContent=ok?'✅ Correct label'+(requiresLidCheck(job.name)?' — now take a photo of the lid':'— ready to start run!'):'❌ Wrong label!';
@@ -7535,8 +7543,9 @@ function scanFirstLabel(){
 }
 function scanLastLabel(){
   var job=scheduleData[currentLine][currentJobIdx];var input=document.getElementById('lastLabelInput');
-  var expected=getLabelBarcode(job.name);var scanned=input.value.trim()||(Math.random()>0.2?expected:'LBL-WRONG-999');
-  input.value=scanned;var ok=scanned===expected;
+  if(needBarcode(input)) return;
+  var expected=getLabelBarcode(job.name);var scanned=input.value.trim();
+  var ok=scanned===expected;
   job.lastLabelScanned=ok;job.lastLabelCode=scanned;
   var r=document.getElementById('lastLabelResult');r.style.display='block';r.className='scan-result '+(ok?'success':'fail');
   r.textContent=ok?'✅ Last label confirmed'+(requiresLidCheck(job.name)?' — now take photo of last lid':''):'❌ Wrong label!';
