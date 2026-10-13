@@ -6027,8 +6027,11 @@ function pushLineProgress(){
   _linePushTimer=setTimeout(function(){
     if(!window.fbDb) return;
     LINES.forEach(function(line){
-      var jobs=(scheduleData[line]||[]).map(function(j){
-        return {name:j.name||'',sku:j.sku||'',qty:j.qty||0,time:j.time||null,finishTime:j.finishTime||null,status:j.status||'pending',skipped:!!j.skipped,actStart:j.actStart||null,actFinish:j.actFinish||null};
+      // A device with no schedule of its own must not overwrite the live copy
+      // another device is keeping up to date.
+      if(!(scheduleData[line]||[]).length) return;
+      var jobs=scheduleData[line].map(function(j){
+        return {name:j.name||'',sku:j.sku||'',qty:j.qty||0,time:j.time||null,finishTime:j.finishTime||null,status:j.status||'pending',skipped:!!j.skipped,skipReason:j.skipReason||'',skipNotes:j.skipNotes||'',halted:!!j.halted,actStart:j.actStart||null,actFinish:j.actFinish||null};
       });
       fbDb.collection('lineProgress').doc(line).set({line:line,jobs:jobs,leader:lineTeamLeaders[line]||null,updatedAt:nowTime()})
         .catch(function(e){console.error('Firestore lineProgress push failed:',e);});
@@ -6042,13 +6045,88 @@ function initLineProgressSync(){
   fbReady.then(function(){
     fbDb.collection('lineProgress').onSnapshot(function(snap){
       var next={};
-      snap.docs.forEach(function(d){var v=d.data();next[v.line]={jobs:v.jobs||[],leader:v.leader||null};});
+      snap.docs.forEach(function(d){var v=d.data();next[v.line]={jobs:v.jobs||[],leader:v.leader||null,updatedAt:v.updatedAt||''};});
       remoteLineProgress=next;
       refreshLiveLinePanels();
     }, function(err){console.error('Firestore lineProgress listener failed:',err);});
   });
 }
 initLineProgressSync();
+
+// ── Live line view for the main Dashboard ──────────────────────────────
+// Reads this device's schedule if it has one for the line, otherwise the live
+// mirror from whichever device is running it, so the Dashboard works from any screen.
+function getLineJobsLive(line){
+  var local=scheduleData[line]||[];
+  var remote=remoteLineProgress[line];
+  return (local.length?local:(remote?remote.jobs:[])).filter(function(j){return j.status!=='transferred'&&j.status!=='removed';});
+}
+function getLineLeaderLive(line){
+  var remote=remoteLineProgress[line];
+  return lineTeamLeaders[line]||(remote&&remote.leader)||null;
+}
+function hasLiveSchedule(){
+  return LINES.some(function(l){return getLineJobsLive(l).length>0;});
+}
+function fmtClock(m){
+  if(m===null||m===undefined||isNaN(m)) return '—';
+  m=((Math.round(m)%1440)+1440)%1440;
+  var h=Math.floor(m/60),mm=m%60,ap=h>=12?'pm':'am';
+  h=h%12||12;
+  return h+':'+(mm<10?'0':'')+mm+' '+ap;
+}
+function fmtMins(m){
+  if(m===null||m===undefined||isNaN(m)) return '—';
+  m=Math.round(m);
+  return m<60?m+'m':Math.floor(m/60)+'h '+(m%60)+'m';
+}
+function getLineKpis(line){
+  var jobs=getLineJobsLive(line);
+  var stats=getLineLiveStats(line);
+  var nowM=timeToMins(nowTime());
+  var totalQty=0,finishes=[];
+  jobs.forEach(function(j){
+    if(!j.halted) totalQty+=(j.qty||0);
+    var fm=timeToMins(j.finishTime); if(fm!==null) finishes.push(fm);
+  });
+  var cur=jobs.find(function(j){return j.status==='in-progress';})||null;
+  var next=jobs.find(function(j){return j.status==='pending'&&!j.skipped&&!j.halted;})||null;
+  var runMins=null,runSched=null;
+  if(cur){
+    var as=timeToMins(cur.actStart);
+    if(as!==null&&nowM!==null) runMins=Math.max(0,nowM-as);
+    var s=timeToMins(cur.time),f=timeToMins(cur.finishTime);
+    if(s!==null&&f!==null) runSched=f-s;
+  }
+  var allDone=jobs.length>0&&jobs.every(function(j){return j.status==='complete'||j.halted;});
+  var schedFinish=finishes.length?Math.max.apply(null,finishes):null;
+  var projFinish=null;
+  if(allDone){
+    var af=jobs.map(function(j){return timeToMins(j.actFinish);}).filter(function(v){return v!==null;});
+    projFinish=af.length?Math.max.apply(null,af):null;
+  } else if(schedFinish!==null&&totalQty>0){
+    // Scheduled finish, moved earlier/later by how far ahead/behind the line is, converted to
+    // minutes at the schedule's own pace (so breaks and cleans in the schedule are accounted for).
+    var firstStart=null;
+    jobs.forEach(function(j){var sm=timeToMins(j.time);if(sm!==null&&(firstStart===null||sm<firstStart)) firstStart=sm;});
+    var span=firstStart!==null?schedFinish-firstStart:0;
+    if(span>0) projFinish=schedFinish-stats.paceDelta/(totalQty/span);
+  }
+  return {stats:stats,totalQty:totalQty,cur:cur,next:next,runMins:runMins,runSched:runSched,schedFinish:schedFinish,projFinish:projFinish,allDone:allDone,jobs:jobs};
+}
+function getLineWorkers(line){
+  var nowM=timeToMins(nowTime()),rows=[];
+  function span(inT,outT){
+    var a=timeToMins(inT),b=outT?timeToMins(outT):nowM;
+    return (a===null||b===null||b<a)?0:b-a;
+  }
+  var leader=getLineLeaderLive(line);
+  if(leader) rows.push({name:leader.name,role:leader.role==='supervisor'?'Covering (Supervisor)':'Team Leader',timeIn:leader.time,timeOut:null,mins:span(leader.time,null)});
+  (lineStaffing[line]||[]).forEach(function(e){
+    rows.push({name:e.name,role:'Line Staff',timeIn:e.timeIn,timeOut:e.timeOut||null,mins:span(e.timeIn,e.timeOut)});
+  });
+  return rows;
+}
 
 // ── Live UPLH + schedule pace — shared by Manager & Supervisor dashboards ──
 // Prefers this device's own live schedule (if it's actually running jobs for
@@ -6059,12 +6137,18 @@ function getLineLiveStats(line){
   var jobs=(localJobs.length?localJobs:(remote?remote.jobs:[])).filter(function(j){return j.status!=='transferred'&&j.status!=='removed';});
   var leader=lineTeamLeaders[line]||(remote&&remote.leader)||null;
   var nowM=timeToMins(nowTime());
-  var completedQty=0, expectedQty=0;
+  var completedQty=0, expectedQty=0, runningEst=0;
   jobs.forEach(function(j){
     var q=j.qty||0;
     if(j.status==='complete') completedQty+=q;
-    if(j.skipped&&j.status==='pending') return;
     var startM=timeToMins(j.time), endM=timeToMins(j.finishTime);
+    // A job in progress counts proportionally (time run vs its scheduled length) so a line that
+    // has just started a big job isn't shown as behind just because nothing has finished yet.
+    if(j.status==='in-progress'&&nowM!==null&&startM!==null&&endM!==null&&endM>startM){
+      var as=timeToMins(j.actStart);
+      if(as!==null) runningEst+=q*Math.max(0,Math.min(1,(nowM-as)/(endM-startM)));
+    }
+    if(j.skipped&&j.status==='pending') return;
     if(startM===null||endM===null||endM<=startM||nowM===null) return;
     if(nowM<=startM) return;
     expectedQty+=(nowM>=endM)?q:q*(nowM-startM)/(endM-startM);
@@ -6081,11 +6165,12 @@ function getLineLiveStats(line){
   var laborHours=laborMins/60;
   return {
     completedQty:completedQty,
+    runningEst:Math.round(runningEst),
     expectedQty:Math.round(expectedQty),
     headcount:headcount,
     laborHours:laborHours,
     uplh:laborHours>0?(completedQty/laborHours):null,
-    paceDelta:Math.round(completedQty-expectedQty)
+    paceDelta:Math.round(completedQty+runningEst-expectedQty)
   };
 }
 
@@ -7793,10 +7878,10 @@ function openManager(){showPanel('mgrPanel');renderMgr();mgrRefreshInterval=setI
 function closeManager(){hidePanel('mgrPanel');clearInterval(mgrRefreshInterval);mgrDrillLine=null;}
 function closeDrilldown(){mgrDrillLine=null;document.getElementById('mgrDrilldown').style.display='none';document.getElementById('mgrLines').style.display='block';document.getElementById('mgrSummary').style.display='grid';}
 function renderMgr(){
-  var noSchedule=!Object.keys(scheduleData).length;
+  var noSchedule=!hasLiveSchedule();
   var total=0,done=0,inProg=0;
   if(!noSchedule){
-    LINES.forEach(function(l){var j=(scheduleData[l]||[]).filter(function(x){return x.status!=='transferred'&&x.status!=='removed';});total+=j.length;done+=j.filter(function(x){return x.status==='complete';}).length;inProg+=j.filter(function(x){return x.status==='in-progress';}).length;});
+    LINES.forEach(function(l){var j=getLineJobsLive(l);total+=j.length;done+=j.filter(function(x){return x.status==='complete';}).length;inProg+=j.filter(function(x){return x.status==='in-progress';}).length;});
   }
   var pct=total?Math.round((done/total)*100):0;
   var openIssCount=issueLog.filter(function(i){return !i.resolved;}).length;
@@ -7815,19 +7900,37 @@ function renderMgr(){
     linesEl.appendChild(noSchedDiv);
   } else {
     LINES.forEach(function(line){
-      var jobs=(scheduleData[line]||[]).filter(function(j){return j.status!=='transferred'&&j.status!=='removed';});
+      var kp=getLineKpis(line);
+      var jobs=kp.jobs;
       var dn=jobs.filter(function(j){return j.status==='complete';}).length;
-      var run=jobs.find(function(j){return j.status==='in-progress';});
+      var run=kp.cur;
       var pl=jobs.length?Math.round((dn/jobs.length)*100):0;
       var isStat=line==='STAT';
       var errs=jobs.filter(function(j){return j.halted;}).length;
       var openIss=issueLog.filter(function(i){return i.line===line&&!i.resolved;}).length;
       var bc=errs?'#e74c3c':openIss?'#e67e22':run?'#0074d9':pl===100?'#2ecc40':'#f39c12';
       var st=errs?('🛑 '+errs+' DO NOT MAKE'):openIss?('⚠️ '+openIss+' issue'+(openIss>1?'s':'')):run?('🔵 '+(run.name.length>24?run.name.substring(0,24)+'…':run.name)):pl===100?'✅ All Complete':'⏳ Waiting';
-      var lineLeader=lineTeamLeaders[line];
-      var liveStats=getLineLiveStats(line);
+      var lineLeader=getLineLeaderLive(line);
+      var liveStats=kp.stats;
       var paceTxt=liveStats.paceDelta>0?('+'+liveStats.paceDelta+' ahead'):liveStats.paceDelta<0?(liveStats.paceDelta+' behind'):'on pace';
       var paceColor=liveStats.paceDelta>0?'#27ae60':liveStats.paceDelta<0?'#e74c3c':'#888';
+      var skippedJobs=jobs.filter(function(j){return j.skipped&&j.status==='pending';});
+      var finVar=(kp.projFinish!==null&&kp.schedFinish!==null)?Math.round(kp.projFinish-kp.schedFinish):null;
+      var finColor=finVar===null?'#888':finVar>10?'#e74c3c':finVar>0?'#e67e22':'#27ae60';
+      var nowNext=(run?'▶ Now: <strong style="color:#222;">'+metalEsc(run.name)+'</strong>'+(kp.runMins!==null?' · running '+fmtMins(kp.runMins)+(kp.runSched?' of '+fmtMins(kp.runSched)+' scheduled':''):''):'')+
+        (kp.next?(run?' &nbsp;·&nbsp; ':'')+'Next: <strong style="color:#222;">'+metalEsc(kp.next.name)+'</strong>'+(kp.next.time?' ('+metalEsc(kp.next.time)+')':''):'');
+      function kpiTile(label,value,sub,color){
+        return '<div style="background:#f7f8fa;border-radius:10px;padding:8px 10px;">'+
+          '<div style="font-size:0.6rem;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.5px;">'+label+'</div>'+
+          '<div style="font-size:1.05rem;font-weight:900;color:'+(color||'#222')+';line-height:1.25;">'+value+'</div>'+
+          '<div style="font-size:0.66rem;color:#999;">'+sub+'</div></div>';
+      }
+      var kpiGrid='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:7px;margin-top:10px;">'+
+        kpiTile('Units made',liveStats.completedQty+'<span style="font-size:0.75rem;color:#aaa;font-weight:600;"> / '+kp.totalQty+'</span>','should be '+liveStats.expectedQty+' by now'+(liveStats.runningEst?' · ~'+liveStats.runningEst+' running':''))+
+        kpiTile('Vs schedule',paceTxt,liveStats.paceDelta<0?'behind the clock':'on or ahead',paceColor)+
+        kpiTile('UPLH',liveStats.uplh!==null?liveStats.uplh.toFixed(1):'—',liveStats.headcount+' on line · '+liveStats.laborHours.toFixed(1)+' labour hrs')+
+        kpiTile(kp.allDone?'Finished':'Projected finish',fmtClock(kp.projFinish),kp.schedFinish!==null?'scheduled '+fmtClock(kp.schedFinish)+(finVar!==null&&finVar!==0?' ('+(finVar>0?'+':'')+finVar+'m)':''):'',finColor)+
+      '</div>';
 
       // Wrapper card
       var card=document.createElement('div');
@@ -7846,7 +7949,7 @@ function renderMgr(){
             '<div style="font-weight:800;font-size:0.95rem;">'+line+'</div>'+
             '<div style="font-size:0.8rem;color:'+bc+';font-weight:600;margin-top:1px;">'+st+'</div>'+
             '<div style="font-size:0.72rem;color:'+(lineLeader?'#27ae60':'#bbb')+';font-weight:600;margin-top:1px;">'+(lineLeader?'👤 '+lineLeader.name+(lineLeader.role==='supervisor'?' (covering)':''):'No team leader registered')+'</div>'+
-            '<div style="font-size:0.72rem;color:#888;font-weight:600;margin-top:1px;">👥 '+liveStats.headcount+' on line · ⚙️ UPLH '+(liveStats.uplh!==null?liveStats.uplh.toFixed(1):'—')+' · <span style="color:'+paceColor+';">'+paceTxt+'</span></div>'+
+            (nowNext?'<div style="font-size:0.72rem;color:#666;margin-top:2px;">'+nowNext+'</div>':'')+
           '</div>'+
           '<div style="text-align:right;display:flex;align-items:center;gap:10px;">'+
             '<div><div style="font-size:1.2rem;font-weight:900;">'+pl+'%</div><div style="font-size:0.68rem;color:#aaa;">'+dn+'/'+jobs.length+'</div></div>'+
@@ -7856,8 +7959,10 @@ function renderMgr(){
         '<div style="height:7px;border-radius:4px;background:#eee;overflow:hidden;">'+
           '<div style="height:100%;width:'+pl+'%;background:'+bc+';border-radius:4px;"></div>'+
         '</div>'+
-        '<div style="display:flex;justify-content:space-between;margin-top:7px;">'+
-          '<div style="display:flex;gap:5px;">'+
+        kpiGrid+
+        '<div style="display:flex;justify-content:space-between;margin-top:9px;">'+
+          '<div style="display:flex;gap:5px;flex-wrap:wrap;">'+
+            (skippedJobs.length?'<span style="font-size:0.68rem;font-weight:700;padding:2px 7px;border-radius:7px;background:#fff8e1;color:#b8860b;">⏭️ '+skippedJobs.length+' skipped</span>':'')+
             (errs?'<span style="font-size:0.68rem;font-weight:700;padding:2px 7px;border-radius:7px;background:#fff0f0;color:#c0392b;">🛑 '+errs+'</span>':'')+
             (openIss?'<span style="font-size:0.68rem;font-weight:700;padding:2px 7px;border-radius:7px;background:#fff8f0;color:#b85c00;">⚠️ '+openIss+'</span>':'')+
           '</div>'+
@@ -7869,18 +7974,75 @@ function renderMgr(){
       var detail=document.createElement('div');
       detail.style.cssText='display:'+(isOpen?'block':'none')+';margin-top:12px;padding-top:12px;border-top:1.5px solid #f0f0f0;';
 
-      // Job list
+      function secHead(t){return '<div style="font-size:0.68rem;font-weight:800;color:#888;text-transform:uppercase;letter-spacing:0.6px;margin:2px 0 6px;">'+t+'</div>';}
+
+      if(!(scheduleData[line]||[]).length&&remoteLineProgress[line]){
+        var liveNote=document.createElement('div');
+        liveNote.style.cssText='font-size:0.7rem;color:#0074d9;background:#e8f4fd;border-radius:8px;padding:6px 10px;margin-bottom:10px;';
+        liveNote.textContent='📡 Live view from the line\'s own device'+(remoteLineProgress[line].updatedAt?' · last update '+remoteLineProgress[line].updatedAt:'');
+        detail.appendChild(liveNote);
+      }
+
+      // Workers on this line
+      var workers=getLineWorkers(line);
+      var wk=document.createElement('div');
+      wk.style.cssText='margin-bottom:12px;';
+      wk.innerHTML=secHead('👥 Workers on this line ('+liveStats.headcount+' now)')+
+        (workers.length?workers.map(function(w){
+          var off=!!w.timeOut;
+          return '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;margin-bottom:4px;background:'+(off?'#f4f4f4':'#f0fdf4')+';'+(off?'opacity:0.65;':'')+'">'+
+            '<div style="flex:1;"><span style="font-weight:700;font-size:0.82rem;">'+metalEsc(w.name)+'</span> <span style="font-size:0.68rem;color:#888;">'+w.role+'</span></div>'+
+            '<div style="font-size:0.72rem;color:#666;text-align:right;">'+metalEsc(w.timeIn||'—')+(off?' → '+metalEsc(w.timeOut):' → now')+' · '+fmtMins(w.mins)+'</div></div>';
+        }).join(''):'<div style="font-size:0.78rem;color:#bbb;padding:2px 0 4px;">No one registered on this line yet.</div>');
+      detail.appendChild(wk);
+
+      // Skipped / do-not-make
+      var haltedJobs=jobs.filter(function(j){return j.halted;});
+      if(skippedJobs.length||haltedJobs.length){
+        var sk=document.createElement('div');
+        sk.style.cssText='margin-bottom:12px;';
+        sk.innerHTML=secHead('⏭️ Skipped & held jobs')+
+          skippedJobs.map(function(j){
+            return '<div style="padding:7px 10px;border-radius:8px;margin-bottom:4px;background:#fff8e1;border-left:4px solid #f39c12;">'+
+              '<div style="font-weight:700;font-size:0.82rem;">'+metalEsc(j.name)+' <span style="font-weight:600;color:#888;">· Qty '+(j.qty||0)+' · sched '+metalEsc(j.time||'—')+'</span></div>'+
+              '<div style="font-size:0.72rem;color:#b8860b;">Skipped: '+metalEsc(j.skipReason||'no reason recorded')+(j.skipNotes?' — '+metalEsc(j.skipNotes):'')+'</div></div>';
+          }).join('')+
+          haltedJobs.map(function(j){
+            return '<div style="padding:7px 10px;border-radius:8px;margin-bottom:4px;background:#fff0f0;border-left:4px solid #e74c3c;">'+
+              '<div style="font-weight:700;font-size:0.82rem;">🛑 '+metalEsc(j.name)+' <span style="font-weight:600;color:#c0392b;">· DO NOT MAKE</span></div></div>';
+          }).join('');
+        detail.appendChild(sk);
+      }
+
+      // Job timeline — scheduled vs actual
+      var tl=document.createElement('div');
+      tl.innerHTML=secHead('🕐 Scheduled vs actual');
       jobs.forEach(function(job){
         var isHalted=job.halted,ev=isEvent(job.name);
-        var icon=isHalted?'🛑':job.status==='complete'?'✅':job.status==='in-progress'?'🔵':ev?'☕':'⏳';
-        var jbc=isHalted?'#e74c3c':job.status==='in-progress'?'#0074d9':job.status==='complete'?'#2ecc40':'#ddd';
+        var icon=isHalted?'🛑':job.status==='complete'?'✅':job.status==='in-progress'?'🔵':(job.skipped?'⏭️':ev?'☕':'⏳');
+        var jbc=isHalted?'#e74c3c':job.status==='in-progress'?'#0074d9':job.status==='complete'?'#2ecc40':job.skipped?'#f39c12':'#ddd';
+        var sM=timeToMins(job.time),fM=timeToMins(job.finishTime),aS=timeToMins(job.actStart),aF=timeToMins(job.actFinish);
+        var startVar=(sM!==null&&aS!==null)?aS-sM:null;
+        var schedDur=(sM!==null&&fM!==null)?fM-sM:null;
+        var actDur=(aS!==null&&aF!==null)?aF-aS:null;
+        var durVar=(schedDur!==null&&actDur!==null)?actDur-schedDur:null;
+        function varBadge(v,late,early){
+          if(v===null||v===0) return '';
+          var bad=v>0;
+          return ' <span style="font-weight:700;color:'+(bad?'#e74c3c':'#27ae60')+';">'+(bad?'+':'')+v+'m '+(bad?late:early)+'</span>';
+        }
+        var timing='Sched '+metalEsc(job.time||'—')+(job.finishTime?' – '+metalEsc(job.finishTime):'')+
+          '<br>Actual '+(job.actStart?metalEsc(job.actStart):'<span style="color:#bbb;">not started</span>')+(job.actFinish?' – '+metalEsc(job.actFinish):(job.status==='in-progress'?' – running':''))+
+          varBadge(startVar,'late start','early start')+
+          (durVar!==null?varBadge(durVar,'over time','under time'):'');
         var jrow=document.createElement('div');
-        jrow.style.cssText='display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:8px;margin-bottom:5px;background:#f9f9f9;border-left:4px solid '+jbc+';';
+        jrow.style.cssText='display:flex;align-items:flex-start;gap:9px;padding:7px 10px;border-radius:8px;margin-bottom:5px;background:#f9f9f9;border-left:4px solid '+jbc+';';
         jrow.innerHTML='<div style="font-size:1rem;">'+icon+'</div>'+
-          '<div style="flex:1;"><div style="font-weight:700;font-size:0.85rem;'+(isHalted?'text-decoration:line-through;color:#aaa;':'')+'">'+job.name+'</div>'+
-          '<div style="font-size:0.72rem;color:#888;">'+(ev?'':('Qty: '+job.qty+' · '))+'Sched: '+job.time+(job.actStart?' · ▶️ '+job.actStart:'')+(job.actFinish?' · ⏹ '+job.actFinish:'')+'</div></div>';
-        detail.appendChild(jrow);
+          '<div style="flex:1;"><div style="font-weight:700;font-size:0.85rem;'+(isHalted?'text-decoration:line-through;color:#aaa;':'')+'">'+metalEsc(job.name)+(ev?'':' <span style="font-weight:600;color:#888;">· Qty '+(job.qty||0)+'</span>')+'</div>'+
+          '<div style="font-size:0.72rem;color:#888;line-height:1.45;">'+timing+'</div></div>';
+        tl.appendChild(jrow);
       });
+      detail.appendChild(tl);
 
       // Wastage shortcut
       var wBtn=document.createElement('button');
@@ -7910,8 +8072,11 @@ function renderMgr(){
           smInline.style.display='none';
         }
       };
-      detail.appendChild(smToggleBtn);
-      detail.appendChild(smInline);
+      // Schedule edits work on this device's own schedule, so only offer them when it has one.
+      if((scheduleData[line]||[]).length){
+        detail.appendChild(smToggleBtn);
+        detail.appendChild(smInline);
+      }
 
       card.appendChild(detail);
 
@@ -10820,7 +10985,7 @@ function confirmNewShift(){
   // Trigger the end-of-shift email/download flow
   openEndOfShiftReport(function(){
     // After report flow, wipe state
-    scheduleData={};scheduleChanges=[];lineTeamLeaders={};prepPositionLeaders={};prepTransferLog=[];prepQtyAdjustLog=[];workOrders=[];_workOrderKnownIds=null;fbClearCollection('workorders');mixCountWeights={};stockCountData={};form067Manual={};
+    scheduleData={};scheduleChanges=[];lineTeamLeaders={};prepPositionLeaders={};prepTransferLog=[];prepQtyAdjustLog=[];workOrders=[];_workOrderKnownIds=null;fbClearCollection('workorders');lineStaffing={};remoteLineProgress={};fbClearCollection('lineStaffing');fbClearCollection('lineProgress');mixCountWeights={};stockCountData={};form067Manual={};
     toolUsageForm={date:"",day:"",startCount:"",startCompletedBy:"",startSignature:"",entries:[],endCount:"",endCompletedBy:"",endSignature:"",allAccountedFor:"",comments:"",prodMgrName:"",prodMgrSig:"",prodMgrDate:"",qaName:"",qaSig:"",qaDate:"",status:"in-progress"};
     toolboxRegisterForm={checked:{},missingReasons:{},comments:'',prodMgrName:'',prodMgrSig:'',prodMgrDate:'',qaName:'',qaSig:'',qaDate:'',status:'in-progress'};
     toolboxChangesLog=[];
