@@ -258,7 +258,7 @@ if(sessionStorage.getItem(PW_KEY)==='1'){
 <div class="overlay" id="scanOverlay"><div class="ov-box"><div class="ov-icon" id="ovIcon"></div><div class="ov-title" id="ovTitle"></div><div class="ov-sub" id="ovSub"></div><button class="ov-btn" id="ovBtn">OK</button></div></div>
 <div class="overlay" id="notifOverlay"><div class="ov-box"><div style="font-size:1.1rem;font-weight:900;margin-bottom:12px;">📨 Messages</div><div id="notifList"></div><button class="ov-btn grey" id="notifCloseBtn">Close</button></div></div>
 <div class="overlay" id="importReportOverlay"><div class="ov-box"><div style="font-size:1.1rem;font-weight:900;margin-bottom:12px;">⚠️ Rows Skipped on Import</div><div id="importReportList" style="max-height:340px;overflow-y:auto;"></div><button class="ov-btn grey" id="importReportCloseBtn">Close</button></div></div>
-<div class="overlay" id="overrideOverlay"><div class="ov-box"><div class="ov-icon">🔒</div><div class="ov-title">Supervisor Override</div><div class="ov-sub">Original use-by date will not be changed.</div><div class="ov-field"><label>Authorised By</label><input type="text" id="ovName"/></div><div class="ov-field"><label>PIN</label><input type="password" id="ovPin"/><div class="ov-err" id="ovErr">❌ Incorrect PIN.</div></div><div class="ov-field"><label>Reason</label><textarea id="ovReason" rows="3"></textarea></div><div class="info-box orange">⚠️ Original use-by date unchanged. For audit purposes only.</div><button class="ov-btn orange" id="ovSubmitBtn">✅ Authorise</button><button class="ov-btn grey" id="ovCancelBtn">Cancel</button></div></div>
+<div class="overlay" id="overrideOverlay"><div class="ov-box"><div class="ov-icon">🔒</div><div class="ov-title">Supervisor Override</div><div class="ov-sub">Original use-by date will not be changed.</div><div class="ov-field"><label>Authorised By</label><select id="ovName"></select></div><div class="ov-field"><label>PIN</label><input type="password" id="ovPin"/><div class="ov-err" id="ovErr">❌ Incorrect PIN.</div></div><div class="ov-field"><label>Reason</label><textarea id="ovReason" rows="3"></textarea></div><div class="info-box orange">⚠️ Original use-by date unchanged. For audit purposes only.</div><button class="ov-btn orange" id="ovSubmitBtn">✅ Authorise</button><button class="ov-btn grey" id="ovCancelBtn">Cancel</button></div></div>
 <div class="overlay" id="transferOverlay"><div class="ov-box"><div class="ov-icon">🔀</div><div class="ov-title">Transfer to Another Line</div><div class="ov-sub" id="txSub"></div><div class="ov-field"><label>Authorised By</label><input type="text" id="txName"/></div><div class="ov-field"><label>PIN</label><input type="password" id="txPin"/><div class="ov-err" id="txErr">❌ Incorrect PIN.</div></div><div class="ov-field"><label>Transfer to Line</label><select id="txLine"></select></div><div class="ov-field"><label>Reason</label><textarea id="txReason" rows="2"></textarea></div><div class="info-box">📋 Logged for auditing.</div><button class="ov-btn purple" id="txSubmitBtn">🔀 Confirm Transfer</button><button class="ov-btn grey" id="txCancelBtn">Cancel</button></div></div>
 <div class="overlay" id="issueOverlay"><div class="ov-box"><div class="ov-icon">⚠️</div><div class="ov-title">Log an Issue</div><div class="ov-sub" id="issueSub"></div><div class="ov-field"><label>Category</label><select id="issueCategory"><option value="">Select…</option><option>🔧 Equipment / Machinery</option><option>🥗 Ingredient / Raw Material</option><option>🏷️ Labelling / Packaging</option><option>🌡️ Temperature / Food Safety</option><option>👷 Staffing</option><option>📦 Supply / Stock</option><option>🧹 Hygiene / Cleaning</option><option>⚡ Other</option></select></div><div class="ov-field"><label>Severity</label><div style="display:flex;gap:8px;"><button class="mtype-btn active" id="sev-low">🟡 Low</button><button class="mtype-btn" id="sev-medium">🟠 Medium</button><button class="mtype-btn" id="sev-high">🔴 High</button></div></div><div class="ov-field"><label>Describe the Issue</label><textarea id="issueDescription" rows="3"></textarea></div><div class="ov-field"><label>Action Taken</label><input type="text" id="issueAction"/></div><button class="ov-btn orange" id="issueSubmitBtn">⚠️ Submit Issue</button><button class="ov-btn grey" id="issueCancelBtn">Cancel</button></div></div>
 <div class="overlay" id="lcSignOffOverlay"><div class="ov-box"><div style="font-size:1.1rem;font-weight:900;text-align:center;margin-bottom:12px;">📋 FORM053.0 Sign-Off</div><div id="lcSignOffContent"></div><button class="ov-btn grey" id="lcSignOffClose">Close</button></div></div>
@@ -1089,6 +1089,18 @@ function isFloorRole(){
   if(!currentUser) return false;
   if(currentUser.id==='16') return false;
   return currentUser.role==='teamleader'||currentUser.role==='prep';
+}
+// People allowed to authorise things (Supervisors, QA, Managers) — for "Authorised By" dropdowns.
+function authoriserOptionsHTML(){
+  var allowed=['supervisor','qa','manager'];
+  return '<option value="">-- Select your name --</option>'+
+    staffRoster.filter(function(s){return allowed.indexOf(s.role)!==-1;})
+      .sort(function(a,b){return a.name.localeCompare(b.name);})
+      .map(function(s){return '<option value="'+s.id+'">'+s.name+' ('+ROLE_LABELS[s.role]+')</option>';}).join('');
+}
+// The PIN has to be the selected person's own — not just any authoriser's.
+function authoriserPinOk(id,pin){
+  return !!id&&!!pin&&STAFF_PINS[id]===pin&&['supervisor','qa','manager'].indexOf(STAFF_ROLES[id])!==-1;
 }
 function isSupervisorPin(pin){
   var ids = Object.keys(STAFF_PINS);
@@ -7464,11 +7476,12 @@ function scanBarcode(ingId,correct){
   showScanPop(ok?'✅':'❌',ok?'Correct Mix!':'Wrong Mix!',popMsg,ok);
   if(ing){reRenderIng(ing,recipe);updateCompleteBtn(recipe);updateTraceStatus(recipe);}
 }
-function openOverride(ingId){currentOverrideIngId=ingId;['ovName','ovPin','ovReason'].forEach(function(id){document.getElementById(id).value='';});document.getElementById('ovErr').style.display='none';showOverlay('overrideOverlay');}
+function openOverride(ingId){currentOverrideIngId=ingId;document.getElementById('ovName').innerHTML=authoriserOptionsHTML();['ovName','ovPin','ovReason'].forEach(function(id){document.getElementById(id).value='';});document.getElementById('ovErr').style.display='none';showOverlay('overrideOverlay');}
 function submitOverride(){
-  var name=document.getElementById('ovName').value.trim();var pin=document.getElementById('ovPin').value;var reason=document.getElementById('ovReason').value.trim();
-  if(!isSupervisorPin(pin)){document.getElementById('ovErr').style.display='block';return;}
-  if(!name||!reason){showToast('Please fill in all fields.');return;}
+  var authId=document.getElementById('ovName').value;var pin=document.getElementById('ovPin').value;var reason=document.getElementById('ovReason').value.trim();
+  if(!authId||!reason){showToast('Please select your name and enter a reason.');return;}
+  if(!authoriserPinOk(authId,pin)){document.getElementById('ovErr').style.display='block';return;}
+  var name=STAFF_NAMES[authId];
   document.getElementById('ovErr').style.display='none';
   var _ok2=ingKey(currentOverrideIngId); if(!ingredientState[_ok2]) ingredientState[_ok2]={}; var st=ingredientState[_ok2]; st.overridden=true;st.shelfLifeOk=true;
   var t=nowTime();
