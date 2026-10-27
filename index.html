@@ -840,6 +840,15 @@ if(sessionStorage.getItem(PW_KEY)==='1'){
   <div class="mgr-body" id="traceSignBody"></div>
 </div>
 
+<!-- FORM064.3 TRACEABILITY BY SKU — SHEET GENERATED FROM THE SCHEDULE -->
+<div class="mgr-panel" id="traceSheetPanel">
+  <div class="mgr-hdr">
+    <div class="mgr-hdr-title"><span style="color:#2ecc40;">FRENZ</span><span style="color:#0074d9;">EE</span> <span style="font-size:0.8rem;color:#888;">FORM064.3 — Today's Sheet</span></div>
+    <button class="mgr-close" id="traceSheetCloseBtn">✕ Close</button>
+  </div>
+  <div class="mgr-body" id="traceSheetBody"></div>
+</div>
+
 <!-- METAL PRODUCT MANAGEMENT — PIN GATE -->
 <div class="overlay" id="metalGateOverlay">
   <div class="ov-box" style="max-width:340px;">
@@ -7661,6 +7670,141 @@ function endRun(){
   showToast('✅ Run complete · '+job.actStart+' – '+now);showSchedule(currentLine);
 }
 
+// ── FORM064.3 sheet, generated from the schedule + recipes ───────────────
+// The paper form is produced automatically after the schedule upload: one block per scheduled SKU.
+// Position = the SKU's row in the schedule counted from the first row of Line A (line number A=1 … STAT=6).
+// Each ingredient shows its per-unit amount and the total needed (per-unit x scheduled quantity).
+var TRACE_SITE='Stapylton';
+// A triple is one scheduled SKU made of component sandwiches, each a half share of the pack.
+// Component lists come from the product's Work Instruction (spec). Add the other triples here as their specs arrive.
+var TRIPLE_COMPONENTS={
+  '971138':[
+    {code:'990622',name:'COMP 971138 EAT HAM CHEESE WHITE SW',share:0.5,ingredients:[
+      {code:'281094',name:'15K MARGARINE SPREAD',per:6,unit:"GM'S"},
+      {code:'920189',name:'1K(5) PRAGER SLICED HAM PRIMO',per:36,unit:"GM'S"},
+      {code:'921022',name:'R/W TOMATOES SLICED (W&S)',per:40,unit:"GM'S"},
+      {code:'946733',name:"1.5K(8) REAL VINTAGE CHEDDAR SLICE 72'S REAL DAIRY",per:21,unit:"GM'S"},
+      {code:'964335',name:'700G VITAMIN/MINERAL SANDWICH',per:2,unit:"SL'S"}]},
+    {code:'990621',name:'COMP 971138 EAT CHICKEN AVOCADO SW',share:0.5,ingredients:[
+      {code:'964113',name:'700G 9 GRAIN ORIGINAL BREAD',per:2,unit:"SL'S"},
+      {code:'600049',name:'2K(3) BLACK SWAN GUACAMOLE',per:20,unit:"GM'S"},
+      {code:'940468',name:'R/W MIX OTR EAT CHK MAYO',per:70,unit:"GM'S"},
+      {code:'920962',name:'R/W COS LETTUCE',per:15,unit:"GM'S"}]},
+    {code:'990623',name:'COMP 971138 EAT EGG MAYO SW',share:0.5,ingredients:[
+      {code:'281094',name:'15K MARGARINE SPREAD',per:3,unit:"GM'S"},
+      {code:'920962',name:'R/W COS LETTUCE',per:15,unit:"GM'S"},
+      {code:'940465',name:'R/W MIX OTR EAT EGG MAYO',per:80,unit:"GM'S"},
+      {code:'964335',name:'700G VITAMIN/MINERAL SANDWICH',per:2,unit:"SL'S"}]}
+  ]
+};
+function traceNum(w){var m=/^\s*(\d+(?:\.\d+)?)/.exec(String(w==null?'':w));return m?parseFloat(m[1]):null;}
+function traceFmt(n){return n==null?'—':String(Math.round(n*100)/100);}
+// One recipe ingredient → a sheet line, or null for packaging (bases, lids, labels are on FORM066.0, not this sheet).
+// Bread is counted in slices (2 per sandwich) and wraps each, as on the paper form; everything else in grams.
+function traceIngLine(ing){
+  var w=String(ing.targetWeight==null?'':ing.targetWeight),nm=String(ing.name||'');
+  if(/^\s*\d+(?:\.\d+)?\s*(?:units?|labels?)\s*$/i.test(w)) return null;
+  var n=traceNum(w);
+  var code=String(ing.isMix&&ing.mixCode?ing.mixCode:(ing.code||'')).split('/')[0].trim();
+  var tortilla=/tortilla|wrap/i.test(nm)&&!/box|label|film/i.test(nm);
+  var sliced=!tortilla&&n!==null&&/bread|toast|loaf|abbott|wonder|sandwich|helga|sourdough/i.test(nm)&&!/spread|mayo/i.test(nm);
+  if(sliced) return {code:code,name:nm,per:2,unit:"SL'S"};
+  if(tortilla) return {code:code,name:nm,per:1,unit:"EA'S"};
+  return {code:code,name:nm,per:n,unit:n===null?'':/sheet/i.test(w)?'SHEETS':"GM'S"};
+}
+function traceRecipeForJob(job){
+  var real=null;
+  if(job.sku) real=recipeLibrary.find(function(r){return String(r.sku)===String(job.sku);});
+  return real||getRecipeBySkuOrName(job.name)||null;
+}
+function buildTraceSheet(){
+  var blocks=[],pos=0;
+  LINES.forEach(function(line,li){
+    var jobs=scheduleData[line]||[],used={},lineNo=li+1;
+    function lbl(p){return 'Line '+lineNo+' - '+p;}
+    function ingRows(list,mult){
+      return list.map(function(il){return {kind:'ing',code:il.code,desc:il.name,per:il.per,total:il.per==null?null:il.per*mult,unit:il.unit};});
+    }
+    jobs.forEach(function(job,ji){
+      pos++;
+      if(used[ji]||isEvent(job.name)||!(job.qty>0)) return;
+      var qty=job.qty,real=traceRecipeForJob(job);
+      var head={kind:'head',code:(real&&real.sku)||job.sku||'',desc:(real&&real.productName)||job.name,per:0,total:qty,unit:''};
+      var b={line:line,lineNo:lineNo,pos:pos,label:lbl(pos),sku:head.code,name:head.desc,qty:qty,rows:[head],notes:[],comp:false};
+      blocks.push(b);
+      if(!real){b.notes.push("No recipe found for this product — its ingredients can't be listed.");return;}
+      var spec=TRIPLE_COMPONENTS[real.sku];
+      if(spec){
+        spec.forEach(function(c){b.rows.push({kind:'link',code:c.code,desc:c.name,per:c.share,total:qty*c.share,unit:"EA'S"});});
+        var allReal=spec.every(function(c,k){return jobs[ji+1+k]&&String(jobs[ji+1+k].sku).trim()===c.code;});
+        spec.forEach(function(c,k){
+          if(allReal) used[ji+1+k]=true;
+          var cb={line:line,lineNo:lineNo,pos:pos+1+k,label:lbl(pos+1+k),sku:c.code,name:c.name,qty:qty*c.share,
+            rows:[{kind:'head',code:c.code,desc:c.name,per:0,total:qty*c.share,unit:''}],notes:[],comp:true,parentSku:real.sku};
+          cb.rows=cb.rows.concat(ingRows(c.ingredients,qty*c.share));
+          blocks.push(cb);
+        });
+        if(!allReal) pos+=spec.length;
+        return;
+      }
+      var lines=[],compLines=[];
+      (real.ingredients||[]).forEach(function(ing){
+        var il=traceIngLine(ing);
+        if(!il) return;
+        if(/^99\d{4}$/.test(il.code)) compLines.push(il); else lines.push(il);
+      });
+      if(compLines.length){
+        compLines.forEach(function(c){b.rows.push({kind:'link',code:c.code,desc:c.name,per:0.5,total:qty*0.5,unit:"EA'S"});});
+        b.notes.push("This triple's components ("+compLines.map(function(c){return c.code;}).join(', ')+") aren't set up yet — their ingredients need the product spec.");
+      }
+      b.rows=b.rows.concat(ingRows(lines,qty));
+      var noW=lines.filter(function(l){return l.per==null;}).length;
+      if(noW) b.notes.push(noW+' ingredient'+(noW===1?' has':'s have')+' no weight in the recipe, so no total can be worked out.');
+      if(!lines.length&&!compLines.length) b.notes.push('This recipe has no ingredients with weights.');
+      if(/triple|4pt/i.test(real.productName)&&!compLines.length) b.notes.push("Components of this product aren't split out yet — amounts are for the whole pack.");
+    });
+  });
+  return blocks;
+}
+function openTraceSheet(){showPanel('traceSheetPanel');renderTraceSheet();}
+function renderTraceSheet(){
+  var body=document.getElementById('traceSheetBody');
+  body.innerHTML='';
+  var blocks=buildTraceSheet();
+  var hdr=document.createElement('div');
+  hdr.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border:1.5px solid #222;';
+  hdr.innerHTML='<div style="font-size:0.7rem;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:0.5px;">Quality Assurance Manual</div>'+
+    '<div style="font-size:0.95rem;font-weight:900;color:#222;">'+TRACE_FORM_NO+' — TRACEABILITY BY SKU</div>'+
+    '<div style="font-size:0.8rem;color:#444;margin-top:4px;"><strong>Site:</strong> '+TRACE_SITE+' &nbsp;·&nbsp; <strong>Production date:</strong> '+new Date().toLocaleDateString('en-AU')+'</div>'+
+    '<div style="font-size:0.74rem;color:#777;margin-top:6px;line-height:1.5;">Worked out from today\'s schedule and each product\'s recipe. Position is the SKU\'s row in the schedule from Line A (Line A = 1 … STAT = 6). Total needed = amount per unit × scheduled quantity.</div>';
+  body.appendChild(hdr);
+  if(!blocks.length){
+    var none=document.createElement('div');
+    none.style.cssText='text-align:center;color:#bbb;padding:30px;font-size:0.85rem;';
+    none.textContent='No schedule loaded yet — upload the schedule and the sheet appears here.';
+    body.appendChild(none);return;
+  }
+  LINES.forEach(function(line){
+    var lb=blocks.filter(function(b){return b.line===line;});
+    if(!lb.length) return;
+    var card=document.createElement('div');
+    card.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #16a085;';
+    var h='<div style="font-weight:800;font-size:0.95rem;margin-bottom:8px;">'+line+'</div><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.7rem;">'+
+      '<thead><tr style="text-align:left;color:#888;"><th style="padding:3px 4px;">Line</th><th>Code</th><th>Description</th><th style="text-align:right;">/ unit</th><th style="text-align:right;">Total</th><th style="padding-left:8px;">Unit</th></tr></thead><tbody>';
+    lb.forEach(function(b){
+      b.rows.forEach(function(r){
+        var st=r.kind==='head'?'background:#e8e8e8;font-weight:800;':r.kind==='link'?'background:#f6f6f6;font-style:italic;':'';
+        h+='<tr style="border-top:1px solid #eee;'+st+'"><td style="padding:3px 4px;white-space:nowrap;">'+metalEsc(b.label)+'</td><td>'+metalEsc(r.code)+'</td><td>'+metalEsc(r.desc)+'</td>'+
+          '<td style="text-align:right;">'+(r.kind==='head'?'0':traceFmt(r.per))+'</td><td style="text-align:right;font-weight:700;">'+traceFmt(r.total)+'</td><td style="padding-left:8px;">'+metalEsc(r.unit)+'</td></tr>';
+      });
+      b.notes.forEach(function(n){h+='<tr><td></td><td colspan="5" style="padding:2px 4px 6px;color:#c0392b;font-size:0.68rem;">⚠️ '+metalEsc(n)+'</td></tr>';});
+    });
+    h+='</tbody></table></div>';
+    card.innerHTML=h;
+    body.appendChild(card);
+  });
+}
+
 // ── FORM064.3 — Traceability by SKU: status, sign-off, report ────────────
 function traceLineStatus(line){
   var recs=traceRecords.filter(function(t){return t.line===line;});
@@ -7692,7 +7836,11 @@ function renderTraceSign(){
   hdr.innerHTML='<div style="font-size:0.7rem;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:0.5px;">Quality Assurance Manual</div>'+
     '<div style="font-size:0.95rem;font-weight:900;color:#222;">'+TRACE_FORM_NO+' — TRACEABILITY BY SKU</div>'+
     '<div style="font-size:0.78rem;color:#666;margin-top:6px;line-height:1.5;">Built from each run\'s recipe as it finishes. Review each line\'s records, then the Supervisor and QA sign the line off — that ticks '+TRACE_FORM_NO+' on FORM067.0 and puts the records in the End of Shift report.</div>';
-  body.appendChild(hdr);
+  var sheetBtn=document.createElement('button');
+  sheetBtn.style.cssText='background:#16a085;color:#fff;border:none;border-radius:10px;padding:11px;font-size:0.88rem;font-weight:700;cursor:pointer;width:100%;margin-bottom:12px;';
+  sheetBtn.textContent='📄 View today\'s sheet (worked out from the schedule)';
+  sheetBtn.onclick=openTraceSheet;
+  body.appendChild(hdr);body.appendChild(sheetBtn);
   var any=false;
   LINES.forEach(function(line){
     var s=traceLineStatus(line);
@@ -12268,6 +12416,7 @@ document.getElementById('metalRoomCloseBtn').onclick=function(){hidePanel('metal
 document.getElementById('metalWorkCloseBtn').onclick=function(){currentMetalMachine=null;hidePanel('metalWorkPanel');showPanel('metalRoomPanel');renderMetalRoom();};
 document.getElementById('metalProductsCloseBtn').onclick=closeMetalProducts;
 document.getElementById('traceSignCloseBtn').onclick=function(){hidePanel('traceSignPanel');};
+document.getElementById('traceSheetCloseBtn').onclick=function(){hidePanel('traceSheetPanel');};
 document.getElementById('mpCancelBtn').onclick=function(){hideOverlay('metalProductOverlay');};
 document.getElementById('mgCancelBtn').onclick=function(){hideOverlay('metalGateOverlay');};
 document.getElementById('pmOverlayCancelBtn').onclick=function(){hideOverlay('prepMixOverlay');};
