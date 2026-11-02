@@ -849,6 +849,15 @@ if(sessionStorage.getItem(PW_KEY)==='1'){
   <div class="mgr-body" id="traceSheetBody"></div>
 </div>
 
+<!-- FORM064.1 INGREDIENT & MIX PRODUCTION SHELF LIFE -->
+<div class="mgr-panel" id="shelfListPanel">
+  <div class="mgr-hdr">
+    <div class="mgr-hdr-title"><span style="color:#2ecc40;">FRENZ</span><span style="color:#0074d9;">EE</span> <span style="font-size:0.8rem;color:#888;">FORM064.1 — Shelf Life</span></div>
+    <button class="mgr-close" id="shelfListCloseBtn">✕ Close</button>
+  </div>
+  <div class="mgr-body" id="shelfListBody"></div>
+</div>
+
 <!-- METAL PRODUCT MANAGEMENT — PIN GATE -->
 <div class="overlay" id="metalGateOverlay">
   <div class="ov-box" style="max-width:340px;">
@@ -7671,6 +7680,352 @@ function endRun(){
   showToast('✅ Run complete · '+job.actStart+' – '+now);showSchedule(currentLine);
 }
 
+// ── FORM064.1 — Ingredient & Mix Production Shelf Life ───────────────────
+// The rule for every raw ingredient and in-house mix: how its "Use By / Last day" is worked out once it is
+// opened, thawed or made (OPEN + 3, THAWED + 2, UBD - 4, BBD - 4, P + 2 / SSL ...). Typed from the QA manual
+// form as issued (see SHELF_FORM). Rows: g = category, c = code(s), s = supplier, d = description, u = customers, r = rule.
+var SHELF_FORM={no:'FORM064.1',ref:'QA-971-F-064.1',title:'Ingredient & Mix Production Shelf Life',version:'089',issued:'21/10/26',by:'National QESH'};
+var SHELF_LIFE_RULES=[
+{"g":"Cheese","c":"260815","s":"DAIRY FARMERS","d":"SHAVED PARMESAN","u":"BP, WW","r":"OPEN + 3"},
+{"g":"Cheese","c":"256742","s":"CHEER / SAPUTO","d":"TASTY CHEESE SLICES","u":"BP, FTG, RISE","r":"OPEN + 10"},
+{"g":"Cheese","c":"600024","s":"FONTERRA","d":"HOLY COW MOZARELLA","u":"RISE","r":"OPEN + 3"},
+{"g":"Cheese","c":"600033","s":"FONTERRA","d":"PERFECT ITALIANO ORIGINAL RICOTTA","u":"RISE","r":"OPEN + 3"},
+{"g":"Cheese","c":"036032","s":"MAINLAND","d":"MOZZARELLA CHEESE SHREDDED","u":"FTG FZN","r":"OPEN + 3"},
+{"g":"Cheese","c":"099167","s":"MAINLAND","d":"TASTY CHEESE SLICES","u":"WW","r":"OPEN + 3"},
+{"g":"Cheese","c":"920004","s":"REAL DAIRY","d":"REAL PROFESSIONALS PARMESAN","u":"FTG, RISE","r":"OPEN + 3"},
+{"g":"Cheese","c":"946725","s":"REAL DAIRY","d":"TASTY CHEESE SHREDDED","u":"ALL","r":"OPEN + 3"},
+{"g":"Cheese","c":"946733","s":"REAL DAIRY","d":"VINTAGE CHEDDAR SLICES","u":"BP, OTR, RISE","r":"OPEN + 3"},
+{"g":"Cheese","c":"964202","s":"REAL DAIRY","d":"REAL CATERERS CHEESE SLICES","u":"BP, FTG","r":"OPEN + 3"},
+{"g":"Cheese","c":"279516","s":"REAL DAIRY","d":"SWISS CHEESE SLICES DIROSSI","u":"WW","r":"OPEN + 3"},
+{"g":"Cheese","c":"600041","s":"REAL DAIRY","d":"SWISS CHEESE SLICES KEBIA","u":"WW","r":"OPEN + 3"},
+{"g":"Cheese","c":"976217","s":"REAL DAIRY","d":"FETA CRUMBLE","u":"BP, RISE","r":"OPEN + 3"},
+{"g":"Butter / Margarine","c":"281094","s":"PEERLESS","d":"MARGARINE 15kg BLOCK","u":"ALL","r":"OPEN + 7"},
+{"g":"Meat - cooked & uncured","c":"269521","s":"HORMEL","d":"BACON CRUMB (SHELF STABLE)","u":"BP","r":"OPEN + 3"},
+{"g":"Meat - cooked & uncured","c":"921435","s":"PRIMO","d":"ROAST BEEF SLICED","u":"FTG, RISE","r":"OPEN + 2"},
+{"g":"Meat - cooked & uncured","c":"600047","s":"PRIMO","d":"PORK CHIPOLATA","u":"OTR, DA FZN, RISE","r":"OPEN + 2 / SLICED + 1"},
+{"g":"Meat - cooked & uncured","c":"600059","s":"TENDER CHOICE","d":"MEXICAN PULLED BEEF","u":"WW","r":"OPEN + 2"},
+{"g":"Meat - cooked & uncured","c":"385557","s":"ZAMMIT","d":"SSF PORK SAUSAGE","u":"DA FZN WRAP","r":"OPEN + 2 / SLICED + 1"},
+{"g":"Meat - cured / fermented","c":"920189","s":"PRIMO","d":"PRAGER HAM SLICED","u":"BP, FTG, RISE","r":"OPEN + 3"},
+{"g":"Meat - cured / fermented","c":"250968","s":"PRIMO","d":"VIRGINIAN HAM THINLY SLICED","u":"BP, OTR, RISE, EG","r":"OPEN + 3"},
+{"g":"Meat - cured / fermented","c":"250153","s":"PRIMO","d":"THINLY SLICED SILVERSIDE","u":"BP, FTG, RISE","r":"OPEN + 2"},
+{"g":"Meat - cured / fermented","c":"964125","s":"PRIMO","d":"FRESH SHORT CUT BACON","u":"BP, FTG","r":"OPEN + 3"},
+{"g":"Meat - cured / fermented","c":"384357","s":"PRIMO","d":"SOW STALL FREE ENGLISH STYLE HAM","u":"WW, RISE","r":"OPEN + 3"},
+{"g":"Meat - cured / fermented","c":"921434","s":"PRIMO","d":"SLICED DANISH SALAMI","u":"FTG FZN, RISE","r":"OPEN + 2"},
+{"g":"Meat - cured / fermented","c":"600071 600098","s":"PRIMO","d":"SLICED PEPPERONI (600071 FZN / 600098 CHILLED)","u":"RISE","r":"THAWED + 2 / OPEN + 1"},
+{"g":"Meat - cured / fermented","c":"600092","s":"PRIMO","d":"SHREDDED HAM","u":"MOVIE-WORLD","r":"OPEN + 4"},
+{"g":"Meat - cured / fermented","c":"600012","s":"TENDER CHOICE","d":"HIGH WELFARE SHORTCUT BACON","u":"FTG, WW","r":"OPEN + 3"},
+{"g":"Meat - cured / fermented","c":"600020","s":"TENDER CHOICE","d":"HIGH WELFARE DICED BACON","u":"ALL","r":"OPEN + 3"},
+{"g":"Poultry - HPP treated","c":"283551","s":"MOIRA MACS","d":"RSPCA CHICKEN BREAST SHREDDED","u":"BP, FTG","r":"OPEN + 3"},
+{"g":"Poultry - HPP treated","c":"600031","s":"MOIRA MACS","d":"RSPCA DICED CHICKEN BREAST","u":"WW, RISE","r":"OPEN + 3"},
+{"g":"Poultry - HPP treated","c":"381226","s":"TENDER CHOICE","d":"92% RSPCA CHICKEN BREAST SLICED","u":"Dnata","r":"OPEN + 2"},
+{"g":"Poultry - HPP treated","c":"384481","s":"TENDER CHOICE","d":"RSPCA DICED CHICKEN WITH NISIN","u":"WW, RISE","r":"OPEN + 3"},
+{"g":"Poultry - cooked","c":"600054","s":"B&E / MELCO FOODS","d":"SOUTHERN CHICKEN TENDERS","u":"OTR","r":"THAWED + 4"},
+{"g":"Poultry - cooked","c":"018168","s":"INGHAMS","d":"SOUTHERN STYLE TENDERS","u":"BP","r":"THAWED + 3"},
+{"g":"Poultry - cooked","c":"256909","s":"INGHAMS","d":"SWEET CHILLI TENDERS","u":"BP, OTR, FTG","r":"THAWED + 3"},
+{"g":"Poultry - cooked","c":"093016","s":"INGHAMS","d":"FLAME GRILLED CHICKEN BREAST FILLET","u":"BP","r":"THAWED + 3"},
+{"g":"Poultry - cooked","c":"256887","s":"MOIRA MACS","d":"RSPCA SQUARE CHICKEN SCHNITZEL","u":"FTG, WW","r":"THAWED + 3"},
+{"g":"Poultry - cooked","c":"384353","s":"MOIRA MACS","d":"RSPCA GRILL FLAVOUR CHICKEN SCHNITZEL","u":"FTG, RISE","r":"THAWED + 3"},
+{"g":"Poultry - cooked","c":"600074","s":"MOIRA MACS","d":"CRUMBED REVO CHICKEN SCHNITZEL","u":"RISE","r":"THAWED + 2"},
+{"g":"Retorted products (pouches & cans)","c":"015773","s":"EDGELL","d":"SWEETCORN KERNELS","u":"WW, FTG, RISE","r":"OPEN + 1"},
+{"g":"Retorted products (pouches & cans)","c":"600100","s":"EDGELL","d":"BLACK BEANS","u":"DA FZN","r":"OPEN + 0"},
+{"g":"Retorted products (pouches & cans)","c":"097726","s":"GREEN SEAS","d":"TUNA CHUNKS IN SPRINGWATER","u":"WW, FTG, RISE","r":"OPEN + 2"},
+{"g":"Retorted products (pouches & cans)","c":"600008","s":"RIVIANA (as required)","d":"ROASTED RED PEPPER STRIPS (TIN)","u":"FTG, RISE","r":"OPEN + 3"},
+{"g":"Retorted products (pouches & cans)","c":"600093","s":"LLOYDS","d":"PINEAPPLE CUT PIECES","u":"MOVIE-WORLD","r":"OPEN + 3"},
+{"g":"Fresh veggies","c":"920028 256720","s":"LOCAL SUPPLIER (920028 all not WA / 256720 WA)","d":"BABY SPINACH","u":"BP, WW","r":"UBD - 4"},
+{"g":"Fresh veggies","c":"920362","s":"LOCAL SUPPLIER - SA","d":"WHOLE SPRING ONION BUNCH","u":"WW","r":"UBD - 4"},
+{"g":"Fresh veggies","c":"920974","s":"LOCAL SUPPLIER - QLD, NSW, VIC, WA","d":"SPRING ONION FINE SLICED","u":"WW","r":"UBD - 4"},
+{"g":"Fresh veggies","c":"920923","s":"LOCAL SUPPLIER - WA","d":"RED CAPSICUM WHOLE","u":"WW","r":"UBD - 4"},
+{"g":"Fresh veggies","c":"961742","s":"LOCAL SUPPLIER - QLD, NSW, VIC, SA","d":"DICED CAPSICUM 10MM","u":"WW","r":"UBD - 4"},
+{"g":"Fresh veggies","c":"920929","s":"LOCAL SUPPLIER - ALL","d":"CARROTS SHREDDED","u":"ALL NOT WW","r":"UBD - 4"},
+{"g":"Fresh veggies","c":"920940","s":"LOCAL SUPPLIER - VIC, SA, WA","d":"WHOLE CUCUMBER","u":"BP, WW, FTG","r":"UBD - 4"},
+{"g":"Fresh veggies","c":"920943","s":"LOCAL SUPPLIER - ALL NOT SA","d":"SLICED CUCUMBER","u":"BP, WW, FTG","r":"UBD - 4"},
+{"g":"Fresh veggies","c":"920961 920962","s":"LOCAL SUPPLIER (920961 WA / 920962 all not WA)","d":"COS LETTUCE / BABY COS LETTUCE","u":"ALL","r":"UBD - 4"},
+{"g":"Fresh veggies","c":"920966 256721","s":"LOCAL SUPPLIER (920966 all not WA / 256721 WA)","d":"MESCLUN LETTUCE","u":"ALL NOT BP","r":"UBD - 4"},
+{"g":"Fresh veggies","c":"920972 921529","s":"LOCAL SUPPLIER (920972 SA / 921529 WA)","d":"RED SPANISH ONION WHOLE / WHOLE RED ONIONS","u":"ALL NOT WW","r":"UBD - 4"},
+{"g":"Fresh veggies","c":"946707","s":"LOCAL SUPPLIER - QLD, NSW, VIC, WA","d":"RED ONION DICED 5MMX5MM","u":"ALL NOT WW","r":"UBD - 4"},
+{"g":"Fresh veggies","c":"920992 256722","s":"LOCAL SUPPLIER (920992 all not WA / 256722 WA)","d":"BABY ROCKET LETTUCE","u":"FTG, RISE","r":"UBD - 4"},
+{"g":"Fresh veggies","c":"921017","s":"LOCAL SUPPLIER - SA, WA","d":"TOMATOES WHOLE WASHED","u":"ALL","r":"UBD - 4"},
+{"g":"Fresh veggies","c":"921022","s":"LOCAL SUPPLIER - QLD, NSW, VIC, WA","d":"TOMATOES SLICED","u":"ALL","r":"UBD - 4"},
+{"g":"Fresh veggies","c":"921313","s":"LOCAL SUPPLIER - ALL","d":"DRY COLESLAW","u":"BP, WW","r":"UBD - 4"},
+{"g":"Fresh veggies","c":"921400","s":"LOCAL SUPPLIER - ALL","d":"CORIANDER WASH / SANITISED","u":"WW","r":"UBD - 4 & WASHED + 2"},
+{"g":"Fresh veggies","c":"480127","s":"LOCAL SUPPLIER - QLD, NSW, VIC","d":"MINT WASH / SANITISED","u":"WW","r":"UBD - 4 & WASHED + 2"},
+{"g":"Fresh veggies","c":"921572 964159","s":"LOCAL SUPPLIER (921572 all not NSW / 964159 NSW)","d":"CELERY SLICED","u":"FTG, WW, RISE","r":"UBD - 4"},
+{"g":"Fresh veggies","c":"600052","s":"LOCAL SUPPLIER - QLD, NSW, VIC","d":"CELERY DICED","u":"OTR","r":"UBD - 4"},
+{"g":"Fresh veggies","c":"275213","s":"LOCAL SUPPLIER - ALL","d":"SHREDDED BEETROOT","u":"BP, DNATA, RISE","r":"UBD - 4"},
+{"g":"Fresh veggies","c":"600050 600051","s":"LOCAL SUPPLIER - QLD, NSW, VIC","d":"SHREDDED RED CABBAGE","u":"OTR","r":"UBD - 4"},
+{"g":"Veggies - not fresh","c":"273233","s":"EATEO","d":"CAPERS IN VINEGAR","u":"WW","r":"OPEN + 17"},
+{"g":"Veggies - not fresh","c":"384367","s":"GOLDEN FALAFEL","d":"SWEET POTATO STICK FALAFEL","u":"OTR, BP","r":"THAWED + 6 / OPEN + 2"},
+{"g":"Veggies - not fresh","c":"089299","s":"RIVIANA","d":"SLICED SPICED SWEET GHERKIN","u":"FTG","r":"OPEN + 10"},
+{"g":"Veggies - not fresh","c":"088539","s":"RIVIANA","d":"ROASTED RED PEPPER STRIPS","u":"FTG, RISE","r":"OPEN + 35 / DRAINED + 3"},
+{"g":"Veggies - not fresh","c":"077034","s":"RIVIANA","d":"SUN DRIED TOMATO STRIPS","u":"RISE","r":"OPEN & DRAINED + 3"},
+{"g":"Veggies - not fresh","c":"600088","s":"SANDHURST","d":"CHARGRILLED PUMPKIN","u":"BP","r":"OPEN + 8 / DRAINED + 2"},
+{"g":"Veggies - not fresh","c":"600110","s":"SANDHURST","d":"SLICED GHERKINS","u":"RISE, DD","r":"OPEN + 6 / DRAINED + 3"},
+{"g":"Chilled mayonnaise, dips, dressings & sauces","c":"388692","s":"BIRCH & WAITE","d":"CAESAR DRESSING","u":"BP, FTG","r":"OPEN + 26"},
+{"g":"Chilled mayonnaise, dips, dressings & sauces","c":"976591","s":"BIRCH & WAITE","d":"FTG ONLY WHOLE EGG MAYONNAISE","u":"ALL","r":"OPEN + 26"},
+{"g":"Chilled mayonnaise, dips, dressings & sauces","c":"600049","s":"BLACK SWAN","d":"CRAFTED GUACAMOLE","u":"OTR","r":"OPEN + 2"},
+{"g":"Chilled mayonnaise, dips, dressings & sauces","c":"281428 033959","s":"ELEGRE","d":"FRESH BASIL PESTO","u":"FTG, RISE","r":"OPEN + 3"},
+{"g":"Chilled mayonnaise, dips, dressings & sauces","c":"284570","s":"ELEGRE","d":"GUACAMOLE DIP","u":"ALL","r":"OPEN + 3"},
+{"g":"Chilled mayonnaise, dips, dressings & sauces","c":"384417","s":"ELEGRE","d":"AVOCADO SPREAD","u":"WW, EG","r":"OPEN + 3"},
+{"g":"Chilled mayonnaise, dips, dressings & sauces","c":"064364 600062","s":"FARMERS UNION","d":"GREEK STYLE YOGHURT 1kg / 10kg","u":"EG, EAT SA, WW, RISE","r":"OPEN + 3"},
+{"g":"Chilled mayonnaise, dips, dressings & sauces","c":"075364","s":"FOOD FX","d":"FREE RANGE EGG CAESAR DRESSING","u":"WW, RISE","r":"OPEN + 56"},
+{"g":"Chilled mayonnaise, dips, dressings & sauces","c":"204357","s":"FOOD FX","d":"FREE RANGE EGG AIOLI 10kg","u":"BP, WW, RISE","r":"OPEN + 56"},
+{"g":"Chilled mayonnaise, dips, dressings & sauces","c":"255456","s":"FOOD FX","d":"HERMANS HICKORY BBQ SAUCE","u":"WW, RISE","r":"OPEN + 56"},
+{"g":"Chilled mayonnaise, dips, dressings & sauces","c":"257562","s":"FOOD FX","d":"CHIPOTLE MAYONNAISE PORT MAHON","u":"OTR, WW","r":"OPEN + 56"},
+{"g":"Chilled mayonnaise, dips, dressings & sauces","c":"600013","s":"FOOD FX","d":"FREE RANGE WHOLE EGG MAYONNAISE","u":"FTG, RISE, WW","r":"OPEN + 56"},
+{"g":"Chilled mayonnaise, dips, dressings & sauces","c":"600116","s":"PURE DAIRY (FS0136)","d":"UNIVERSAL CHEESE SAUCE WHITE 500g x 20","u":"RISE","r":"OPEN + 2"},
+{"g":"Shelf stable sauces, mustards & relishes","c":"600046","s":"BARKERS","d":"BUTTER CHICKEN PASTE","u":"WW","r":"OPEN + 26"},
+{"g":"Shelf stable sauces, mustards & relishes","c":"254723","s":"BEERENBERG","d":"CARAMELISED ONION","u":"FTG FZN, RISE","r":"OPEN + 17"},
+{"g":"Shelf stable sauces, mustards & relishes","c":"600057","s":"BEERENBERG","d":"BEETROOT BALSAMIC RELISH","u":"RISE","r":"OPEN + 17"},
+{"g":"Shelf stable sauces, mustards & relishes","c":"388693","s":"BIRCH & WAITE","d":"PERI PERI SAUCE","u":"BP","r":"OPEN + 56"},
+{"g":"Shelf stable sauces, mustards & relishes","c":"285328 285330","s":"EATEO","d":"SWEET CHILLI SAUCE - 2L / 5L","u":"BP, FTG, RISE","r":"OPEN + 56"},
+{"g":"Shelf stable sauces, mustards & relishes","c":"252015","s":"EDLYN","d":"MILD CHUNKY SALSA","u":"RISE","r":"OPEN + 17"},
+{"g":"Shelf stable sauces, mustards & relishes","c":"095235","s":"MASTERFOODS","d":"RELISH FRUIT CHUTNEY","u":"FTG - QLD","r":"BBD - 4"},
+{"g":"Shelf stable sauces, mustards & relishes","c":"041339","s":"MASTERFOODS","d":"SWEET MUSTARD PICKLES RELISH","u":"ALL","r":"BBD - 4"},
+{"g":"Shelf stable sauces, mustards & relishes","c":"060505","s":"MASTERFOODS","d":"SEEDED MUSTARD","u":"BP, FTG, RISE","r":"BBD - 4"},
+{"g":"Shelf stable sauces, mustards & relishes","c":"079294","s":"MASTERFOODS","d":"DIJONNAISE","u":"OTR","r":"BBD - 4"},
+{"g":"Shelf stable sauces, mustards & relishes","c":"060468","s":"MASTERFOODS","d":"DIJON MUSTARD","u":"RISE","r":"BBD - 4"},
+{"g":"Shelf stable sauces, mustards & relishes","c":"600048","s":"SWEET BABY RAYS","d":"ORIGINAL BBQ SAUCE","u":"OTR","r":"BBD - 4"},
+{"g":"Shelf stable sauces, mustards & relishes","c":"272370","s":"UNILEVER (Sakims)","d":"CHILLI TOMATO RELISH","u":"FTG","r":"OPEN + 10"},
+{"g":"Shelf stable sauces, mustards & relishes","c":"061000","s":"UNILEVER (Sakims)","d":"THAI SWEET CHILLI SAUCE","u":"WW","r":"OPEN + 7"},
+{"g":"Shelf stable sauces, mustards & relishes","c":"243152","s":"WOODS","d":"TOMATO RELISH GLUTEN FREE","u":"FTG, RISE","r":"OPEN + 24"},
+{"g":"Shelf stable sauces, mustards & relishes","c":"600068","s":"EDLYN","d":"NAPOLITANA SAUCE","u":"GRAND ITALIANO, MOVIE-WORLD","r":"OPEN + 28"},
+{"g":"Shelf stable sauces, mustards & relishes","c":"071313","s":"EDLYN","d":"BBQ SAUCE","u":"MOVIE-WORLD","r":"OPEN + 21"},
+{"g":"Eggs","c":"031707","s":"FARM PRIDE","d":"COOKED PEELED EGGS","u":"BP, FTG, RISE","r":"OPEN + 1"},
+{"g":"Eggs","c":"920048","s":"FARM PRIDE","d":"FREE RANGE HARD BOIL EGGS","u":"WW, DNATA","r":"OPEN + 1"},
+{"g":"Eggs","c":"600091","s":"SUNNY QUEEN","d":"FREE RANGE HARD BOILED EGGS","u":"WW ONLY","r":"OPEN + 1"},
+{"g":"Eggs","c":"600104","s":"FARM PRIDE","d":"FREE RANGE H/BOILED EGG PIECES","u":"WW, DNATA, OTR","r":"OPEN + 1"},
+{"g":"Eggs","c":"600107","s":"FARM PRIDE","d":"CAGE FREE H/BOILED EGG PIECES","u":"RISE, OTR","r":"OPEN + 1"},
+{"g":"Eggs","c":"600111","s":"FARM PRIDE","d":"CAGED H/BOILED EGG PIECES","u":"FTG, RISE","r":"OPEN + 1"},
+{"g":"Seasoning, spices, herbs (dry)","c":"259952","s":"KRIO KRUSH","d":"FAJITA SEASONING","u":"BP","r":"BBD - 4 (1 year max)"},
+{"g":"Seasoning, spices, herbs (dry)","c":"200464","s":"KRIO KRUSH","d":"GREEN DILL TOPS DRIED","u":"FTG, BP","r":"BBD - 4 (1 year max)"},
+{"g":"Seasoning, spices, herbs (dry)","c":"104338","s":"KRIO KRUSH","d":"SMOKEY PAPRIKA","u":"BP, FTG FZN, RISE","r":"BBD - 4 (1 year max)"},
+{"g":"Seasoning, spices, herbs (dry)","c":"060213","s":"MASTERFOODS","d":"CURRY POWDER","u":"FTG, WW, RISE","r":"BBD - 4"},
+{"g":"Seasoning, spices, herbs (dry)","c":"071232","s":"MASTERFOODS","d":"CHILLI SPRINKLE","u":"FTG, WW","r":"BBD - 4"},
+{"g":"Seasoning, spices, herbs (dry)","c":"206081 206082","s":"MASTERFOODS","d":"BLACK CRACKED PEPPERCORN","u":"ALL","r":"BBD - 4"},
+{"g":"Seasoning, spices, herbs (dry)","c":"600055","s":"MASTERFOODS","d":"CAJUN SEASONING","u":"OTR","r":"BBD - 4"},
+{"g":"Seasoning, spices, herbs (dry)","c":"019912","s":"MCKENZIES","d":"CHILLI POWDER","u":"BP, OTR, RISE","r":"BBD - 4"},
+{"g":"Seasoning, spices, herbs (dry)","c":"023340","s":"MCKENZIES","d":"DRIED CHIVES CHOPPED","u":"ALL","r":"BBD - 4"},
+{"g":"Seasoning, spices, herbs (dry)","c":"060998","s":"SAXA","d":"TABLE SALT","u":"ALL","r":"BBD - 4 (1 year if no BBD)"},
+{"g":"Seasoning, spices, herbs (dry)","c":"383107","s":"TRUMPS","d":"DRIED CHIVES FLAKES BAGGED","u":"ALL","r":"BBD - 4"},
+{"g":"Seasoning, spices, herbs (dry)","c":"600043","s":"TRUMPS","d":"CHILLI FLAKES","u":"WW","r":"BBD - 4"},
+{"g":"Miscellaneous ingredients","c":"964327","s":"AGRI FOOD","d":"MODIFIED TAPIOCA 25kg","u":"ALL","r":"BBD - 4"},
+{"g":"Miscellaneous ingredients","c":"600022","s":"BARKERS","d":"BERRY COMPOTE","u":"EG, WW, RISE","r":"OPEN + 10"},
+{"g":"Miscellaneous ingredients","c":"600063","s":"BARKERS","d":"PEACH & MANGO COMPOTE","u":"EG, RISE","r":"OPEN + 10"},
+{"g":"Miscellaneous ingredients","c":"090314 066448","s":"BEECHWORTH","d":"PURE HONEY SQUEEZY / 3L","u":"EG, EAT - SA, RISE","r":"BBD - 4"},
+{"g":"Miscellaneous ingredients","c":"255223","s":"CARMANS","d":"NATURAL BIRCHER MUESLI","u":"EG, EAT - SA, RISE","r":"BBD - 4"},
+{"g":"Miscellaneous ingredients","c":"600021","s":"CARMANS","d":"BERRY OAT CLUSTERS","u":"EG, WW, RISE","r":"BBD - 4"},
+{"g":"Miscellaneous ingredients","c":"600064","s":"CARMANS","d":"HONEY CRUNCH OAT CLUSTERS","u":"EG, RISE","r":"BBD - 4"},
+{"g":"Miscellaneous ingredients","c":"","s":"EATEO","d":"HONEY 3L (code TBC on the form)","u":"EG, EAT - SA, RISE","r":"BBD - 4"},
+{"g":"Miscellaneous ingredients","c":"038224","s":"EDLYN","d":"LEMON JUICE","u":"BP","r":"BBD - 4"},
+{"g":"Miscellaneous ingredients","c":"097607","s":"HEINZ (Golden Circle)","d":"ORANGE JUICE","u":"EG, EAT - SA, RISE","r":"OPEN + 3"},
+{"g":"Miscellaneous ingredients","c":"946708","s":"MCKENZIES","d":"DRIED APPLES DICED","u":"EG, EAT - SA, RISE","r":"BBD - 4"},
+{"g":"Miscellaneous ingredients","c":"600017","s":"ROYAL NUT COMPANY","d":"DRIED APPLES - DICED","u":"EG, EAT - SA, RISE","r":"BBD - 4"},
+{"g":"Fresh bread","c":"921432","s":"GOODMAN FIELDER","d":"SOFT WHITE HELGAS","u":"BP, DNATA","r":"BBD - 4"},
+{"g":"Fresh bread","c":"921433","s":"GOODMAN FIELDER","d":"MIXED GRAIN OATS HELGAS","u":"BP","r":"BBD - 4"},
+{"g":"Fresh bread","c":"962652","s":"GOODMAN FIELDER","d":"PUMPKIN SEED GRAIN BREAD HELGAS","u":"BP, FTG, DNATA","r":"BBD - 4"},
+{"g":"Fresh bread","c":"964335","s":"GOODMAN FIELDER","d":"VIT/MINS SANDWICH WONDER WHITE","u":"BP","r":"BBD - 4"},
+{"g":"Fresh bread","c":"964336","s":"GOODMAN FIELDER","d":"VIT/MINS TOAST WONDER WHITE","u":"BP","r":"BBD - 4"},
+{"g":"Fresh bread","c":"384359","s":"GOODMAN FIELDER","d":"50% LOWER CARB 5 SEED HELGAS","u":"WW","r":"BBD - 4"},
+{"g":"Fresh bread","c":"380622","s":"GOODMAN FIELDER","d":"HELGAS GLUTEN FREE SOY LINSEED","u":"FTG (as required)","r":"BBD - 4 / OPEN + 4"},
+{"g":"Fresh bread","c":"964195","s":"GOODMAN FIELDER","d":"WONDER WHOLEMEAL SANDWICH","u":"OTR","r":"BBD - 4"},
+{"g":"Fresh bread","c":"600053","s":"GOODMAN FIELDER","d":"HELGAS RUSTIC WHITE SOURDOUGH","u":"OTR","r":"BBD - 4"},
+{"g":"Fresh bread","c":"997017","s":"GOODMAN FIELDER","d":"HELGAS GLUTEN FREE WHITE","u":"RISE / FTG (as required)","r":"BBD - 4"},
+{"g":"Fresh bread","c":"921318","s":"TIP TOP","d":"TEXAS TOAST THICK","u":"FTG, RISE","r":"BBD - 4"},
+{"g":"Fresh bread","c":"964113","s":"TIP TOP","d":"9 GRAIN ORIGINAL BREAD","u":"BP, OTR, FTG","r":"BBD - 4"},
+{"g":"Fresh bread","c":"964171","s":"TIP TOP","d":"THE ONE WHOLEMEAL SW","u":"FTG, WW","r":"BBD - 4"},
+{"g":"Fresh bread","c":"964114","s":"TIP TOP","d":"THE ONE WHITE TOAST","u":"EG GO FRESH","r":"BBD - 4"},
+{"g":"Fresh bread","c":"260848","s":"TIP TOP","d":"COUNTRY GRAIN ABBOTTS","u":"BP, WW, FTG, RISE","r":"BBD - 4"},
+{"g":"Fresh bread","c":"260849","s":"TIP TOP","d":"RUSTIC WHITE ABBOTTS","u":"WW, FTG, RISE","r":"BBD - 4"},
+{"g":"Fresh bread","c":"976208","s":"TIP TOP","d":"FARMHOUSE WHOLEMEAL ABBOTTS","u":"WW","r":"BBD - 4"},
+{"g":"Fresh bread","c":"380462","s":"TIP TOP","d":"ABBOTTS SOURDOUGH RYE BREAD","u":"FTG FZN","r":"BBD - 4"},
+{"g":"Fresh bread","c":"270097","s":"TIP TOP","d":"ABBOTT'S GLUTEN FREE SOY LINSEED","u":"FTG (as required)","r":"BBD - 4"},
+{"g":"Fresh bread","c":"600042","s":"TIP TOP","d":"ABBOTT'S GLUTEN FREE RUSTIC WHITE","u":"RISE / FTG (as required)","r":"BBD - 4"},
+{"g":"Frozen bread","c":"600087","s":"BAKERS MAISON","d":"DEMI BAGUETTE","u":"RISE","r":"THAWED + 1"},
+{"g":"Frozen bread","c":"600069","s":"DELBAKE / LONGHURST","d":"WHITE SOURDOUGH","u":"RISE","r":"THAWED + 1"},
+{"g":"Frozen bread","c":"600075","s":"LANTMANNEN (SA only)","d":"PREMIUM STRAIGHT CROISSANT","u":"OTR","r":"THAWED + 1"},
+{"g":"Frozen bread","c":"946710","s":"MISSION","d":"10\" PLAIN FLOUR TORTILLA","u":"BP, FTG, DNATA, RISE","r":"THAWED + 2"},
+{"g":"Frozen bread","c":"027757","s":"MISSION","d":"10\" LOW FAT FLOUR TORTILLA","u":"WW","r":"THAWED + 2"},
+{"g":"Frozen bread","c":"385290","s":"MISSION","d":"10\" NO ADDED PRESERVATIVE NAP FLOUR TORTILLA","u":"OTR","r":"THAWED + 2"},
+{"g":"Frozen bread","c":"600095","s":"SUGO TU","d":"PIZZA BASES PARBAKED ROMANA 9\"","u":"GRAND ITALIAN","r":"THAW + 1"},
+{"g":"Frozen bread","c":"600094","s":"SUGO TU","d":"PIZZA BASES PARBAKED ROMANA 11\"","u":"GRAND ITALIAN","r":"THAW + 1"},
+{"g":"Frozen bread","c":"600106","s":"SUGO TU","d":"ROMANA SLAB PIZZA BASE 10\" x 11\"","u":"MOVIE WORLD","r":"THAW + 3"},
+{"g":"In-house mix - Moira Macs Ckn","c":"940064","s":"","d":"R/W MIX BP MM SH/CHK MAYO BW BP ONLY","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Moira Macs Ckn","c":"940183","s":"","d":"R/W MIX BP MM SH/CHK HERB MAYO BW BP","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Moira Macs Ckn","c":"940191","s":"","d":"R/W MIX MM SH/CHK PEPPER MAYO FX FTG","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Moira Macs Ckn","c":"940193","s":"","d":"R/W MIX MM SH/CHK CAESAR BW FTG","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Moira Macs Ckn","c":"940403","s":"","d":"R/W MIX BP MM SH/CHK HERB BACON BW BP","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Moira Macs Ckn","c":"940429","s":"","d":"R/W MIX BP MM SH/CHK CAESAR BW BP","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Moira Macs Ckn","c":"940438","s":"","d":"R/W MIX MEXICAN CHICKEN FTG","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Moira Macs Ckn","c":"940440","s":"","d":"R/W MIX BP MM SH/CHK PEPPER MAYO BW BP ONLY","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Moira Macs Ckn","c":"940450","s":"","d":"R/W MIX BP MM SH/CHK CORN BW BP ONLY","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Diced Chicken","c":"940405","s":"","d":"R/W MIX WW TC D/CHK PEPPER MAYO BW WW","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Diced Chicken","c":"940406","s":"","d":"R/W MIX WW TC D/CHK CAESAR FX WW","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Diced Chicken","c":"940412","s":"","d":"R/W MIX WW TC D/CHK S/CHILLI AIOLI WW","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Diced Chicken","c":"940454","s":"","d":"R/W MIX WW BUTTER CHICKEN RAITA WW","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Diced Chicken","c":"940473","s":"","d":"R/W MIX RISE DICED CHICKEN MAYO RISE","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Diced Chicken","c":"940474","s":"","d":"R/W MIX RISE DICED CHICKEN PESTO RICOTTA MAYO RISE","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Diced Chicken","c":"940484","s":"","d":"R/W MIX RISE DICED CHK CAESAR RISE","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Diced Chicken","c":"940486","s":"","d":"R/W MIX RISE DICED CHICKEN FAJITA RISE","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Diced Chicken","c":"940469","s":"","d":"R/W MIX WW CHICKEN FAJITA WW","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Diced Chicken","c":"940489","s":"","d":"R/W MIX RISE DICED CHICKEN FAJITA RED PEPPER RISE FZN","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Diced Chicken","c":"940490","s":"","d":"R/W MIX RISE FZN CHK CAESAR BACON RISE FZN","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Diced Chicken","c":"940498","s":"","d":"R/W MIX BP DICED CHK MAYO BW - to start end May BP","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Diced Chicken","c":"940499","s":"","d":"R/W MIX RISE CHICKEN MAYO & AVOCADO RISE","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Diced Chicken","c":"940500","s":"","d":"R/W MIX RISE CHICKEN PESTO & AIOLI RISE","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Tender Choice Ckn","c":"940386","s":"","d":"R/W MIX DA FZN TC SL/CHK AVO CHIVE FTG, COMPASS","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Tender Choice Ckn","c":"940391","s":"","d":"R/W MIX TC SL/CHK CHEESE CHIVE FX FTG FZN ONLY","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Tender Choice Ckn","c":"940392","s":"","d":"R/W MIX TC SL/CHK PEPPER MAYO FTGFZN, EG","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Tender Choice Ckn","c":"940394","s":"","d":"R/W MIX DA FZN TC SL/CHK CHEESE FX FTG FZN ONLY","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Tender Choice Ckn","c":"940395","s":"","d":"R/W MIX DA FZN TC SL/CHK AVO CAP FTG FZN ONLY","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Tender Choice Ckn","c":"940396","s":"","d":"R/W MIX TC SL/CHK EGG CAESAR BW FTG, COMPASS","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Tender Choice Ckn","c":"940397","s":"","d":"R/W MIX TC SL/CHK S/CHILLI FX FTG FZN ONLY","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Tender Choice Ckn","c":"940399","s":"","d":"R/W MIX DNATA TC SL/CHK CAESAR FX DNATA ONLY","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Tender Choice Ckn","c":"940449","s":"","d":"R/W MIX TC SL/CHK MAYO CHIVES FX COMPASS","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Tender Choice Ckn","c":"940456","s":"","d":"R/W MIX TC SL CHK CAESAR EG GO FRESH","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Tender Choice Ckn","c":"940457","s":"","d":"R/W MIX TC SL CHK MAYO FX EG GO FRESH","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Tender Choice Ckn","c":"940458","s":"","d":"R/W MIX TC SL SWEET CHILLI CHK AIOLI EG GO FRESH","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Tender Choice Ckn","c":"940459","s":"","d":"R/W MIX OTR EAT CHK SWEET CHILLI OTR","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Tender Choice Ckn","c":"940460","s":"","d":"R/W MIX OTR EAT CHK CHEESE OTR FZN","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Tender Choice Ckn","c":"940461","s":"","d":"R/W MIX OTR EAT CHK CAESAR OTR","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Tender Choice Ckn","c":"940468","s":"","d":"R/W MIX OTR EAT CHK MAYO OTR","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Tuna","c":"940373","s":"","d":"R/W MIX TUNA SWEETCORN MAYO FX FTG","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Tuna","c":"940413","s":"","d":"R/W MIX TUNA SWEETCORN CAPERS MAYO BW WW","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Tuna","c":"940467","s":"","d":"R/W MIX OTR EAT TUNA CRUNCH OTR","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Tuna","c":"940481","s":"","d":"R/W MIX RISE TUNA CORN CELERY MAYO RISE","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Egg","c":"940159","s":"","d":"R/W MIX EGG CHIVE MAYO FX FTG, COMPASS","u":"","r":"P + 1"},
+{"g":"In-house mix - Egg","c":"940190","s":"","d":"R/W MIX EGG BACON MAYO FX FTG","u":"","r":"P + 1"},
+{"g":"In-house mix - Egg","c":"940251","s":"","d":"R/W MIX CURRIED EGG MAYO FX FTG, RISE","u":"","r":"P + 1"},
+{"g":"In-house mix - Egg","c":"940430","s":"","d":"R/W MIX BP SAUSAGE EGG BACON BW BP","u":"","r":"P + 1"},
+{"g":"In-house mix - Egg","c":"940441","s":"","d":"R/W MIX BP EGG CHIVE MAYO BW BP ONLY","u":"","r":"P + 1"},
+{"g":"In-house mix - Egg","c":"940452","s":"","d":"R/W MIX SAUSAGE EGG BACON COMPASS","u":"","r":"P + 1"},
+{"g":"In-house mix - Egg","c":"940479","s":"","d":"R/W MIX RISE CHUNKY CAGED EGG MAYO RISE","u":"","r":"P + 1"},
+{"g":"In-house mix - Egg","c":"940482","s":"","d":"R/W MIX RISE SAUSAGE EGG BACON RISE","u":"","r":"P + 1"},
+{"g":"In-house mix - Free Range Egg","c":"940233","s":"","d":"R/W MIX F/RANGE EGG CHIVE MAYO FX DNATA","u":"","r":"P + 1"},
+{"g":"In-house mix - Free Range Egg","c":"940407","s":"","d":"R/W MIX WW F/RANGE CURRIED EGG MAYO BW WW","u":"","r":"P + 1"},
+{"g":"In-house mix - Free Range Egg","c":"940408","s":"","d":"R/W MIX WW F/RANGE EGG MAYO BW WW","u":"","r":"P + 1"},
+{"g":"In-house mix - Free Range Egg","c":"940465","s":"","d":"R/W MIX OTR EAT EGG MAYO OTR","u":"","r":"P + 1"},
+{"g":"In-house mix - Free Range Egg","c":"940466","s":"","d":"R/W MIX OTR EAT SAUSAGE EGG OTR","u":"","r":"P + 1"},
+{"g":"In-house mix - Other Meat","c":"940470","s":"","d":"R/W MIX WW PULLED BEEF WW","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Other Meat","c":"940494","s":"","d":"R/W MIX HAWAIIAN PIZZA GRAND ITALIAN","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Other Meat","c":"940496","s":"","d":"R/W MIX MEAT LOVERS PIZZA GRAND ITALIAN","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Other Meat","c":"940497","s":"","d":"R/W MIX PIZZA WRAP FTG","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Coleslaw","c":"940244","s":"","d":"R/W MIX BBQ COLESLAW FTG FZN","u":"","r":"P + 1"},
+{"g":"In-house mix - Coleslaw","c":"940372","s":"","d":"R/W MIX WW HICKORY BBQ SLAW MAYO BW WW","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Coleslaw","c":"940389","s":"","d":"R/W MIX DA FZN SCHILLI SLAW FX FTG FZN","u":"","r":"P + 1"},
+{"g":"In-house mix - Coleslaw","c":"940463","s":"","d":"R/W MIX OTR EAT MAYO SLAW OTR","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Flavoured Mayo","c":"940060","s":"","d":"R/W MIX BASIL PESTO MAYO FX FTG - NOT WA, SA","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Flavoured Mayo","c":"940194","s":"","d":"R/W MIX HOT SWEET CHILLI MAYO FX FTG","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Flavoured Mayo","c":"940375","s":"","d":"R/W MIX BP PERI PERI MAYO BW BP","u":"","r":"P + 3 / SSL"},
+{"g":"In-house mix - Flavoured Mayo","c":"940384","s":"","d":"R/W MIX BP SWEET CHIILI MAYO BW BP","u":"","r":"P + 3 / SSL"},
+{"g":"In-house mix - Flavoured Mayo","c":"940444","s":"","d":"R/W MIX HOT SWEET CHILLI MAYO FTG","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Flavoured Mayo","c":"940451","s":"","d":"R/W MIX BP SW CHILLI CHEESE MAYO BW BP","u":"","r":"P + 3 / SSL"},
+{"g":"In-house mix - Flavoured Mayo","c":"940462","s":"","d":"R/W MIX OTR EAT HOT SWEET CHILLI MAYO OTR","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Flavoured Mayo","c":"940464","s":"","d":"R/W MIX OTR EAT DIJONNAISE MAYO OTR","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Flavoured Mayo","c":"940480","s":"","d":"R/W MIX RISE MAYO & PEPPER RISE","u":"","r":"P + 4 / SSL"},
+{"g":"In-house mix - Flavoured Mayo","c":"940485","s":"","d":"R/W MIX RISE SWEET CHILLI MAYO RISE","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Flavoured Mayo","c":"940488","s":"","d":"R/W MIX RISE SWEET CHILLI MAYO SLAW RISE FZN","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Cheese","c":"940472","s":"","d":"R/W MIX RISE CROQUE DIJON RISE","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Cheese","c":"940475","s":"","d":"R/W MIX RISE FOUR CHEESE RISE","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Cheese","c":"940477","s":"","d":"R/W MIX RISE RICOTTA RED PEPPER SEMI DRIED TOMATOES RISE","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Cheese","c":"940478","s":"","d":"R/W MIX RISE TASTY CHEESE MOZZA PARMESAN RISE","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Other","c":"940210","s":"","d":"R/W MIX TAPIOCA FOOD STARCH ALL WRAPS","u":"","r":"P + 4 / SSL"},
+{"g":"In-house mix - Other","c":"940476","s":"","d":"R/W MIX RISE NAPOLI SAUCE RISE","u":"","r":"P + 2 / SSL"},
+{"g":"In-house mix - Other - Nuts","c":"940236","s":"","d":"R/W MIX ORANGE BIRCHER MUESLI EG, EAT SA, RISE","u":"","r":"P + 2 / SSL"}
+];
+var shelfIndex=null,shelfFilterText='';
+function shelfRuleFor(code){
+  if(!shelfIndex){
+    shelfIndex={};
+    SHELF_LIFE_RULES.forEach(function(r){String(r.c).split(/\s+/).forEach(function(c){if(c) shelfIndex[c]=r;});});
+  }
+  var parts=String(code||'').split('/');
+  for(var i=0;i<parts.length;i++){
+    var k=parts[i].trim().replace(/[^0-9A-Za-z].*$/,'');   // '920961-WA' -> '920961'
+    if(k&&shelfIndex[k]) return shelfIndex[k];
+  }
+  return null;
+}
+function makeShelfBtn(){
+  var b=document.createElement('button');
+  b.style.cssText='background:#fff;color:#16a085;border:1.5px solid #16a085;border-radius:10px;padding:10px;font-size:0.85rem;font-weight:700;cursor:pointer;width:100%;margin-bottom:12px;';
+  b.textContent='📋 Shelf life list — '+SHELF_FORM.no+' (v'+SHELF_FORM.version+')';
+  b.onclick=openShelfList;
+  return b;
+}
+function openShelfList(){showPanel('shelfListPanel');renderShelfList();}
+function renderShelfList(){
+  var body=document.getElementById('shelfListBody');
+  body.innerHTML='';
+  var hdr=document.createElement('div');
+  hdr.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border:1.5px solid #222;';
+  hdr.innerHTML='<div style="font-size:0.7rem;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:0.5px;">Quality Assurance Manual</div>'+
+    '<div style="font-size:0.95rem;font-weight:900;color:#222;">'+SHELF_FORM.no+' — '+SHELF_FORM.title.toUpperCase()+'</div>'+
+    '<div style="font-size:0.74rem;color:#666;margin-top:4px;">'+SHELF_FORM.ref+' · Version '+SHELF_FORM.version+' · Issued '+SHELF_FORM.issued+' · Authorised by '+SHELF_FORM.by+'</div>'+
+    '<div style="font-size:0.74rem;color:#777;margin-top:6px;line-height:1.5;"><strong>OPEN + n</strong> / <strong>THAWED + n</strong> — n days after the ingredient is opened or thawed. <strong>UBD - n</strong> / <strong>BBD - n</strong> — n days before the supplier\'s use-by / best-before date. <strong>P + n / SSL</strong> — n days after the mix is made, or the shortest shelf life of what is in it, whichever is sooner.</div>';
+  body.appendChild(hdr);
+  var wrap=document.createElement('div');
+  wrap.style.cssText='position:relative;margin-bottom:10px;';
+  wrap.innerHTML='<input class="field-input" type="search" id="shelf-filter" placeholder="Find by code, name, supplier or customer — e.g. tasty cheese, 099167, rise…" value="'+metalEsc(shelfFilterText)+'" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search"/>';
+  body.appendChild(wrap);
+  var list=document.createElement('div');list.id='shelf-list';body.appendChild(list);
+  var gaps=document.createElement('div');gaps.id='shelf-gaps';body.appendChild(gaps);
+  document.getElementById('shelf-filter').oninput=function(){shelfFilterText=this.value;renderShelfRows();};
+  renderShelfRows();
+  renderShelfGaps();
+}
+function renderShelfRows(){
+  var host=document.getElementById('shelf-list');
+  if(!host) return;
+  var tokens=shelfFilterText.toLowerCase().split(/\s+/).filter(Boolean);
+  var rows=SHELF_LIFE_RULES.filter(function(r){
+    if(!tokens.length) return true;
+    var hay=(r.c+' '+r.s+' '+r.d+' '+r.u+' '+r.r+' '+r.g).toLowerCase();
+    return tokens.every(function(t){return hay.indexOf(t)!==-1;});
+  });
+  if(!rows.length){host.innerHTML='<div style="text-align:center;color:#bbb;padding:24px;font-size:0.85rem;">Nothing on the form matches that.</div>';return;}
+  var h='',lastG=null;
+  rows.forEach(function(r){
+    if(r.g!==lastG){
+      if(lastG!==null) h+='</div>';
+      h+='<div style="font-size:0.75rem;font-weight:800;color:#16a085;text-transform:uppercase;letter-spacing:0.5px;margin:14px 0 6px;">'+metalEsc(r.g)+'</div><div style="background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(15,46,28,0.06);">';
+      lastG=r.g;
+    }
+    h+='<div style="display:flex;gap:10px;align-items:center;padding:9px 12px;border-bottom:1px solid #f3f3f3;">'+
+      '<div style="min-width:0;flex:1;"><div style="font-size:0.8rem;font-weight:700;">'+metalEsc(r.d)+'</div>'+
+      '<div style="font-size:0.68rem;color:#888;margin-top:2px;">'+(r.c?'<span style="font-family:monospace;color:#555;">'+metalEsc(r.c.split(/\s+/).join(' / '))+'</span>':'<span style="color:#c0392b;">code not on the form</span>')+
+      (r.s?' · '+metalEsc(r.s):'')+(r.u?' · '+metalEsc(r.u):'')+'</div></div>'+
+      '<div style="flex-shrink:0;background:#e8f8f5;color:#117a65;font-weight:800;font-size:0.74rem;border-radius:8px;padding:5px 9px;white-space:nowrap;">'+metalEsc(r.r)+'</div></div>';
+  });
+  h+='</div>';
+  host.innerHTML=h;
+}
+// Ingredient codes used in recipes that have no rule on the form — worth QA's attention.
+function shelfGaps(){
+  var seen={};
+  recipeLibrary.forEach(function(rec){
+    (rec.ingredients||[]).forEach(function(ing){
+      var il=traceIngLine(ing);
+      if(!il||!il.code||/^99\d{4}$/.test(il.code)||/^[45]00\d{3}$/.test(il.code)||/\bfilm\b/i.test(il.name)) return;
+      if(shelfRuleFor(ing.isMix&&ing.mixCode?ing.mixCode:ing.code)) return;
+      var g=seen[il.code]||(seen[il.code]={code:il.code,name:il.name,recipes:0});
+      g.recipes++;
+    });
+  });
+  return Object.keys(seen).map(function(k){return seen[k];}).sort(function(a,b){return b.recipes-a.recipes||a.code.localeCompare(b.code);});
+}
+function renderShelfGaps(){
+  var host=document.getElementById('shelf-gaps');
+  if(!host) return;
+  var g=shelfGaps();
+  if(!g.length){host.innerHTML='';return;}
+  host.innerHTML='<div style="background:#fff8f0;border-left:5px solid #e67e22;border-radius:14px;padding:12px 14px;margin-top:16px;">'+
+    '<div style="font-size:0.78rem;font-weight:800;color:#b9650c;margin-bottom:4px;">⚠️ '+g.length+' ingredient code'+(g.length===1?'':'s')+' used in recipes '+(g.length===1?'isn\'t':'aren\'t')+' on this form</div>'+
+    '<div style="font-size:0.7rem;color:#8a5a1a;margin-bottom:6px;">These show a blank in the Shelf life column of the traceability sheet. Check whether they need a rule, or whether the recipe code is wrong.</div>'+
+    '<div style="font-size:0.7rem;color:#555;line-height:1.6;max-height:220px;overflow:auto;">'+
+    g.map(function(x){return '<span style="font-family:monospace;">'+metalEsc(x.code)+'</span> '+metalEsc(x.name)+' <span style="color:#aaa;">('+x.recipes+' recipe'+(x.recipes===1?'':'s')+')</span>';}).join('<br>')+
+    '</div></div>';
+}
+
 // ── FORM064.3 sheet, generated from the schedule + recipes ───────────────
 // The paper form is produced automatically after the schedule upload: one block per scheduled SKU.
 // Position = the SKU's row in the schedule counted from the first row of Line A (line number A=1 … STAT=6).
@@ -7811,7 +8166,7 @@ function buildTraceSheet(){
     var jobs=scheduleData[line]||[],used={},lineNo=li+1;
     function lbl(p){return 'Line '+lineNo+' - '+p;}
     function ingRows(list,mult){
-      return list.map(function(il){return {kind:'ing',code:il.code,desc:il.name,per:il.per,total:il.per==null?null:il.per*mult,unit:il.unit};});
+      return list.map(function(il){return {kind:'ing',code:il.code,desc:il.name,per:il.per,total:il.per==null?null:il.per*mult,unit:il.unit,rule:(shelfRuleFor(il.code)||{}).r||''};});
     }
     jobs.forEach(function(job,ji){
       pos++;
@@ -7866,6 +8221,7 @@ function renderTraceSheet(){
     '<div style="font-size:0.8rem;color:#444;margin-top:4px;"><strong>Site:</strong> '+TRACE_SITE+' &nbsp;·&nbsp; <strong>Production date:</strong> '+new Date().toLocaleDateString('en-AU')+'</div>'+
     '<div style="font-size:0.74rem;color:#777;margin-top:6px;line-height:1.5;">Worked out from today\'s schedule and each product\'s recipe. Position is the SKU\'s row in the schedule from Line A (Line A = 1 … STAT = 6). Total needed = amount per unit × scheduled quantity.</div>';
   body.appendChild(hdr);
+  body.appendChild(makeShelfBtn());
   if(!blocks.length){
     var none=document.createElement('div');
     none.style.cssText='text-align:center;color:#bbb;padding:30px;font-size:0.85rem;';
@@ -7878,14 +8234,14 @@ function renderTraceSheet(){
     var card=document.createElement('div');
     card.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #16a085;';
     var h='<div style="font-weight:800;font-size:0.95rem;margin-bottom:8px;">'+line+'</div><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.7rem;">'+
-      '<thead><tr style="text-align:left;color:#888;"><th style="padding:3px 4px;">Line</th><th>Code</th><th>Description</th><th style="text-align:right;">/ unit</th><th style="text-align:right;">Total</th><th style="padding-left:8px;">Unit</th></tr></thead><tbody>';
+      '<thead><tr style="text-align:left;color:#888;"><th style="padding:3px 4px;">Line</th><th>Code</th><th>Description</th><th style="text-align:right;">/ unit</th><th style="text-align:right;">Total</th><th style="padding-left:8px;">Unit</th><th style="padding-left:8px;">Shelf life</th></tr></thead><tbody>';
     lb.forEach(function(b){
       b.rows.forEach(function(r){
         var st=r.kind==='head'?'background:#e8e8e8;font-weight:800;':r.kind==='link'?'background:#f6f6f6;font-style:italic;':'';
         h+='<tr style="border-top:1px solid #eee;'+st+'"><td style="padding:3px 4px;white-space:nowrap;">'+metalEsc(b.label)+'</td><td>'+metalEsc(r.code)+'</td><td>'+metalEsc(r.desc)+'</td>'+
-          '<td style="text-align:right;">'+(r.kind==='head'?'0':traceFmt(r.per))+'</td><td style="text-align:right;font-weight:700;">'+traceFmt(r.total)+'</td><td style="padding-left:8px;">'+metalEsc(r.unit)+'</td></tr>';
+          '<td style="text-align:right;">'+(r.kind==='head'?'0':traceFmt(r.per))+'</td><td style="text-align:right;font-weight:700;">'+traceFmt(r.total)+'</td><td style="padding-left:8px;">'+metalEsc(r.unit)+'</td><td style="padding-left:8px;white-space:nowrap;">'+metalEsc(r.rule||'')+'</td></tr>';
       });
-      b.notes.forEach(function(n){h+='<tr><td></td><td colspan="5" style="padding:2px 4px 6px;color:#c0392b;font-size:0.68rem;">⚠️ '+metalEsc(n)+'</td></tr>';});
+      b.notes.forEach(function(n){h+='<tr><td></td><td colspan="6" style="padding:2px 4px 6px;color:#c0392b;font-size:0.68rem;">⚠️ '+metalEsc(n)+'</td></tr>';});
     });
     h+='</tbody></table></div>';
     card.innerHTML=h;
@@ -7928,7 +8284,7 @@ function renderTraceSign(){
   sheetBtn.style.cssText='background:#16a085;color:#fff;border:none;border-radius:10px;padding:11px;font-size:0.88rem;font-weight:700;cursor:pointer;width:100%;margin-bottom:12px;';
   sheetBtn.textContent='📄 View today\'s sheet (worked out from the schedule)';
   sheetBtn.onclick=openTraceSheet;
-  body.appendChild(hdr);body.appendChild(sheetBtn);
+  body.appendChild(hdr);body.appendChild(sheetBtn);body.appendChild(makeShelfBtn());
   var any=false;
   LINES.forEach(function(line){
     var s=traceLineStatus(line);
@@ -12505,6 +12861,7 @@ document.getElementById('metalWorkCloseBtn').onclick=function(){currentMetalMach
 document.getElementById('metalProductsCloseBtn').onclick=closeMetalProducts;
 document.getElementById('traceSignCloseBtn').onclick=function(){hidePanel('traceSignPanel');};
 document.getElementById('traceSheetCloseBtn').onclick=function(){hidePanel('traceSheetPanel');};
+document.getElementById('shelfListCloseBtn').onclick=function(){hidePanel('shelfListPanel');};
 document.getElementById('mpCancelBtn').onclick=function(){hideOverlay('metalProductOverlay');};
 document.getElementById('mgCancelBtn').onclick=function(){hideOverlay('metalGateOverlay');};
 document.getElementById('pmOverlayCancelBtn').onclick=function(){hideOverlay('prepMixOverlay');};
