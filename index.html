@@ -2471,6 +2471,7 @@ var FORM_REGISTRY=[
   {key:'line-loose',   section:'Line Forms',     name:'Loose Items Register',                        number:'FORM014.1', version:''},
   {key:'line-labeller',section:'Line Forms',     name:"Labeller's Paperwork",                        number:'—',         version:''},
   {key:'line-trace',   section:'Line Forms',     name:'Traceability by SKU',                         number:'FORM064.3', version:''},
+  {key:'line-shelf',   section:'Line Forms',     name:'Ingredient & Mix Production Shelf Life',      number:'FORM064.1', version:'089'},
   // METAL DETECTOR
   {key:'met-detect',  section:'Metal Detector',  name:'Metal Detection Record',                      number:'FORM005.0', version:''},
   {key:'met-loose',   section:'Metal Detector',  name:'Loose Items Register',                        number:'FORM014.1', version:''},
@@ -5262,7 +5263,7 @@ function renderRecipeLib(){
     return card;
   }
 
-  var FOLDER_ICONS={'Woolworths':'🛒','Emirates':'✈️','Dnata':'🛫','BP':'⛽','Rise':'🥐','Go Fresh':'🥗','Frozen':'🧊','OTR Eat':'🥪','Pizza':'🍕'};
+  var FOLDER_ICONS={'Woolworths':'🛒','Emirates':'✈️','Dnata':'🛫','BP':'⛽','Rise':'🥐','Go Fresh':'🥗','Frozen':'🧊','OTR Eat':'🥪','Pizza':'🍕','4 Points':'🔷'};
   var NESTED_FOLDERS={'Frozen':true}; // customers grouped by two levels: customer, then brand
   var recipeFoldersOpen=window.recipeFoldersOpen||(window.recipeFoldersOpen={});
 
@@ -7678,7 +7679,7 @@ var TRACE_SITE='Stapylton';
 // A triple is one scheduled SKU made of component sandwiches/wraps, each a half share of the pack.
 // Component lists come from each product's Work Instruction (the recipe's method steps). Where the spec gives only a
 // range (e.g. "4 slices (32-40g)") the middle of the range is used, which is what the paper sheet shows.
-// Components are listed in the order the spec makes them. Still to add: 971120, 971122 and the 4PT 963818.
+// Components are listed in the order the spec makes them. Still to add: 971120 and 971122.
 function tcg(code,name,per){return {code:code,name:name,per:per,unit:"GM'S"};}
 function tcs(code,name){return {code:code,name:name,per:2,unit:"SL'S"};}
 function tce(code,name){return {code:code,name:name,per:1,unit:"EA'S"};}
@@ -7772,6 +7773,18 @@ var TRIPLE_COMPONENTS={
       TC_TORTILLA,tcStarch(),tcg('600049','2K(3) BLACK SWAN GUACAMOLE',20),tcg('940486','R/W MIX RISE DICED CHICKEN FAJITA',60),tcCos(20)]}
   ]
 };
+// 4PT mixed variety (Uniting Care): one quarter of each of 4 components per pack (spec: 963818 V7).
+TRIPLE_COMPONENTS['963818']=[
+  {code:'990522',name:'COMP 4PT 963818 EGG ROCKET WMEAL',share:0.25,ingredients:[
+    tcs('964171','THE ONE WHOLEMEAL 700g'),tcMarg(6),tcg('940189','R/W MIX EGG PEPPER MAYO FX',50),tcg('920992','ROCKET LETTUCE',10)]},
+  {code:'990523',name:'COMP 4PT 963818 HAM CHS TOMATO WHITE',share:0.25,ingredients:[
+    tcs('964336','VIT/MIN WONDER WHITE TOAST 700G'),tcMarg(6),tcHam(27),tcTom(30),tcg('964202','TASTY CHEESE - SLICED',15)]},
+  {code:'990203',name:'COMP 4PT 963818 CHICKEN MAYO COS WMEAL',share:0.25,ingredients:[
+    tcs('964171','THE ONE WHOLEMEAL 700g'),tcMarg(6),tcg('940191','R/W MIX MM SH/CHK MAYO FX',50),tcCos(15)]},
+  {code:'990521',name:'COMP 4PT 963818 BEEF ROCKET CHTNEY',share:0.25,ingredients:[
+    tcs('964336','VIT/MIN WONDER WHITE TOAST 700G'),tcg('976824','MARGARINE SPREAD',6),tcg('095235','FRUIT CHUTNEY',10),
+    tcg('921435','ROAST BEEF - SLICED',40),tcg('920992','ROCKET LETTUCE',10)]}
+];
 function traceNum(w){var m=/^\s*(\d+(?:\.\d+)?)/.exec(String(w==null?'':w));return m?parseFloat(m[1]):null;}
 function traceFmt(n){return n==null?'—':String(Math.round(n*100)/100);}
 // One recipe ingredient → a sheet line, or null for packaging (bases, lids, labels are on FORM066.0, not this sheet).
