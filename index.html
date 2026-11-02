@@ -858,6 +858,15 @@ if(sessionStorage.getItem(PW_KEY)==='1'){
   <div class="mgr-body" id="shelfListBody"></div>
 </div>
 
+<!-- FORM065.0 BREAD TRACEABILITY - QLD -->
+<div class="mgr-panel" id="breadFormPanel">
+  <div class="mgr-hdr">
+    <div class="mgr-hdr-title"><span style="color:#2ecc40;">FRENZ</span><span style="color:#0074d9;">EE</span> <span style="font-size:0.8rem;color:#888;">FORM065.0 — Bread Traceability</span></div>
+    <button class="mgr-close" id="breadFormCloseBtn">✕ Close</button>
+  </div>
+  <div class="mgr-body" id="breadFormBody"></div>
+</div>
+
 <!-- METAL PRODUCT MANAGEMENT — PIN GATE -->
 <div class="overlay" id="metalGateOverlay">
   <div class="ov-box" style="max-width:340px;">
@@ -2481,6 +2490,7 @@ var FORM_REGISTRY=[
   {key:'line-labeller',section:'Line Forms',     name:"Labeller's Paperwork",                        number:'—',         version:''},
   {key:'line-trace',   section:'Line Forms',     name:'Traceability by SKU',                         number:'FORM064.3', version:''},
   {key:'line-shelf',   section:'Line Forms',     name:'Ingredient & Mix Production Shelf Life',      number:'FORM064.1', version:'089'},
+  {key:'line-bread',   section:'Line Forms',     name:'Bread Traceability - QLD',                    number:'FORM065.0', version:'025'},
   // METAL DETECTOR
   {key:'met-detect',  section:'Metal Detector',  name:'Metal Detection Record',                      number:'FORM005.0', version:''},
   {key:'met-loose',   section:'Metal Detector',  name:'Loose Items Register',                        number:'FORM014.1', version:''},
@@ -7394,6 +7404,8 @@ function renderTrace(){
 }
 
 function buildIngCard(ing,recipe,ph){
+  breadRelaxMark(ing);
+  breadPrefill(ing);
   var st=ingGet(ing.id)||{useBy:'',batchCode:'',tubNumber:'',scanned:false,verified:null,shelfLifeOk:null,overridden:false,overrideInfo:null};
   var isMix=ing.type==='mix';var minDays=getMinDays(ing);
   var isV=isMix?st.verified===true:st.shelfLifeOk===true;
@@ -7404,7 +7416,7 @@ function buildIngCard(ing,recipe,ph){
   var shelfTag=isMix?'<span style="font-size:0.68rem;color:#e67e22;font-weight:600;">⏱ '+minDays+'-day shelf life</span>':'<span style="font-size:0.68rem;color:#0074d9;font-weight:600;">📅 Min. '+minDays+' days required</span>';
   var shelfHTML='';
   if(st.useBy){var d=daysUntil(st.useBy);if(st.overridden)shelfHTML='<div class="scan-result warning" style="display:block;">⚠️ Override — '+st.overrideInfo.reason+'</div>';else if(d>=minDays)shelfHTML='<div class="scan-result success" style="display:block;">✅ '+d+' days remaining</div>';else if(d<0)shelfHTML='<div class="scan-result fail" style="display:block;">❌ Expired '+(-d)+' day'+(d===-1?'':'s')+' ago — min '+minDays+' required</div>';else shelfHTML='<div class="scan-result fail" style="display:block;">❌ Only '+d+' day'+(d===1?'':'s')+' — min '+minDays+' required</div>';}
-  var batchHTML=isMix||isBread(ing.name)?'':'<div class="field-row"><div class="field-label">Batch / Lot Code</div><input class="field-input" type="text" value="'+st.batchCode+'" placeholder="Enter batch code" data-ingid="'+ing.id+'" data-field="batchCode"/></div>';
+  var batchHTML=isMix||(isBread(ing.name)&&!breadSliced(ing.code))?'':'<div class="field-row"><div class="field-label">Batch / Lot Code</div><input class="field-input" type="text" value="'+st.batchCode+'" placeholder="Enter batch code" data-ingid="'+ing.id+'" data-field="batchCode"/></div>';
   var barcodeHTML=isMix?
     '<div class="field-row"><div class="field-label">Scan Mix Tub Barcode</div>'+
     '<div class="scan-row"><input class="field-input scan-input" type="text" placeholder="Scan tub barcode…" data-scanid="'+ing.id+'"/>'+
@@ -7426,27 +7438,28 @@ function buildIngCard(ing,recipe,ph){
   var showOv=(st.shelfLifeOk===false&&!st.overridden&&!isMix)||(isMix&&st.scanned&&st.shelfLifeOk===false&&!st.overridden);
   var ovBtn=showOv?'<button class="ov-btn" style="background:#e67e22;margin-top:8px;font-size:0.85rem;" data-ovid="'+ing.id+'">🔒 Supervisor Override</button>':'';
   var ovNote=st.overridden?'<div style="margin-top:6px;padding:8px 10px;border-radius:7px;font-size:0.8rem;background:#fff8f0;border:1.5px solid #e67e22;color:#7d4c00;">⚠️ Override by '+st.overrideInfo.name+' at '+st.overrideInfo.time+'<br>'+st.overrideInfo.reason+'</div>':'';
-  var capRule=!isMix?shelfRuleFor(ing.code):null,capEv=capRule?shelfEval(capRule.r,st):null;
-  var extraHTML='';
+  var capRule=!isMix?shelfRuleFor(ing.code,st.frozen):null,capEv=capRule?shelfEval(capRule.r,st):null;
+  var extraHTML=frozenToggleHTML(ing,st);
   if(capEv&&(capEv.needOpen||capEv.needThaw)){
     extraHTML+='<div style="display:grid;grid-template-columns:'+((capEv.needOpen&&capEv.needThaw)?'1fr 1fr':'1fr')+';gap:8px;margin-top:8px;">';
     if(capEv.needOpen) extraHTML+=dateFieldHTML(ing.id,'openDate',st.openDate,shelfOpenLabel(capEv));
     if(capEv.needThaw) extraHTML+=dateFieldHTML(ing.id,'thawedDate',st.thawedDate,'Date thawed');
     extraHTML+='</div>';
   }
-  extraHTML+=lastDayHTML(capRule,capEv)+secondBatchHTML(ing,st,isMix);
+  extraHTML+=lastDayHTML(capRule,capEv,st.relaxed)+secondBatchHTML(ing,st,isMix);
   var scoopHTML=ing.scoopLabel?'<div style="display:inline-flex;align-items:center;gap:5px;background:#fff;border:2px solid '+scoopColorHex(ing.scoopLabel)+';border-radius:20px;padding:2px 10px 2px 6px;margin:4px 0;font-size:0.74rem;font-weight:800;color:#222;">'+
     '<span style="width:13px;height:13px;border-radius:50%;background:'+scoopColorHex(ing.scoopLabel)+';border:1px solid rgba(0,0,0,0.25);display:inline-block;flex-shrink:0;"></span>🥄 USE '+ing.scoopLabel.toUpperCase()+' SCOOP</div>':'';
   var card=document.createElement('div');
   card.className='ing-card '+cc;card.id='ing-card-'+ing.id;
   if(ing.scoopLabel&&!isOv){var scoopHex=scoopColorHex(ing.scoopLabel);card.style.background=hexToRgba(scoopHex,0.16);card.style.borderLeftColor=cc?'':scoopHex;}
-  card.innerHTML='<div class="ing-top"><div class="ing-icon">'+ing.icon+'</div><div class="ing-name">'+ing.name+'<br>'+scoopHTML+shelfTag+'</div><div class="ing-vi" id="vicon-'+ing.id+'">'+vi+'</div></div><div class="ing-fields"><div class="field-row"><div class="field-label">Use By Date</div><input class="field-input" type="date" value="'+st.useBy+'" data-ingid="'+ing.id+'" data-field="useBy" data-type="'+ing.type+'" data-mindays="'+minDays+'"/>'+shelfHTML+'</div>'+batchHTML+barcodeHTML+extraHTML+ovBtn+ovNote+'</div>';
+  card.innerHTML='<div class="ing-top"><div class="ing-icon">'+ing.icon+'</div><div class="ing-name">'+ing.name+'<br>'+scoopHTML+shelfTag+'</div><div class="ing-vi" id="vicon-'+ing.id+'">'+vi+'</div></div><div class="ing-fields"><div class="field-row"><div class="field-label">'+(!isMix&&breadRowFor(ing.code)?'Best Before Date (BBD)':'Use By Date')+'</div><input class="field-input" type="date" value="'+st.useBy+'" data-ingid="'+ing.id+'" data-field="useBy" data-type="'+ing.type+'" data-mindays="'+minDays+'"/>'+shelfHTML+'</div>'+batchHTML+barcodeHTML+extraHTML+ovBtn+ovNote+'</div>';
   card.querySelectorAll('[data-ingid]').forEach(function(el){el.addEventListener('change',function(){updateField(el.dataset.ingid,el.dataset.field,el.value,el.dataset.type,el.dataset.mindays);});});
   card.querySelectorAll('[data-barcodeingid]').forEach(function(btn){btn.addEventListener('click',function(){scanBarcode(btn.dataset.barcodeingid,btn.dataset.barcode);});});
   card.querySelectorAll('[data-ovid]').forEach(function(btn){btn.addEventListener('click',function(){openOverride(btn.dataset.ovid);});});
   card.querySelectorAll('[data-todayid]').forEach(function(btn){btn.addEventListener('click',function(){updateField(btn.dataset.todayid,btn.dataset.todayfield,shelfToday());});});
   card.querySelectorAll('[data-b2add]').forEach(function(btn){btn.addEventListener('click',function(){addSecondBatch(btn.dataset.b2add);});});
   card.querySelectorAll('[data-b2rm]').forEach(function(btn){btn.addEventListener('click',function(){removeSecondBatch(btn.dataset.b2rm);});});
+  card.querySelectorAll('[data-frozenid]').forEach(function(el){el.addEventListener('change',function(){setBreadFrozen(el.dataset.frozenid,el.checked);});});
   if(ph)ph.replaceWith(card);else document.getElementById('ingredientList').appendChild(card);
 }
 function reRenderIng(ing,recipe){var old=document.getElementById('ing-card-'+ing.id);if(!old)return;var ph=document.createElement('div');old.parentNode.insertBefore(ph,old);old.remove();buildIngCard(ing,recipe,ph);}
@@ -7695,7 +7708,7 @@ function buildTraceRecord(line,jobIdx,job){
       overridden:!!st.overridden,
       override:st.overrideInfo?{name:st.overrideInfo.name,reason:st.overrideInfo.reason,time:st.overrideInfo.time}:null,
       rule:cap.rule,openDate:cap.openDate,thawedDate:cap.thawedDate,lastDay:cap.lastDay,lastDayBasis:cap.lastDayBasis,
-      datesMissing:cap.datesMissing,second:cap.second};
+      datesMissing:cap.datesMissing,second:cap.second,frozen:cap.frozen,relaxed:cap.relaxed};
   }):[];
   var complete=ings.length>0&&ings.every(function(i){return !!i.useBy&&(i.shelfLifeOk||i.overridden)&&(i.type!=='mix'||i.verified)&&!i.datesMissing&&(!i.second||i.second.ok);});
   var d=new Date();
@@ -7881,6 +7894,7 @@ var SHELF_LIFE_RULES=[
 {"g":"Fresh bread","c":"600042","s":"TIP TOP","d":"ABBOTT'S GLUTEN FREE RUSTIC WHITE","u":"RISE / FTG (as required)","r":"BBD - 4"},
 {"g":"Frozen bread","c":"600087","s":"BAKERS MAISON","d":"DEMI BAGUETTE","u":"RISE","r":"THAWED + 1"},
 {"g":"Frozen bread","c":"600069","s":"DELBAKE / LONGHURST","d":"WHITE SOURDOUGH","u":"RISE","r":"THAWED + 1"},
+{"g":"Frozen bread","c":"275496","s":"BAKERS MAISON","d":"LARGE STRAIGHT CROISSANT","u":"FTG, OTR","r":"THAWED + 1"},
 {"g":"Frozen bread","c":"600075","s":"LANTMANNEN (SA only)","d":"PREMIUM STRAIGHT CROISSANT","u":"OTR","r":"THAWED + 1"},
 {"g":"Frozen bread","c":"946710","s":"MISSION","d":"10\" PLAIN FLOUR TORTILLA","u":"BP, FTG, DNATA, RISE","r":"THAWED + 2"},
 {"g":"Frozen bread","c":"027757","s":"MISSION","d":"10\" LOW FAT FLOUR TORTILLA","u":"WW","r":"THAWED + 2"},
@@ -7972,7 +7986,7 @@ var SHELF_LIFE_RULES=[
 {"g":"In-house mix - Other - Nuts","c":"940236","s":"","d":"R/W MIX ORANGE BIRCHER MUESLI EG, EAT SA, RISE","u":"","r":"P + 2 / SSL"}
 ];
 var shelfIndex=null,shelfFilterText='';
-function shelfRuleFor(code){
+function shelfRuleFor(code,frozen){
   if(!shelfIndex){
     shelfIndex={};
     SHELF_LIFE_RULES.forEach(function(r){String(r.c).split(/\s+/).forEach(function(c){if(c) shelfIndex[c]=r;});});
@@ -7980,7 +7994,12 @@ function shelfRuleFor(code){
   var parts=String(code||'').split('/');
   for(var i=0;i<parts.length;i++){
     var k=parts[i].trim().replace(/[^0-9A-Za-z].*$/,'');   // '920961-WA' -> '920961'
-    if(k&&shelfIndex[k]) return shelfIndex[k];
+    if(k&&shelfIndex[k]){
+      var rule=shelfIndex[k];
+      // sliced bread used frozen follows FORM065.0's frozen rule (THAWED + 0), not its fresh BBD - 4
+      if(frozen){var br=breadRowFor(k);if(br&&br.k==='s'&&br.z) return {g:rule.g,c:rule.c,s:rule.s,d:rule.d,u:rule.u,r:br.z,frozen:true};}
+      return rule;
+    }
   }
   return null;
 }
@@ -8065,6 +8084,342 @@ function renderShelfGaps(){
     '</div></div>';
 }
 
+// ── FORM065.0 — Bread Traceability (QLD) ─────────────────────────────────
+// QA enters each day's bread before production: best before date (BBD), batch no. (sliced bread only) and the date
+// removed from the freezer (if used frozen). The line screens read it, so a team leader sees the bread's dates already
+// filled in and Frenzee knows whether it is fresh or frozen. Typed from the QA manual form as issued (see BREAD_FORM).
+// k: 's' = sliced bread (fresh: BBD - 4, or z if used frozen; z '' = not to be used frozen), 'f' = frozen product (z always applies).
+var BREAD_FORM={no:'FORM065.0',ref:'QA-911-F-065.0',title:'Bread Traceability - QLD',version:'025',issued:'17/12/25',by:'National QA'};
+var BREAD_REGISTER=[
+{s:'Goodman Fielder',c:'921432',d:'SOFT WHITE HELGAS',u:'Dnata',k:'s',z:'THAWED + 0'},
+{s:'Goodman Fielder',c:'921433',d:'MIXED GRAIN OATS HELGAS',u:'BP',k:'s',z:'THAWED + 0'},
+{s:'Goodman Fielder',c:'962652',d:'PUMPKIN SEED HELGAS',u:'BP, FTG, Dnata',k:'s',z:'THAWED + 0'},
+{s:'Goodman Fielder',c:'964335',d:'VITAMIN/MINERALS SANDWICH WONDER WHITE',u:'BP',k:'s',z:'THAWED + 0'},
+{s:'Goodman Fielder',c:'964336',d:'VITAMIN/MINERALS TOAST WONDER WHITE',u:'BP, FTG',k:'s',z:'THAWED + 0'},
+{s:'Goodman Fielder',c:'384359',d:'50% LOWER CARB 5 SEED HELGAS',u:'WW',k:'s',z:'THAWED + 0'},
+{s:'Goodman Fielder',c:'600053',d:'HELGAS CLASSIC RUSTIC WHITE SOURDOUGH',u:'OTR',k:'s',z:''},
+{s:'Goodman Fielder',c:'964195',d:'WONDER WHOLEMEAL SANDWICH',u:'OTR',k:'s',z:'THAWED + 0'},
+{s:'Goodman Fielder',c:'997017',d:'HELGAS GLUTEN FREE WHITE',u:'RISE, FTG',k:'s',z:'THAWED + 0'},
+{s:'Tip Top',c:'921318',d:'700G TEXAS TOAST THICK',u:'FTG',k:'s',z:'THAWED + 0'},
+{s:'Tip Top',c:'964113',d:'700G 9 GRAIN ORIGINAL',u:'OTR, BP, FTG',k:'s',z:'THAWED + 0'},
+{s:'Tip Top',c:'964171',d:'700GM THE ONE WHOLEMEAL SANDWICH',u:'FTG',k:'s',z:'THAWED + 0'},
+{s:'Tip Top',c:'260848',d:'800G COUNTRY GRAIN ABBOTTS',u:'FTG, WW, RISE',k:'s',z:'THAWED + 0'},
+{s:'Tip Top',c:'260849',d:'700G RUSTIC WHITE ABBOTTS',u:'BP, FTG, WW, RISE',k:'s',z:'THAWED + 0'},
+{s:'Tip Top',c:'380462',d:'760G SOURDOUGH RYE ABBOTTS',u:'FTG FZN',k:'s',z:''},
+{s:'Tip Top',c:'976208',d:'750G FARMHOUSE WHOLEMEAL ABBOTTS',u:'WW',k:'s',z:'THAWED + 0'},
+{s:'Tip Top',c:'964114',d:'THE ONE WHITE TOAST 700G',u:'EG',k:'s',z:'THAWED + 0'},
+{s:'Mission Foods',c:'946710',d:'10" PLAIN TORTILLA',u:'BP, Dnata, FTG',k:'f',z:'THAWED + 2'},
+{s:'Mission Foods',c:'027757',d:'10" LOW FAT TORTILLA',u:'WW',k:'f',z:'THAWED + 2'},
+{s:'Mission Foods',c:'385290',d:'10" NO ADDED PRESERVATIVE (NAP) FLOUR TORTILLA',u:'OTR',k:'f',z:'THAWED + 2'},
+{s:'Bakers Maison',c:'275496',d:'LARGE STRAIGHT CROISSANT',u:'FTG, OTR',k:'f',z:'THAWED + 1'},
+{s:'Bakery du Jour / Lantmannen',c:'600075',d:'90GX30 PREMIUM STRAIGHT CROISSANT',u:'BP, RISE',k:'f',z:'THAWED + 1'},
+{s:'Del bake',c:'600069',d:'SOURDOUGH WHITE BREAD',u:'RISE',k:'f',z:'THAWED + 1'},
+{s:'Bakers Maison',c:'600087',d:'DEMI BAGUETTE',u:'RISE',k:'f',z:'THAWED + 1'}
+];
+function blankBreadForm(){
+  return {date:shelfToday(),completedBy:'',rows:{},nonConf:'',prodMgrName:'',prodMgrSig:'',prodMgrDate:'',qaName:'',qaSig:'',qaDate:'',signedOff:false,signedTime:'',updatedAt:''};
+}
+var breadForm=blankBreadForm();
+var BREAD_INDEX=null;
+function breadRowFor(code){
+  if(!BREAD_INDEX){BREAD_INDEX={};BREAD_REGISTER.forEach(function(r){BREAD_INDEX[r.c]=r;});}
+  var k=String(code||'').split('/')[0].trim().replace(/[^0-9A-Za-z].*$/,'');
+  return BREAD_INDEX[k]||null;
+}
+function breadSliced(code){var r=breadRowFor(code);return !!(r&&r.k==='s');}
+function breadRuleText(r){return r.k==='f'?r.z:(r.z?'BBD - 4 / '+r.z:'BBD - 4');}
+function shelfRuleText(code){var r=breadRowFor(code);if(r) return breadRuleText(r);return (shelfRuleFor(code)||{}).r||'';}
+function breadToday(){if(breadForm.date!==shelfToday()) breadForm=blankBreadForm();return breadForm;}
+function breadEntryFor(code){var f=breadForm;if(!f||f.date!==shelfToday()) return null;return f.rows[code]||null;}
+function breadTouch(){var f=breadToday();f.updatedAt=new Date().toISOString();lsScheduleSave();pushBreadForm();}
+// Breads the day's schedule needs, with the lines that use each.
+function breadNeededToday(){
+  var need={};
+  LINES.forEach(function(line){
+    (scheduleData[line]||[]).forEach(function(job){
+      if(!job||!job.name||job.skipped||isEvent(job.name)) return;
+      var recipe=getJobRecipe(job);if(!recipe) return;
+      recipe.ingredients.forEach(function(ing){
+        if(ing.type==='mix') return;
+        var r=breadRowFor(ing.code);if(!r) return;
+        var a=need[r.c]||(need[r.c]=[]);if(a.indexOf(line)<0) a.push(line);
+      });
+    });
+  });
+  return need;
+}
+// What one row works out to from what QA entered.
+function breadRowEval(r,e){
+  e=e||{};
+  if(e.status) return {done:true,status:e.status};
+  var frozen=r.k==='f'||(!!e.removed&&!!r.z);
+  var rule=frozen?r.z:'BBD - 4';
+  var ev=shelfEval(rule,{useBy:e.bbd||'',thawedDate:e.removed||''});
+  return {done:!!e.bbd&&(!frozen||!!e.removed),frozen:frozen,rule:rule,lastDay:ev.lastDay,basis:ev.basis,ok:ev.ok};
+}
+function breadToEnter(){
+  var need=breadNeededToday(),f=breadToday(),n=0;
+  Object.keys(need).forEach(function(c){var r=breadRowFor(c);if(r&&!breadRowEval(r,f.rows[c]).done) n++;});
+  return n;
+}
+function breadHasEntries(){var f=breadToday();return Object.keys(f.rows).some(function(c){var e=f.rows[c];return e&&(e.status||e.bbd||e.batch||e.removed);});}
+function breadSignState(f){
+  var miss=[];
+  if(!(f.prodMgrName&&f.prodMgrSig)) miss.push('Production Super / Mgr name and signature');
+  if(!(f.qaName&&f.qaSig)) miss.push('QA Officer / Co-ord name and signature');
+  var left=breadToEnter();
+  if(left) miss.push(left+' bread'+(left===1?'':'s')+' on today\'s schedule not entered (or mark N/R / N/A)');
+  return {ok:!miss.length,miss:miss};
+}
+function breadFooterHTML(){
+  var B=BREAD_FORM,cell='padding:6px 8px;border-right:1px solid #222;';
+  return '<div style="border:1.5px solid #222;border-radius:8px;display:flex;flex-wrap:wrap;font-size:0.68rem;color:#333;margin-top:12px;">'+
+    '<div style="'+cell+'flex:1 1 90px;">'+metalEsc(B.ref)+'</div>'+
+    '<div style="'+cell+'flex:1 1 90px;">Pages 1 and 2 of 2</div>'+
+    '<div style="'+cell+'flex:1 1 90px;">Version No: '+metalEsc(B.version)+'</div>'+
+    '<div style="'+cell+'flex:1 1 90px;">Issue Date: '+metalEsc(B.issued)+'</div>'+
+    '<div style="padding:6px 8px;flex:1 1 130px;">Authorised By: '+metalEsc(B.by)+'</div></div>';
+}
+// ── Saved on this device, and shared through Firestore so the line screens see what QA entered ─────
+var _breadPushTimer=null;
+function pushBreadForm(){
+  clearTimeout(_breadPushTimer);
+  _breadPushTimer=setTimeout(function(){
+    if(!window.fbDb) return;
+    var f=breadToday();
+    fbDb.collection('breadForm').doc(f.date).set(JSON.parse(JSON.stringify(f)))
+      .catch(function(e){console.error('Firestore breadForm push failed:',e);});
+  },1200);
+}
+var _breadSyncStarted=false;
+function initBreadFormSync(){
+  if(_breadSyncStarted) return;
+  _breadSyncStarted=true;
+  fbReady.then(function(){
+    fbDb.collection('breadForm').doc(shelfToday()).onSnapshot(function(d){
+      if(!d.exists) return;
+      var v=d.data();
+      if(!v||!v.date||v.date!==shelfToday()) return;
+      if(breadForm.updatedAt&&v.updatedAt&&v.updatedAt<=breadForm.updatedAt) return;
+      breadForm=Object.assign(blankBreadForm(),v);
+      if(!breadForm.rows) breadForm.rows={};
+      lsScheduleSave();
+      var p=document.getElementById('breadFormPanel');
+      if(p&&p.classList.contains('show')&&!(document.activeElement&&p.contains(document.activeElement))) renderBreadForm();
+    },function(err){console.error('Firestore breadForm listener failed:',err);});
+  });
+}
+initBreadFormSync();
+// ── The QA entry screen ───────────────────────────────────────────────────
+function openBreadForm(){breadToday();showPanel('breadFormPanel');renderBreadForm();}
+function bfRowHTML(r,e,lines,locked){
+  e=e||{};
+  var ev=breadRowEval(r,e),c=r.c,dis=locked?' disabled':'';
+  var h='<div style="background:#fff;border-radius:14px;padding:11px 13px;margin-bottom:8px;box-shadow:0 2px 10px rgba(15,46,28,0.06);border-left:5px solid '+(ev.done?'#2ecc40':(lines?'#e67e22':'#ddd'))+';">'+
+    '<div style="display:flex;justify-content:space-between;gap:8px;">'+
+    '<div style="min-width:0;"><div style="font-size:0.84rem;font-weight:800;">'+metalEsc(r.d)+'</div>'+
+    '<div style="font-size:0.68rem;color:#888;margin-top:2px;"><span style="font-family:monospace;color:#555;">'+c+'</span> · '+metalEsc(r.s)+' · used in '+metalEsc(r.u)+
+    (lines?' · <strong style="color:#b9650c;">on '+metalEsc(lines.join(', '))+' today</strong>':'')+'</div></div>'+
+    '<div style="flex-shrink:0;align-self:flex-start;background:#e8f8f5;color:#117a65;font-weight:800;font-size:0.7rem;border-radius:8px;padding:4px 8px;text-align:right;">'+metalEsc(breadRuleText(r))+'</div></div>'+
+    '<select class="field-input" data-bfc="'+c+'" data-bff="status"'+dis+' style="margin-top:8px;">'+
+    '<option value="">Enter details</option>'+
+    '<option value="N/R"'+(e.status==='N/R'?' selected':'')+'>N/R — not required at this time</option>'+
+    '<option value="N/A"'+(e.status==='N/A'?' selected':'')+'>N/A — not applicable for this site</option></select>';
+  if(e.status) return h+'<div style="margin-top:6px;font-size:0.76rem;font-weight:700;color:#117a65;">✅ Marked '+metalEsc(e.status)+'</div></div>';
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">'+
+    '<div class="field-row"><div class="field-label">Best before date (BBD)</div><input class="field-input" type="date" value="'+metalEsc(e.bbd||'')+'" data-bfc="'+c+'" data-bff="bbd"'+dis+'/></div>';
+  if(r.k==='s'){
+    h+='<div class="field-row"><div class="field-label">Batch no. (sliced bread)</div><div style="display:flex;gap:6px;"><input class="field-input" type="text" value="'+metalEsc(e.batch||'')+'" placeholder="Tag code" data-bfc="'+c+'" data-bff="batch"'+dis+'/>'+
+      '<button type="button" data-bfbnns="'+c+'"'+dis+' title="Batch number not supplied" style="flex-shrink:0;background:#fff;color:#7d4c00;border:1.5px solid #e67e22;border-radius:8px;padding:0 9px;font-size:0.7rem;font-weight:800;cursor:pointer;">BNNS</button></div></div>';
+  } else {
+    h+='<div class="field-row"><div class="field-label">Batch no.</div><div style="font-size:0.76rem;color:#777;background:#eee;border-radius:8px;padding:10px;">Not for frozen product</div></div>';
+  }
+  h+='</div>';
+  if(r.k==='s'&&!r.z){
+    h+='<div class="field-row" style="margin-top:8px;"><div class="field-label">Date removed from freezer</div><div style="font-size:0.78rem;color:#777;background:#eee;border-radius:8px;padding:10px;">Not to be used FZN</div></div>';
+  } else {
+    h+='<div class="field-row" style="margin-top:8px;"><div class="field-label">Date removed from freezer'+(r.k==='s'?' (if used frozen)':'')+'</div><div style="display:flex;gap:6px;">'+
+      '<input class="field-input" type="date" value="'+metalEsc(e.removed||'')+'" data-bfc="'+c+'" data-bff="removed"'+dis+'/>'+
+      '<button type="button" data-bftoday="'+c+'"'+dis+' style="flex-shrink:0;background:#eef6ff;color:#0074d9;border:1.5px solid #0074d9;border-radius:8px;padding:0 10px;font-size:0.72rem;font-weight:700;cursor:pointer;">Today</button></div></div>';
+  }
+  if(ev.lastDay){
+    h+=ev.ok?'<div style="margin-top:8px;padding:7px 10px;border-radius:7px;font-size:0.78rem;background:#f0fdf4;border:1.5px solid #2ecc40;color:#1a7a2a;">📅 Last day: <strong>'+fmtDate(ev.lastDay)+'</strong> · '+metalEsc(ev.basis)+(ev.frozen?' · frozen':'')+'</div>'
+      :'<div style="margin-top:8px;padding:7px 10px;border-radius:7px;font-size:0.78rem;background:#fff0f0;border:1.5px solid #e74c3c;color:#a93226;">❌ Past its shelf life — the last day was <strong>'+fmtDate(ev.lastDay)+'</strong> ('+metalEsc(ev.basis)+'). Don\'t use it.</div>';
+  } else if(e.bbd||e.removed){
+    h+='<div style="margin-top:8px;padding:7px 10px;border-radius:7px;font-size:0.78rem;background:#fff8f0;border:1.5px solid #e67e22;color:#7d4c00;">📅 Enter the '+(ev.frozen?'date removed from the freezer':'best before date')+' to work out the last day.</div>';
+  }
+  if(r.k==='s'&&e.removed&&/\b(BP|OTR|WW)\b/.test(r.u)){
+    h+='<div style="margin-top:8px;padding:7px 10px;border-radius:7px;font-size:0.74rem;line-height:1.5;background:#eef6ff;border:1.5px solid #0074d9;color:#0b4a82;">❄️ Frozen bread. BP, OTR &amp; WW products can only use frozen bread if fresh is unavailable (delivery issue or bakery breakdown). Notify National QA, the relevant Sales person and the customer — see SCH018.0. In-house frozen sliced bread is THAWED + 0: it can\'t be held over to the next production day.</div>';
+  }
+  return h+'</div>';
+}
+function bfSignHTML(f,locked){
+  var dis=locked?' disabled':'';
+  function fld(label,id,val,type){return '<div class="field-row" style="margin-bottom:6px;"><div class="field-label">'+label+'</div><input class="field-input" type="'+(type||'text')+'" value="'+metalEsc(val||'')+'" data-bft="'+id+'"'+dis+'/></div>';}
+  var h='<div style="background:#fff;border-radius:16px;padding:14px;margin-top:14px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border:1.5px solid #222;">'+
+    '<div style="font-size:0.78rem;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">End of Day Sign Off</div>'+
+    '<div style="font-size:0.74rem;color:#777;margin-bottom:10px;">This form is signed off only when <strong>both</strong> the Production Supervisor / Manager and the QA Officer / Co-ord have signed.</div>'+
+    '<div style="font-size:0.74rem;font-weight:800;color:#0074d9;margin-bottom:4px;">Production Super / Mgr</div>'+
+    fld('Name','prodMgrName',f.prodMgrName)+fld('Signature','prodMgrSig',f.prodMgrSig)+fld('Date','prodMgrDate',f.prodMgrDate,'date')+
+    '<div style="font-size:0.74rem;font-weight:800;color:#16a085;margin:10px 0 4px;">QA Officer / Co-ord</div>'+
+    fld('Name','qaName',f.qaName)+fld('Signature','qaSig',f.qaSig)+fld('Date','qaDate',f.qaDate,'date');
+  if(locked){
+    h+='<div style="margin-top:8px;padding:9px 11px;border-radius:8px;background:#f0fdf4;border:1.5px solid #2ecc40;color:#1a7a2a;font-size:0.82rem;font-weight:700;">✅ Signed off by '+metalEsc(f.prodMgrName)+' (Production) and '+metalEsc(f.qaName)+' (QA)'+(f.signedTime?' at '+metalEsc(f.signedTime):'')+'</div>'+
+      '<button type="button" id="bf-reopen" style="margin-top:8px;background:#fff;color:#c0392b;border:1.5px solid #c0392b;border-radius:10px;padding:9px 12px;font-size:0.8rem;font-weight:700;cursor:pointer;width:100%;">↩ Re-open for changes (clears both sign-offs)</button>';
+  } else {
+    h+='<div id="bf-signmsg"></div><button type="button" id="bf-signbtn" style="margin-top:8px;background:#16a085;color:#fff;border:none;border-radius:10px;padding:11px 12px;font-size:0.9rem;font-weight:800;cursor:pointer;width:100%;">✍️ Sign off form</button>';
+  }
+  return h+'</div>';
+}
+function bfRefreshSign(){
+  var msg=document.getElementById('bf-signmsg'),btn=document.getElementById('bf-signbtn');
+  if(!msg||!btn) return;
+  var s=breadSignState(breadToday());
+  msg.innerHTML=s.ok?'':'<div style="margin-top:8px;font-size:0.76rem;color:#b9650c;line-height:1.6;">Still needed:<br>• '+s.miss.map(metalEsc).join('<br>• ')+'</div>';
+  btn.disabled=!s.ok;btn.style.opacity=s.ok?'1':'0.45';
+}
+function renderBreadForm(){
+  var body=document.getElementById('breadFormBody');if(!body) return;
+  var scroll=body.scrollTop;
+  var f=breadToday(),need=breadNeededToday(),locked=!!f.signedOff,B=BREAD_FORM;
+  var dayName=new Date(f.date+'T00:00:00').toLocaleDateString('en-AU',{weekday:'long'});
+  var onList=BREAD_REGISTER.filter(function(r){return need[r.c];});
+  var otherList=BREAD_REGISTER.filter(function(r){return !need[r.c];});
+  var doneNeed=onList.filter(function(r){return breadRowEval(r,f.rows[r.c]).done;}).length;
+  var h='<div style="background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border:1.5px solid #222;">'+
+    '<div style="font-size:0.7rem;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:0.5px;">Quality Assurance Manual</div>'+
+    '<div style="font-size:0.95rem;font-weight:900;color:#222;">'+B.no+' — '+metalEsc(B.title.toUpperCase())+'</div>'+
+    '<div style="font-size:0.74rem;color:#666;margin-top:4px;">'+B.ref+' · Version '+B.version+' · Issued '+B.issued+' · Authorised by '+B.by+'</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;"><div><div class="field-label">Day</div><div style="font-weight:700;">'+metalEsc(dayName)+'</div></div><div><div class="field-label">Date</div><div style="font-weight:700;">'+fmtDate(f.date)+'</div></div></div>'+
+    '<div class="field-row" style="margin-top:8px;"><div class="field-label">Completed by</div><input class="field-input" type="text" value="'+metalEsc(f.completedBy||'')+'" data-bft="completedBy"'+(locked?' disabled':'')+'/></div>'+
+    '<div style="font-size:0.72rem;color:#777;margin-top:8px;line-height:1.55;"><strong>N/R</strong> not required at this time · <strong>N/A</strong> not applicable for this site · <strong>BNNS</strong> batch number not supplied. <strong>BBD</strong> = best before date. <strong>THAWED + n</strong> = day out of the freezer + n days. All frozen sliced bread has a max life of 3 months in the freezer.</div></div>';
+  h+='<div style="display:flex;gap:10px;margin-bottom:10px;"><div class="sum-tile" style="flex:1;"><div class="sum-val" style="color:'+(doneNeed===onList.length?'#2ecc40':'#e67e22')+';">'+doneNeed+' / '+onList.length+'</div><div class="sum-lbl">Breads on today\'s schedule entered</div></div></div>';
+  function section(title,rows,useLines,note){
+    if(!rows.length) return '';
+    var s='<div style="font-size:0.78rem;font-weight:800;color:#c0763a;text-transform:uppercase;letter-spacing:0.5px;margin:14px 0 4px;">'+title+'</div>'+(note?'<div style="font-size:0.72rem;color:#999;margin-bottom:6px;">'+note+'</div>':''),last=null;
+    rows.forEach(function(r){
+      if(r.s!==last){s+='<div style="font-size:0.72rem;font-weight:700;color:#888;margin:8px 2px 4px;">'+metalEsc(r.s)+'</div>';last=r.s;}
+      s+=bfRowHTML(r,f.rows[r.c],useLines?need[r.c]:null,locked);
+    });
+    return s;
+  }
+  h+=section('On today\'s schedule',onList,true,'');
+  if(!onList.length) h+='<div style="text-align:center;color:#aaa;padding:14px;font-size:0.82rem;">No scheduled run uses a bread on this form yet — upload today\'s schedule, or enter any bread below.</div>';
+  h+=section('Other breads',otherList,false,'Not on today\'s schedule. Enter one only if it is being used.');
+  h+='<div style="background:#fff;border-radius:16px;padding:14px;margin-top:14px;box-shadow:0 4px 18px rgba(15,46,28,0.07);"><div style="font-size:0.78rem;font-weight:800;margin-bottom:6px;">Non-Conformances</div>'+
+    '<textarea class="field-input" rows="3" data-bft="nonConf" placeholder="Record any non-conformance (for example fresh bread unavailable, frozen bread used)"'+(locked?' disabled':'')+' style="width:100%;">'+metalEsc(f.nonConf||'')+'</textarea></div>';
+  h+=bfSignHTML(f,locked)+breadFooterHTML();
+  body.innerHTML=h;
+  body.scrollTop=scroll;
+  body.querySelectorAll('[data-bfc]').forEach(function(el){el.addEventListener('change',function(){
+    var f2=breadToday(),code=el.dataset.bfc,fld=el.dataset.bff,val=el.value;
+    if((fld==='bbd'||fld==='removed')&&val&&!shelfDateOk(val)) return;      // the year is still being typed
+    var e=f2.rows[code]||(f2.rows[code]={status:'',bbd:'',batch:'',removed:''});
+    e[fld]=val;breadTouch();
+    if(fld==='batch') return;
+    renderBreadForm();
+  });});
+  body.querySelectorAll('[data-bfbnns]').forEach(function(b){b.addEventListener('click',function(){
+    var f2=breadToday(),code=b.dataset.bfbnns,e=f2.rows[code]||(f2.rows[code]={status:'',bbd:'',batch:'',removed:''});
+    e.batch='BNNS';breadTouch();renderBreadForm();
+  });});
+  body.querySelectorAll('[data-bftoday]').forEach(function(b){b.addEventListener('click',function(){
+    var f2=breadToday(),code=b.dataset.bftoday,e=f2.rows[code]||(f2.rows[code]={status:'',bbd:'',batch:'',removed:''});
+    e.removed=shelfToday();breadTouch();renderBreadForm();
+  });});
+  body.querySelectorAll('[data-bft]').forEach(function(el){el.addEventListener('input',function(){
+    var f2=breadToday();f2[el.dataset.bft]=el.value;breadTouch();bfRefreshSign();
+  });});
+  var sb=document.getElementById('bf-signbtn');
+  if(sb) sb.onclick=function(){
+    var f2=breadToday(),s=breadSignState(f2);if(!s.ok) return;
+    if(!f2.prodMgrDate) f2.prodMgrDate=shelfToday();
+    if(!f2.qaDate) f2.qaDate=shelfToday();
+    f2.signedOff=true;f2.signedTime=nowTime();breadTouch();renderBreadForm();
+    showToast('✅ '+BREAD_FORM.no+' signed off by Production and QA');
+  };
+  var rb=document.getElementById('bf-reopen');
+  if(rb) rb.onclick=function(){
+    if(!confirm('Re-open this form? Both sign-offs will be cleared and must be signed again.')) return;
+    var f2=breadToday();
+    f2.signedOff=false;f2.signedTime='';f2.prodMgrName='';f2.prodMgrSig='';f2.prodMgrDate='';f2.qaName='';f2.qaSig='';f2.qaDate='';
+    breadTouch();renderBreadForm();
+  };
+  bfRefreshSign();
+}
+// ── End of Shift report ───────────────────────────────────────────────────
+function buildBreadPDFSection(){
+  var f=breadForm;
+  if(!f||!f.date) return '';
+  var rows=BREAD_REGISTER.filter(function(r){var e=f.rows[r.c];return e&&(e.status||e.bbd||e.batch||e.removed);});
+  if(!rows.length&&!f.nonConf&&!f.signedOff) return '';
+  var B=BREAD_FORM;
+  var dayName=new Date(f.date+'T00:00:00').toLocaleDateString('en-AU',{weekday:'long'});
+  var html='<h2 class="blue">'+B.no+' — '+metalEsc(B.title)+'</h2>'+
+    '<div style="font-size:10px;margin:4px 0 6px;">Day: <strong>'+metalEsc(dayName)+'</strong> · Date: <strong>'+fmtDate(f.date)+'</strong> · Completed by: <strong>'+metalEsc(f.completedBy||'—')+'</strong></div>'+
+    '<table><thead><tr><th>Supplier</th><th>Code</th><th>Product</th><th>Used in</th><th>BBD</th><th>Batch no.</th><th>Removed from freezer</th><th>Shelf life</th><th>Last day</th></tr></thead><tbody>'+
+    rows.map(function(r){
+      var e=f.rows[r.c],ev=breadRowEval(r,e);
+      if(e.status) return '<tr><td>'+metalEsc(r.s)+'</td><td>'+r.c+'</td><td>'+metalEsc(r.d)+'</td><td>'+metalEsc(r.u)+'</td><td colspan="5" style="text-align:center;">'+metalEsc(e.status)+'</td></tr>';
+      return '<tr><td>'+metalEsc(r.s)+'</td><td>'+r.c+'</td><td>'+metalEsc(r.d)+'</td><td>'+metalEsc(r.u)+'</td><td>'+(e.bbd?metalEsc(fmtDate(e.bbd)):'—')+'</td><td>'+metalEsc(e.batch||(r.k==='s'?'—':''))+'</td><td>'+(e.removed?metalEsc(fmtDate(e.removed)):'—')+'</td><td>'+metalEsc(breadRuleText(r))+'</td><td>'+(ev.lastDay?metalEsc(fmtDate(ev.lastDay))+(ev.ok?'':' <strong style="color:#c0392b;">PAST</strong>'):'—')+'</td></tr>';
+    }).join('')+'</tbody></table>'+
+    '<div style="font-size:10px;margin:6px 0;"><strong>Non-conformances:</strong> '+metalEsc(f.nonConf||'None recorded')+'</div>'+
+    '<table><thead><tr><th>Production Super / Mgr</th><th>Signature</th><th>Date</th><th>QA Officer / Co-ord</th><th>Signature</th><th>Date</th></tr></thead><tbody>'+
+    (f.signedOff?'<tr><td>'+metalEsc(f.prodMgrName)+'</td><td>'+metalEsc(f.prodMgrSig)+'</td><td>'+metalEsc(f.prodMgrDate)+'</td><td>'+metalEsc(f.qaName)+'</td><td>'+metalEsc(f.qaSig)+'</td><td>'+metalEsc(f.qaDate)+'</td></tr>'
+      :'<tr><td colspan="6" style="color:#c0392b;text-align:center;">NOT SIGNED OFF — needs both the Production Supervisor / Manager and the QA Officer / Co-ord</td></tr>')+
+    '</tbody></table>'+
+    '<div style="font-size:9px;color:#666;">'+metalEsc(B.ref)+' | Pages 1 and 2 of 2 | Version No: '+metalEsc(B.version)+' | Issue Date: '+metalEsc(B.issued)+' | Authorised By: '+metalEsc(B.by)+'</div>';
+  return html;
+}
+// ── Line screen: bread dates filled in from QA's entry, and fresh / frozen ──────
+function breadPrefill(ing){
+  if(!ing||ing.type==='mix') return;
+  var br=breadRowFor(ing.code);if(!br) return;
+  var e=breadEntryFor(br.c);if(!e||e.status) return;
+  ingInit(ing.id);
+  var st=ingGet(ing.id),auto=st.bfAuto||(st.bfAuto={}),changed=false;
+  function put(field,val){
+    if(!val) return;
+    if(!st[field]||st[field]===auto[field]){if(st[field]!==val){st[field]=val;changed=true;}auto[field]=val;}
+  }
+  put('useBy',e.bbd);
+  if(br.k==='s') put('batchCode',e.batch);
+  if(e.removed){
+    put('thawedDate',e.removed);
+    if(br.k==='s'&&br.z&&!st.frozenSet&&st.frozen!==true){st.frozen=true;changed=true;}
+  }
+  if(changed) ingRecalc(ing,st);
+}
+// Frozen sourdough and croissants made into frozen SKUs are used at the Operations Manager's discretion, so the
+// thawed-day rule is advisory there: the last day still shows, but it doesn't block the run and the freezer date is optional.
+var BREAD_FZN_SKU_CODES=['600069','275496','600075'];
+function isFrozenSku(job,recipe){return /\b(FZN|FROZEN)\b/i.test((job&&job.name)||'')||/\b(FZN|FROZEN)\b/i.test((recipe&&recipe.productName)||'');}
+function breadRelaxMark(ing){
+  if(!ing||ing.type==='mix') return;
+  var br=breadRowFor(ing.code);if(!br||BREAD_FZN_SKU_CODES.indexOf(br.c)<0) return;
+  var job=(scheduleData[currentLine]||[])[currentJobIdx];if(!job) return;
+  ingInit(ing.id);
+  ingGet(ing.id).relaxed=isFrozenSku(job,getJobRecipe(job));
+}
+function setBreadFrozen(id,on){
+  ingInit(id);
+  var st=ingGet(id);st.frozen=!!on;st.frozenSet=true;
+  var job=scheduleData[currentLine][currentJobIdx],recipe=getJobRecipe(job);
+  var ing=recipe&&recipe.ingredients.find(function(i){return i.id===id;});
+  if(ing) ingRecalc(ing,st);
+  ingRefresh(id);
+}
+function frozenToggleHTML(ing,st){
+  var br=breadRowFor(ing.code);
+  if(!br||br.k!=='s'||!br.z||ing.type==='mix') return '';
+  var h='<div style="margin-top:8px;"><label style="display:flex;align-items:center;gap:8px;font-size:0.82rem;font-weight:700;color:#0074d9;"><input type="checkbox" data-frozenid="'+ing.id+'"'+(st.frozen?' checked':'')+'/> ❄️ Using frozen bread (FORM065.0)</label>';
+  if(st.frozen){
+    h+='<div style="margin-top:6px;padding:7px 10px;border-radius:7px;font-size:0.76rem;line-height:1.5;background:#eef6ff;border:1.5px solid #0074d9;color:#0b4a82;">Frozen sliced bread is <strong>THAWED + 0</strong> — it can\'t be held over to the next production day.'+
+      (/\b(BP|OTR|WW)\b/.test(br.u)?' BP, OTR &amp; WW products can only use frozen bread if fresh is unavailable (delivery issue or bakery breakdown): notify National QA, the Sales person and the customer — see SCH018.0.':'')+'</div>';
+  }
+  return h+'</div>';
+}
+
 // ── Last day, worked out from a production shelf-life rule ───────────────
 // Rules look like: OPEN + 3, THAWED + 2, UBD - 4, BBD - 4, OPEN + 35 / DRAINED + 3, UBD - 4 & WASHED + 2,
 // THAWED + 6 / OPEN + 2. The last day is the soonest date any clause gives, from the dates the operator entered.
@@ -8123,16 +8478,16 @@ function shelfDateOk(v){var y=parseInt(String(v||'').slice(0,4),10);return !!v&&
 function secondBatchOk(ing,sec){
   if(!sec||!shelfDateOk(sec.useBy)) return false;
   if(daysUntil(sec.useBy)<getMinDays(ing)) return false;
-  if(ing.type!=='mix'){var rule=shelfRuleFor(ing.code);if(rule&&shelfEval(rule.r,sec).ok!==true) return false;}
+  if(ing.type!=='mix'){var rule=shelfRuleFor(ing.code,sec.frozen);if(rule&&!sec.relaxed&&shelfEval(rule.r,sec).ok!==true) return false;}
   return true;
 }
 // Re-works an ingredient's pass / fail from everything entered so far.
 function ingRecalc(ing,st){
   var useByOk=shelfDateOk(st.useBy)?daysUntil(st.useBy)>=getMinDays(ing):null;
   var lastOk=true;
-  if(ing.type!=='mix'){var rule=shelfRuleFor(ing.code);if(rule) lastOk=shelfEval(rule.r,st).ok;}
+  if(ing.type!=='mix'){var rule=shelfRuleFor(ing.code,st.frozen);if(rule) lastOk=st.relaxed?true:shelfEval(rule.r,st).ok;}
   st.shelfLifeOk=(useByOk===null||lastOk===null)?null:(useByOk&&lastOk);
-  if(st.second) st.second.ok=secondBatchOk(ing,st.second);
+  if(st.second){st.second.frozen=!!st.frozen;st.second.relaxed=!!st.relaxed;st.second.ok=secondBatchOk(ing,st.second);}
 }
 function ingOkFor(ing,st){
   var base=ing.type==='mix'?st.verified===true&&(st.shelfLifeOk===true||st.overridden)&&!!st.useBy:!!st.useBy&&(st.shelfLifeOk===true||st.overridden);
@@ -8162,8 +8517,12 @@ function dateFieldHTML(id,field,val,label){
     '<input class="field-input" type="date" value="'+(val||'')+'" data-ingid="'+id+'" data-field="'+field+'"/>'+
     '<button type="button" style="flex-shrink:0;background:#eef6ff;color:#0074d9;border:1.5px solid #0074d9;border-radius:8px;padding:0 10px;font-size:0.72rem;font-weight:700;cursor:pointer;" data-todayid="'+id+'" data-todayfield="'+field+'">Today</button></div></div>';
 }
-function lastDayHTML(rule,ev){
+function lastDayHTML(rule,ev,relaxed){
   if(!rule||!ev) return '';
+  if(relaxed){
+    if(ev.missing) return '<div style="margin-top:8px;padding:7px 10px;border-radius:7px;font-size:0.78rem;background:#eef6ff;border:1.5px solid #0074d9;color:#0b4a82;">❄️ Frozen SKU — the freezer date is optional here (Operations Manager\'s discretion). Rule: <strong>'+metalEsc(rule.r)+'</strong></div>';
+    if(ev.lastDay&&!ev.ok) return '<div style="margin-top:8px;padding:7px 10px;border-radius:7px;font-size:0.78rem;background:#fff8f0;border:1.5px solid #e67e22;color:#7d4c00;">⚠️ Past the last day (<strong>'+fmtDate(ev.lastDay)+'</strong>, '+metalEsc(ev.basis)+') — allowed on a frozen SKU at the Operations Manager\'s discretion.</div>';
+  }
   if(ev.missing) return '<div style="margin-top:8px;padding:7px 10px;border-radius:7px;font-size:0.78rem;background:#fff8f0;border:1.5px solid #e67e22;color:#7d4c00;">📅 Enter the date to work out the last day <strong>('+metalEsc(rule.r)+')</strong></div>';
   if(!ev.lastDay) return '';
   if(ev.ok) return '<div style="margin-top:8px;padding:7px 10px;border-radius:7px;font-size:0.78rem;background:#f0fdf4;border:1.5px solid #2ecc40;color:#1a7a2a;">📅 Last day: <strong>'+fmtDate(ev.lastDay)+'</strong> · '+metalEsc(ev.basis)+'</div>';
@@ -8171,7 +8530,7 @@ function lastDayHTML(rule,ev){
 }
 function secondBatchHTML(ing,st,isMix){
   if(!st.second) return '<button type="button" style="margin-top:8px;background:#fff;color:#0074d9;border:1.5px dashed #0074d9;border-radius:8px;padding:8px 12px;font-size:0.78rem;font-weight:700;cursor:pointer;width:100%;" data-b2add="'+ing.id+'">➕ Add second batch</button>';
-  var s=st.second,rule=!isMix?shelfRuleFor(ing.code):null,ev=rule?shelfEval(rule.r,s):null;
+  var s=st.second,rule=!isMix?shelfRuleFor(ing.code,st.frozen):null,ev=rule?shelfEval(rule.r,s):null;
   var h='<div style="margin-top:10px;border:1.5px dashed #0074d9;border-radius:10px;padding:10px;">'+
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div style="font-size:0.78rem;font-weight:800;color:#0074d9;">2nd batch</div>'+
     '<button type="button" style="background:none;border:none;color:#e74c3c;font-weight:700;font-size:0.75rem;cursor:pointer;" data-b2rm="'+ing.id+'">✕ Remove</button></div>'+
@@ -8180,7 +8539,7 @@ function secondBatchHTML(ing,st,isMix){
   if(ev&&ev.needOpen) h+=dateFieldHTML(ing.id,'b2_openDate',s.openDate,shelfOpenLabel(ev));
   if(ev&&ev.needThaw) h+=dateFieldHTML(ing.id,'b2_thawedDate',s.thawedDate,'Date thawed');
   var msg='';
-  if(s.ok) msg='<div style="margin-top:6px;font-size:0.76rem;color:#1a7a2a;font-weight:700;">✅ In date'+(ev&&ev.lastDay?' · last day '+fmtDate(ev.lastDay):'')+'</div>';
+  if(s.ok) msg='<div style="margin-top:6px;font-size:0.76rem;color:#1a7a2a;font-weight:700;">'+(s.relaxed&&ev&&ev.ok===false?'⚠️ Past the last day (frozen SKU — Operations Manager\'s discretion)':'✅ In date')+(ev&&ev.lastDay?' · last day '+fmtDate(ev.lastDay):'')+'</div>';
   else if(!shelfDateOk(s.useBy)) msg='<div style="margin-top:6px;font-size:0.76rem;color:#b9650c;font-weight:700;">Enter this batch\'s use-by date, or remove it.</div>';
   else if(daysUntil(s.useBy)<getMinDays(ing)) msg='<div style="margin-top:6px;font-size:0.76rem;color:#a93226;font-weight:700;">❌ Needs at least '+getMinDays(ing)+' days left — don\'t use this batch.</div>';
   else if(ev&&ev.missing) msg='<div style="margin-top:6px;font-size:0.76rem;color:#b9650c;font-weight:700;">Enter the date to work out the last day ('+metalEsc(rule.r)+').</div>';
@@ -8213,7 +8572,7 @@ function traceCapKey(code){return String(code||'').split('/')[0].trim().replace(
 function traceCaptureFromState(ing,st){
   st=st||{};
   var isMix=ing.type==='mix';
-  var rule=shelfRuleFor(ing.code);
+  var rule=shelfRuleFor(ing.code,st.frozen);
   var ev=(!isMix&&rule)?shelfEval(rule.r,st):null;
   var sec=null;
   if(st.second){
@@ -8224,7 +8583,7 @@ function traceCaptureFromState(ing,st){
   return {rule:rule?rule.r:'',batchCode:st.batchCode||'',tubNumber:st.tubNumber||'',useBy:st.useBy||'',
     openDate:st.openDate||'',thawedDate:st.thawedDate||'',
     lastDay:isMix?(st.useBy||''):(ev?ev.lastDay:''),lastDayBasis:isMix?'Use by':(ev?ev.basis:''),
-    datesMissing:!!(ev&&ev.missing),second:sec};
+    datesMissing:!!(ev&&ev.missing&&!st.relaxed),second:sec,frozen:!!st.frozen,relaxed:!!st.relaxed};
 }
 // Capture for every ingredient of a scheduled job, keyed by ingredient code: from the saved record once the run is
 // finished, otherwise from the run in progress.
@@ -8249,6 +8608,7 @@ function traceCapCells(c){
   var b=[];
   if(c.batchCode) b.push(c.batchCode);
   if(c.tubNumber) b.push(c.tubNumber);
+  if(c.frozen) b.push('FROZEN');
   if(c.useBy) b.push('UBD '+fmtDate(c.useBy));
   var c1=metalEsc(b.join(' · '))+(c.lastDay?'<br><span style="color:#117a65;">Last day '+fmtDate(c.lastDay)+(c.lastDayBasis?' ('+metalEsc(c.lastDayBasis)+')':'')+'</span>':'');
   var c4='',c5='',s=c.second;
@@ -8444,7 +8804,7 @@ function buildTraceSheet(){
     var jobs=scheduleData[line]||[],used={},lineNo=li+1;
     function lbl(p){return 'Line '+lineNo+' - '+p;}
     function ingRows(list,mult){
-      return list.map(function(il){return {kind:'ing',code:il.code,desc:il.name,per:il.per,total:il.per==null?null:il.per*mult,unit:il.unit,rule:(shelfRuleFor(il.code)||{}).r||''};});
+      return list.map(function(il){return {kind:'ing',code:il.code,desc:il.name,per:il.per,total:il.per==null?null:il.per*mult,unit:il.unit,rule:shelfRuleText(il.code)};});
     }
     jobs.forEach(function(job,ji){
       pos++;
@@ -9236,6 +9596,7 @@ function renderQaDash(){
     {icon:'📋',title:'FORM067.0 — Production Paperwork Sign Off Sheet',desc:'Daily sign-off for all production forms across all lines',count:0,countLabel:'',color:'#555',action:function(){openForm067();}},
     {icon:'📋',title:'FORM093.0 — Labels Issued Log',desc:'First & last label verification for each production run',count:pending093,countLabel:'awaiting sign-off',color:'#9b59b6',action:function(){renderQaForm093List(body);}},
     {icon:'📋',title:'FORM053.0 — Line Clearance Check Sheet',desc:'Pre-run line clearance checks (Woolworths products)',count:pendingLC,countLabel:'awaiting sign-off',color:'#007dc6',action:function(){renderQaLCList(body);}},
+    {icon:'🍞',title:BREAD_FORM.no+' — Bread Traceability',desc:'Enter the day\'s bread best before dates, batch numbers and freezer dates before production starts · Supervisor & QA sign off',count:(breadToEnter()||((breadHasEntries()&&!breadToday().signedOff)?1:0)),countLabel:(breadToEnter()?'bread(s) to enter before production':'form awaiting Supervisor & QA sign-off'),color:'#c0763a',action:function(){clearInterval(qaRefreshInterval);openBreadForm();}},
     {icon:'🔎',title:TRACE_FORM_NO+' — Traceability by SKU',desc:'Ingredient traceability for every run — review and sign off by line',count:LINES.filter(function(l){return traceLineStatus(l).unsigned.length>0;}).length,countLabel:'lines awaiting sign-off',color:'#16a085',action:function(){clearInterval(qaRefreshInterval);openTraceSign();}},
     {icon:'📅',title:'End of Day Schedule Sign Off',desc:'Daily production schedule sign-off at end of shift',count:0,countLabel:'coming soon',color:'#27ae60',action:null,comingSoon:true},
     {icon:'🏷️',title:'Label Retention Records',desc:'Retained labels log for traceability and compliance',count:0,countLabel:'coming soon',color:'#e67e22',action:null,comingSoon:true},
@@ -12277,6 +12638,7 @@ function lsSave(){
       traceRecords: traceRecords,
       traceSignOffs: traceSignOffs,
       ingredientState: ingredientState,
+      breadForm: breadForm,
       allergenVerifications: allergenVerifications,
       skipReasons: skipReasons,
       formChangesLog: formChangesLog,
@@ -12348,6 +12710,7 @@ function lsLoad(){
     if(snap.traceSignOffs) traceSignOffs=snap.traceSignOffs;
     // scans for runs still in progress (a finished run's state is cleared once its record is saved)
     if(snap.ingredientState) ingredientState=snap.ingredientState;
+    if(snap.breadForm){breadForm=Object.assign(blankBreadForm(),snap.breadForm);if(!breadForm.rows) breadForm.rows={};}
     if(snap.allergenVerifications) allergenVerifications=snap.allergenVerifications;
     if(snap.skipReasons) skipReasons=snap.skipReasons;
     formChangesLog   = snap.formChangesLog   || [];
@@ -12453,7 +12816,7 @@ function confirmNewShift(){
     allergenVerifications={};
     skipReasons=[];
     issueLog=[];transferLog=[];overrideLog=[];form093Records=[];lcRecords=[];
-    dmgLogs=[];messages=[];msgIdCtr=0;ingredientState={};
+    dmgLogs=[];messages=[];msgIdCtr=0;ingredientState={};breadForm=blankBreadForm();
     localStorage.removeItem(LS_KEY);
     hideOverlay('newShiftOverlay');
     hideOverlay('eosOverlay');
@@ -12862,6 +13225,8 @@ function buildEosPDF(){
   // Inject FORM064.3 Traceability by SKU
   var trPDF=buildTraceabilityPDFSection();
   if(trPDF) html=html.replace('</body></html>', trPDF+'</body></html>');
+  var brPDF=buildBreadPDFSection();
+  if(brPDF) html=html.replace('</body></html>', brPDF+'</body></html>');
   // Inject skip reasons
   if(skipReasons.length){
     var srHTML='<h2 class="orange">⏭️ Skipped Jobs Log</h2>'+
@@ -13147,6 +13512,11 @@ document.getElementById('metalProductsCloseBtn').onclick=closeMetalProducts;
 document.getElementById('traceSignCloseBtn').onclick=function(){hidePanel('traceSignPanel');};
 document.getElementById('traceSheetCloseBtn').onclick=function(){hidePanel('traceSheetPanel');};
 document.getElementById('shelfListCloseBtn').onclick=function(){hidePanel('shelfListPanel');};
+document.getElementById('breadFormCloseBtn').onclick=function(){
+  hidePanel('breadFormPanel');
+  var qp=document.getElementById('qaPanel');
+  if(qp&&qp.classList.contains('show')){renderQaDash();clearInterval(qaRefreshInterval);qaRefreshInterval=setInterval(renderQaDash,10000);}
+};
 document.getElementById('mpCancelBtn').onclick=function(){hideOverlay('metalProductOverlay');};
 document.getElementById('mgCancelBtn').onclick=function(){hideOverlay('metalGateOverlay');};
 document.getElementById('pmOverlayCancelBtn').onclick=function(){hideOverlay('prepMixOverlay');};
