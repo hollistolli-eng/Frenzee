@@ -7675,26 +7675,101 @@ function endRun(){
 // Position = the SKU's row in the schedule counted from the first row of Line A (line number A=1 … STAT=6).
 // Each ingredient shows its per-unit amount and the total needed (per-unit x scheduled quantity).
 var TRACE_SITE='Stapylton';
-// A triple is one scheduled SKU made of component sandwiches, each a half share of the pack.
-// Component lists come from the product's Work Instruction (spec). Add the other triples here as their specs arrive.
+// A triple is one scheduled SKU made of component sandwiches/wraps, each a half share of the pack.
+// Component lists come from each product's Work Instruction (the recipe's method steps). Where the spec gives only a
+// range (e.g. "4 slices (32-40g)") the middle of the range is used, which is what the paper sheet shows.
+// Components are listed in the order the spec makes them. Still to add: 971120, 971122 and the 4PT 963818.
+function tcg(code,name,per){return {code:code,name:name,per:per,unit:"GM'S"};}
+function tcs(code,name){return {code:code,name:name,per:2,unit:"SL'S"};}
+function tce(code,name){return {code:code,name:name,per:1,unit:"EA'S"};}
+var TC_BREAD_CG=tcs('260848','800G COUNTRY GRAIN ABBOTTS TIP TOP');
+var TC_BREAD_RW=tcs('260849','700G RUSTIC WHITE ABBOTTS TIP TOP');
+var TC_BREAD_WS=tcs('964335','700G VITAMIN/MINERAL SANDWICH');
+var TC_BREAD_9G=tcs('964113','700G 9 GRAIN ORIGINAL BREAD');
+var TC_BREAD_ONE=tcs('964114','700G THE ONE WHITE TOAST BREAD');
+var TC_TORTILLA=tce('385290','10" FTG NAP FLOUR TORTILLA');
+function tcMarg(g){return tcg('281094','15K MARGARINE SPREAD',g);}
+function tcCos(g){return tcg('920962','R/W COS LETTUCE',g);}
+function tcHam(g){return tcg('920189','1K(5) PRAGER SLICED HAM PRIMO',g);}
+function tcTom(g){return tcg('921022','R/W TOMATOES SLICED (W&S)',g);}
+function tcCheer(g){return tcg('256742','1.5K(8) CATERING 96 SLICES CHEER',g);}
+function tcStarch(){return tcg('940210','R/W MIX TAPIOCA FOOD STARCH',2);}
 var TRIPLE_COMPONENTS={
   '971138':[
     {code:'990622',name:'COMP 971138 EAT HAM CHEESE WHITE SW',share:0.5,ingredients:[
-      {code:'281094',name:'15K MARGARINE SPREAD',per:6,unit:"GM'S"},
-      {code:'920189',name:'1K(5) PRAGER SLICED HAM PRIMO',per:36,unit:"GM'S"},
-      {code:'921022',name:'R/W TOMATOES SLICED (W&S)',per:40,unit:"GM'S"},
-      {code:'946733',name:"1.5K(8) REAL VINTAGE CHEDDAR SLICE 72'S REAL DAIRY",per:21,unit:"GM'S"},
-      {code:'964335',name:'700G VITAMIN/MINERAL SANDWICH',per:2,unit:"SL'S"}]},
+      tcMarg(6),tcg('920189','1K(5) PRAGER SLICED HAM PRIMO',36),tcTom(40),
+      tcg('946733',"1.5K(8) REAL VINTAGE CHEDDAR SLICE 72'S REAL DAIRY",21),TC_BREAD_WS]},
     {code:'990621',name:'COMP 971138 EAT CHICKEN AVOCADO SW',share:0.5,ingredients:[
-      {code:'964113',name:'700G 9 GRAIN ORIGINAL BREAD',per:2,unit:"SL'S"},
-      {code:'600049',name:'2K(3) BLACK SWAN GUACAMOLE',per:20,unit:"GM'S"},
-      {code:'940468',name:'R/W MIX OTR EAT CHK MAYO',per:70,unit:"GM'S"},
-      {code:'920962',name:'R/W COS LETTUCE',per:15,unit:"GM'S"}]},
+      TC_BREAD_9G,tcg('600049','2K(3) BLACK SWAN GUACAMOLE',20),tcg('940468','R/W MIX OTR EAT CHK MAYO',70),tcCos(15)]},
     {code:'990623',name:'COMP 971138 EAT EGG MAYO SW',share:0.5,ingredients:[
-      {code:'281094',name:'15K MARGARINE SPREAD',per:3,unit:"GM'S"},
-      {code:'920962',name:'R/W COS LETTUCE',per:15,unit:"GM'S"},
-      {code:'940465',name:'R/W MIX OTR EAT EGG MAYO',per:80,unit:"GM'S"},
-      {code:'964335',name:'700G VITAMIN/MINERAL SANDWICH',per:2,unit:"SL'S"}]}
+      tcMarg(3),tcCos(15),tcg('940465','R/W MIX OTR EAT EGG MAYO',80),TC_BREAD_WS]}
+  ],
+  '971064':[
+    {code:'990553',name:'COMP 971064 WW CHICKEN MAYO MGRAIN',share:0.5,ingredients:[
+      TC_BREAD_CG,tcg('940405','R/W MIX WW DICED CHICKEN MAYONNAISE PEPPER',70),tcCos(10)]},
+    {code:'990555',name:'COMP 971064 WW EGG MAYO COS MGRAIN',share:0.5,ingredients:[
+      TC_BREAD_CG,tcg('940408','R/W MIX WW FREE RANGE EGG MAYO',60),tcCos(10)]},
+    {code:'990554',name:'COMP 971064 WW HAM CHEESE TOMATO WHITE',share:0.5,ingredients:[
+      tcg('099167','1.5K(8) TASTY 90 CHEESE SLICES MAINLAND',17),TC_BREAD_RW,
+      tcg('384357','1K(5) SOW STALL FREE ENGLISH STYLE HAM PRIMO',44),tcTom(20),
+      tcg('976591','10KG WHOLE EGG MAYONNAISE BIRCH & WAITE',10)]}
+  ],
+  '971077':[
+    {code:'990254',name:'COMP 971077 BP CHK MAYO COS WHITE',share:0.5,ingredients:[
+      TC_BREAD_WS,tcMarg(3),tcg('940064','R/W MIX BP MM SH/CHK MAYO BW',70),tcCos(15)]},
+    {code:'990404',name:'COMP 971077 BP HAM CHEESE TOMATO',share:0.5,ingredients:[
+      TC_BREAD_WS,tcMarg(3),tcg('976591','10KG WHOLE EGG MAYONNAISE BIRCH & WAITE',10),tcHam(27),tcTom(30),tcCheer(15)]},
+    {code:'990530',name:'COMP 971077 BP EGG MAYO COS WHITE',share:0.5,ingredients:[
+      TC_BREAD_WS,tcMarg(3),tcg('940441','R/W MIX BP CHUNKY EGG CHIVE MAYONNAISE',70),tcCos(15)]}
+  ],
+  '971099':[
+    {code:'990604',name:'COMP 971099 BP CHICKEN MAYO DILL WHITE',share:0.5,ingredients:[
+      TC_BREAD_WS,tcg('940183','R/W MIX BP MM SH/CHK HERB MAYO BW',50),tcCos(10)]},
+    {code:'990602',name:'COMP 971099 BP CHICKEN BACON TOMATO',share:0.5,ingredients:[
+      TC_BREAD_9G,tcMarg(6),tcg('940403','R/W MIX BP CHICKEN HERB BACON',50),tcTom(20),tcCheer(15)]},
+    {code:'990603',name:'COMP 971099 BP CHICKEN CORN CUCUMBER WHITE',share:0.5,ingredients:[
+      TC_BREAD_WS,tcMarg(3),tcg('940450','R/W MIX BP MM SH/CHK CORN MAYO BW',60),tcg('920943','CUCUMBER SLICED, 3MM',20)]}
+  ],
+  '971116':[
+    {code:'990607',name:'COMP 971116 GO FRESH CHICKEN LETTUCE MGRAIN',share:0.5,ingredients:[
+      TC_BREAD_CG,tcg('940457','R/W MIX TC SLICED CHICKEN MAYONNAISE FX',70),tcCos(15)]},
+    {code:'990609',name:'COMP 971116 GO FRESH HAM CHEESE TOMATO WHITE',share:0.5,ingredients:[
+      TC_BREAD_ONE,tcMarg(6),tcg('600013','10K FREE RANGE WHOLE EGG MAYONNAISE FOOD FX',10),tcHam(27),tcTom(30),tcCheer(15)]},
+    {code:'990608',name:'COMP 971116 GO FRESH EGG LETTUCE MGRAIN',share:0.5,ingredients:[
+      TC_BREAD_9G,tcg('940159','R/W MIX EGG CHIVE MAYO FX',70),tcCos(15)]}
+  ],
+  '971156':[
+    {code:'990641',name:'COMP 971156 WW CHK CAESAR WRAP 10"',share:0.5,ingredients:[
+      TC_TORTILLA,tcStarch(),tcg('940406','R/W MIX WW DICED CHICKEN CAESAR',60),tcg('920048','2.5K (4) FREE-RANGE HARD-BOILED EGGS',20),tcCos(10)]},
+    {code:'990642',name:'COMP 971156 WW S/CHILLI CHK WRAP 10"',share:0.5,ingredients:[
+      TC_TORTILLA,tcStarch(),tcg('940412','R/W MIX WW DICED CHICKEN AND SWEET CHILLI AIOLI',80),tcg('920966','MESCLUN LETTUCE',20)]},
+    {code:'990620',name:'COMP 971156 WW FAJITA CHK WRAP 10"',share:0.5,ingredients:[
+      TC_TORTILLA,tcStarch(),tcg('384417','2KG(4) FTG AVOCADO SPREAD',15),tcg('940469','R/W FAJITA CHICKEN MIX',80),
+      tcg('088539','4.1K(3) MARINATED FIRE ROASTED PEPPER STRIPS',15),tcCos(15)]}
+  ],
+  '971180':[
+    {code:'990631',name:'COMP 971180 RISE CHICKEN MAYO SW',share:0.5,ingredients:[
+      TC_BREAD_CG,tcCos(10),tcg('940473','R/W MIX RISE DICED CHICKEN MAYO',60)]},
+    {code:'990632',name:'COMP 971180 RISE HAM CHEESE TOMATO SW',share:0.5,ingredients:[
+      tcCheer(15),TC_BREAD_RW,tcMarg(6),tcg('920189','1K(5) PRAGER SLICED HAM PRIMO',36),tcTom(30)]},
+    {code:'990633',name:'COMP 971180 RISE EGG MAYO SW',share:0.5,ingredients:[
+      TC_BREAD_CG,tcCos(10),tcg('940479','R/W MIX RISE CHUNKY CAGE EGG MAYO',60)]}
+  ],
+  '971181':[
+    {code:'990634',name:'COMP 971181 RISE CHICKEN AVO SW',share:0.5,ingredients:[
+      TC_BREAD_RW,tcg('940499','R/W MIX RISE CHICKEN MAYO & AVOCADO',80),tcCos(10)]},
+    {code:'990635',name:'COMP 971181 RISE CHICKEN MAYO SW',share:0.5,ingredients:[
+      TC_BREAD_CG,tcg('940473','R/W MIX RISE DICED CHICKEN MAYO',60)]},
+    {code:'990636',name:'COMP 971181 RISE SWEET CHILLI CHICKEN SW',share:0.5,ingredients:[
+      TC_BREAD_RW,tcg('940412','R/W MIX WW DICED CHICKEN AND SWEET CHILLI AIOLI',60)]}
+  ],
+  '971189':[
+    {code:'990637',name:'COMP 971189 RISE CHICKEN & BACON CAESAR',share:0.5,ingredients:[
+      TC_TORTILLA,tcStarch(),tcg('940484','R/W MIX RISE DICED CHICKEN CAESAR',80),tcg('600020','2.5K (4) SSF BACON - DICED',10),tcCos(15)]},
+    {code:'990638',name:'COMP 971189 RISE HAM, CHEESE & TOMATO',share:0.5,ingredients:[
+      TC_TORTILLA,tcStarch(),tcg('600013','10K FREE RANGE WHOLE EGG MAYONNAISE FOOD FX',25),tcHam(27),tcTom(20),tcCheer(15),tcCos(15)]},
+    {code:'990639',name:'COMP 971189 RISE CHICKEN FAJITA',share:0.5,ingredients:[
+      TC_TORTILLA,tcStarch(),tcg('600049','2K(3) BLACK SWAN GUACAMOLE',20),tcg('940486','R/W MIX RISE DICED CHICKEN FAJITA',60),tcCos(20)]}
   ]
 };
 function traceNum(w){var m=/^\s*(\d+(?:\.\d+)?)/.exec(String(w==null?'':w));return m?parseFloat(m[1]):null;}
@@ -7735,7 +7810,7 @@ function buildTraceSheet(){
       if(!real){b.notes.push("No recipe found for this product — its ingredients can't be listed.");return;}
       var spec=TRIPLE_COMPONENTS[real.sku];
       if(spec){
-        spec.forEach(function(c){b.rows.push({kind:'link',code:c.code,desc:c.name,per:c.share,total:qty*c.share,unit:"EA'S"});});
+        spec.slice().sort(function(x,y){return x.code<y.code?-1:x.code>y.code?1:0;}).forEach(function(c){b.rows.push({kind:'link',code:c.code,desc:c.name,per:c.share,total:qty*c.share,unit:"EA'S"});});
         var allReal=spec.every(function(c,k){return jobs[ji+1+k]&&String(jobs[ji+1+k].sku).trim()===c.code;});
         spec.forEach(function(c,k){
           if(allReal) used[ji+1+k]=true;
