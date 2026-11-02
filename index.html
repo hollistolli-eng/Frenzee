@@ -4780,11 +4780,20 @@ function renderTraceAnalytics(){
 
 // ── Helper: get all traceability records from current shift + archives ─
 function traceRecordRows(tr,fallbackDate){
-  return tr.ingredients.filter(function(i){return i.useBy||i.batchCode||i.tubNumber;}).map(function(i){
-    return {date:tr.date||fallbackDate,line:tr.line,jobName:tr.jobName,sku:tr.sku,
-      ingredientName:i.name,supplier:i.supplier,batchCode:i.batchCode,tubNumber:i.tubNumber,useBy:i.useBy,
-      verified:(i.verified||i.overridden)?'✅':'—',teamLeader:tr.teamLeader};
+  var rows=[];
+  tr.ingredients.forEach(function(i){
+    var base={date:tr.date||fallbackDate,line:tr.line,jobName:tr.jobName,sku:tr.sku,
+      ingredientName:i.name,supplier:i.supplier,teamLeader:tr.teamLeader,verified:(i.verified||i.overridden)?'✅':'—'};
+    if(i.useBy||i.batchCode||i.tubNumber){
+      rows.push(Object.assign({},base,{batchCode:i.batchCode,tubNumber:i.tubNumber,useBy:i.useBy,openDate:i.openDate||'',thawedDate:i.thawedDate||'',lastDay:i.lastDay||''}));
+    }
+    // a second batch is searchable too — a recall has to find either batch
+    if(i.second&&(i.second.useBy||i.second.batchCode)){
+      rows.push(Object.assign({},base,{ingredientName:i.name+' (2nd batch)',batchCode:i.second.batchCode||'',tubNumber:'',useBy:i.second.useBy||'',
+        openDate:i.second.openDate||'',thawedDate:i.second.thawedDate||'',lastDay:i.second.lastDay||''}));
+    }
   });
+  return rows;
 }
 function getAllTraceRecords(){
   var records=[];
@@ -6734,7 +6743,7 @@ function getJobRecipe(job){
   var real=null;
   if(job.sku) real=recipeLibrary.find(function(r){return r.sku===job.sku;});
   if(!real) real=getRecipeBySkuOrName(job.name);
-  if(real) return {sku:real.sku,productName:real.productName,ingredients:buildTraceIngredients(real)};
+  if(real) return {sku:real.sku,productName:real.productName,ingredients:buildTraceIngredients({ingredients:expandTripleIngredients(real)})};
   return getRecipe(job.name);
 }
 function requiresLidCheck(n){var u=n.toUpperCase();return u.indexOf('RISE')!==-1||u.indexOf('EATS')!==-1;}
@@ -7417,28 +7426,53 @@ function buildIngCard(ing,recipe,ph){
   var showOv=(st.shelfLifeOk===false&&!st.overridden&&!isMix)||(isMix&&st.scanned&&st.shelfLifeOk===false&&!st.overridden);
   var ovBtn=showOv?'<button class="ov-btn" style="background:#e67e22;margin-top:8px;font-size:0.85rem;" data-ovid="'+ing.id+'">🔒 Supervisor Override</button>':'';
   var ovNote=st.overridden?'<div style="margin-top:6px;padding:8px 10px;border-radius:7px;font-size:0.8rem;background:#fff8f0;border:1.5px solid #e67e22;color:#7d4c00;">⚠️ Override by '+st.overrideInfo.name+' at '+st.overrideInfo.time+'<br>'+st.overrideInfo.reason+'</div>':'';
+  var capRule=!isMix?shelfRuleFor(ing.code):null,capEv=capRule?shelfEval(capRule.r,st):null;
+  var extraHTML='';
+  if(capEv&&(capEv.needOpen||capEv.needThaw)){
+    extraHTML+='<div style="display:grid;grid-template-columns:'+((capEv.needOpen&&capEv.needThaw)?'1fr 1fr':'1fr')+';gap:8px;margin-top:8px;">';
+    if(capEv.needOpen) extraHTML+=dateFieldHTML(ing.id,'openDate',st.openDate,shelfOpenLabel(capEv));
+    if(capEv.needThaw) extraHTML+=dateFieldHTML(ing.id,'thawedDate',st.thawedDate,'Date thawed');
+    extraHTML+='</div>';
+  }
+  extraHTML+=lastDayHTML(capRule,capEv)+secondBatchHTML(ing,st,isMix);
   var scoopHTML=ing.scoopLabel?'<div style="display:inline-flex;align-items:center;gap:5px;background:#fff;border:2px solid '+scoopColorHex(ing.scoopLabel)+';border-radius:20px;padding:2px 10px 2px 6px;margin:4px 0;font-size:0.74rem;font-weight:800;color:#222;">'+
     '<span style="width:13px;height:13px;border-radius:50%;background:'+scoopColorHex(ing.scoopLabel)+';border:1px solid rgba(0,0,0,0.25);display:inline-block;flex-shrink:0;"></span>🥄 USE '+ing.scoopLabel.toUpperCase()+' SCOOP</div>':'';
   var card=document.createElement('div');
   card.className='ing-card '+cc;card.id='ing-card-'+ing.id;
   if(ing.scoopLabel&&!isOv){var scoopHex=scoopColorHex(ing.scoopLabel);card.style.background=hexToRgba(scoopHex,0.16);card.style.borderLeftColor=cc?'':scoopHex;}
-  card.innerHTML='<div class="ing-top"><div class="ing-icon">'+ing.icon+'</div><div class="ing-name">'+ing.name+'<br>'+scoopHTML+shelfTag+'</div><div class="ing-vi" id="vicon-'+ing.id+'">'+vi+'</div></div><div class="ing-fields"><div class="field-row"><div class="field-label">Use By Date</div><input class="field-input" type="date" value="'+st.useBy+'" data-ingid="'+ing.id+'" data-field="useBy" data-type="'+ing.type+'" data-mindays="'+minDays+'"/>'+shelfHTML+'</div>'+batchHTML+barcodeHTML+ovBtn+ovNote+'</div>';
+  card.innerHTML='<div class="ing-top"><div class="ing-icon">'+ing.icon+'</div><div class="ing-name">'+ing.name+'<br>'+scoopHTML+shelfTag+'</div><div class="ing-vi" id="vicon-'+ing.id+'">'+vi+'</div></div><div class="ing-fields"><div class="field-row"><div class="field-label">Use By Date</div><input class="field-input" type="date" value="'+st.useBy+'" data-ingid="'+ing.id+'" data-field="useBy" data-type="'+ing.type+'" data-mindays="'+minDays+'"/>'+shelfHTML+'</div>'+batchHTML+barcodeHTML+extraHTML+ovBtn+ovNote+'</div>';
   card.querySelectorAll('[data-ingid]').forEach(function(el){el.addEventListener('change',function(){updateField(el.dataset.ingid,el.dataset.field,el.value,el.dataset.type,el.dataset.mindays);});});
   card.querySelectorAll('[data-barcodeingid]').forEach(function(btn){btn.addEventListener('click',function(){scanBarcode(btn.dataset.barcodeingid,btn.dataset.barcode);});});
   card.querySelectorAll('[data-ovid]').forEach(function(btn){btn.addEventListener('click',function(){openOverride(btn.dataset.ovid);});});
+  card.querySelectorAll('[data-todayid]').forEach(function(btn){btn.addEventListener('click',function(){updateField(btn.dataset.todayid,btn.dataset.todayfield,shelfToday());});});
+  card.querySelectorAll('[data-b2add]').forEach(function(btn){btn.addEventListener('click',function(){addSecondBatch(btn.dataset.b2add);});});
+  card.querySelectorAll('[data-b2rm]').forEach(function(btn){btn.addEventListener('click',function(){removeSecondBatch(btn.dataset.b2rm);});});
   if(ph)ph.replaceWith(card);else document.getElementById('ingredientList').appendChild(card);
 }
 function reRenderIng(ing,recipe){var old=document.getElementById('ing-card-'+ing.id);if(!old)return;var ph=document.createElement('div');old.parentNode.insertBefore(ph,old);old.remove();buildIngCard(ing,recipe,ph);}
 function updateField(id,field,val,type,minDays){
-  var _uk=ingKey(id); if(!ingredientState[_uk]) ingredientState[_uk]={}; ingredientState[_uk][field]=val;
+  var _uk=ingKey(id); if(!ingredientState[_uk]) ingredientState[_uk]={};
+  var st=ingredientState[_uk];
+  var second=field.indexOf('b2_')===0;
+  var key=second?field.slice(3):field;
+  if(second){ if(!st.second) st.second={ok:false}; st.second[key]=val; } else { st[key]=val; }
+  var isDate=(key==='useBy'||key==='openDate'||key==='thawedDate');
   // While a date is being typed the box passes through years like 0002 / 0020 / 0202. Don't judge or
   // redraw the card until it's a real year, or the box is rebuilt mid-typing and the rest is lost.
-  if(field==='useBy'){
-    var _yr=parseInt(String(val||'').slice(0,4),10);
-    if(!val||isNaN(_yr)||_yr<2000){ingredientState[_uk].shelfLifeOk=null;return;}
+  if(isDate&&val){
+    var _yr=parseInt(String(val).slice(0,4),10);
+    if(isNaN(_yr)||_yr<2000){
+      if(second) st.second.ok=false;
+      else if(key==='useBy') st.shelfLifeOk=null;
+      return;
+    }
   }
-  if(field==='useBy'&&type&&minDays){ingredientState[_uk].shelfLifeOk=daysUntil(val)>=parseInt(minDays);var job=scheduleData[currentLine][currentJobIdx];var recipe=getJobRecipe(job);var ing=recipe&&recipe.ingredients.find(function(i){return i.id===id;});if(ing){reRenderIng(ing,recipe);updateCompleteBtn(recipe);updateTraceStatus(recipe);}}
-  if(field==='tubNumber'||field==='batchCode'){var job=scheduleData[currentLine][currentJobIdx];var recipe=getJobRecipe(job);var ing=recipe&&recipe.ingredients.find(function(i){return i.id===id;});if(ing) reRenderIng(ing,recipe);}
+  var job=scheduleData[currentLine][currentJobIdx];var recipe=getJobRecipe(job);
+  var ing=recipe&&recipe.ingredients.find(function(i){return i.id===id;});
+  if(!ing) return;
+  if(isDate){ingRecalc(ing,st);reRenderIng(ing,recipe);updateCompleteBtn(recipe);updateTraceStatus(recipe);return;}
+  if(second){ingRecalc(ing,st);reRenderIng(ing,recipe);updateCompleteBtn(recipe);updateTraceStatus(recipe);return;}
+  if(key==='tubNumber'||key==='batchCode') reRenderIng(ing,recipe);
 }
 // A scan button must never invent a result — with nothing scanned or typed it does nothing but ask for one.
 function needBarcode(input){
@@ -7520,7 +7554,7 @@ function submitOverride(){
   if(ing){reRenderIng(ing,recipe);updateCompleteBtn(recipe);updateTraceStatus(recipe);}
 }
 function updateCompleteBtn(recipe){
-  var ingOk=recipe.ingredients.every(function(ing){var st=ingGet(ing.id)||{};return ing.type==='mix'?st.verified===true&&(st.shelfLifeOk===true||st.overridden)&&st.useBy:!!st.useBy&&(st.shelfLifeOk===true||st.overridden);});
+  var ingOk=ingAllOk(recipe);
   var job=scheduleData[currentLine][currentJobIdx];
   var lcOk=!requiresLineClearance(job.name)||job.lineClearanceDone===true;
   var hasBread=!!getBreadIng(recipe);
@@ -7534,7 +7568,7 @@ function updateCompleteBtn(recipe){
 function updateTraceStatus(recipe){
   var hasOv=recipe.ingredients.some(function(i){var s=ingGet(i.id)||{};return s.overridden;});
   var job=scheduleData[currentLine][currentJobIdx];
-  var ingOk=recipe.ingredients.every(function(ing){var st=ingGet(ing.id)||{};return ing.type==='mix'?st.verified===true&&(st.shelfLifeOk===true||st.overridden)&&st.useBy:!!st.useBy&&(st.shelfLifeOk===true||st.overridden);});
+  var ingOk=ingAllOk(recipe);
   var lcOk=!requiresLineClearance(job.name)||job.lineClearanceDone===true;
   var breadOk=!getBreadIng(recipe)||job.breadVerified===true;
   var ok=ingOk&&lcOk&&breadOk&&job.firstLabelScanned===true&&(!requiresLidCheck(job.name)||job.firstLidVerified===true);
@@ -7654,17 +7688,22 @@ function buildTraceRecord(line,jobIdx,job){
   var crew=(lineStaffing[line]||[]).filter(function(e){return !e.timeOut;}).map(function(e){return e.name;});
   var ings=recipe?recipe.ingredients.map(function(ing){
     var st=ingredientState[line+'__'+jobIdx+'__'+ing.id]||{};
+    var cap=traceCaptureFromState(ing,st);
     return {name:ing.name,code:ing.code||'',supplier:ing.supplier||'',type:ing.type,scoopLabel:ing.scoopLabel||'',
       batchCode:st.batchCode||'',tubNumber:st.tubNumber||'',useBy:st.useBy||'',
       scanned:!!st.scanned,verified:st.verified===true,shelfLifeOk:st.shelfLifeOk===true,
       overridden:!!st.overridden,
-      override:st.overrideInfo?{name:st.overrideInfo.name,reason:st.overrideInfo.reason,time:st.overrideInfo.time}:null};
+      override:st.overrideInfo?{name:st.overrideInfo.name,reason:st.overrideInfo.reason,time:st.overrideInfo.time}:null,
+      rule:cap.rule,openDate:cap.openDate,thawedDate:cap.thawedDate,lastDay:cap.lastDay,lastDayBasis:cap.lastDayBasis,
+      datesMissing:cap.datesMissing,second:cap.second};
   }):[];
-  var complete=ings.length>0&&ings.every(function(i){return !!i.useBy&&(i.shelfLifeOk||i.overridden)&&(i.type!=='mix'||i.verified);});
+  var complete=ings.length>0&&ings.every(function(i){return !!i.useBy&&(i.shelfLifeOk||i.overridden)&&(i.type!=='mix'||i.verified)&&!i.datesMissing&&(!i.second||i.second.ok);});
   var d=new Date();
+  var sheet=traceSheetSnapshot(line,jobIdx);
   return {id:'TR-'+d.getTime()+'-'+line.replace(/\s+/g,'')+'-'+jobIdx,formNo:TRACE_FORM_NO,line:line,
     date:d.toLocaleDateString('en-AU'),isoDate:d.toISOString().split('T')[0],
     jobName:job.name,sku:(recipe&&recipe.sku)||job.sku||'',recipeName:recipe?recipe.productName:'',qty:job.qty||0,
+    posLabel:sheet.length?sheet[0].label:'',sheet:sheet,
     actStart:job.actStart||'',actFinish:job.actFinish||'',teamLeader:leader?leader.name:'',
     recordedBy:currentUser?currentUser.name:'',crew:crew,
     checks:{bread:job.breadVerified===true,label:job.firstLabelScanned===true,lid:job.firstLidVerified===true,lineClearance:job.lineClearanceDone===true},
@@ -8026,6 +8065,245 @@ function renderShelfGaps(){
     '</div></div>';
 }
 
+// ── Last day, worked out from a production shelf-life rule ───────────────
+// Rules look like: OPEN + 3, THAWED + 2, UBD - 4, BBD - 4, OPEN + 35 / DRAINED + 3, UBD - 4 & WASHED + 2,
+// THAWED + 6 / OPEN + 2. The last day is the soonest date any clause gives, from the dates the operator entered.
+function shelfAddDays(iso,n){
+  var p=String(iso||'').split('-');
+  if(p.length!==3) return '';
+  var d=new Date(parseInt(p[0],10),parseInt(p[1],10)-1,parseInt(p[2],10)+n);
+  return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);
+}
+function shelfToday(){var t=new Date();return t.getFullYear()+'-'+('0'+(t.getMonth()+1)).slice(-2)+'-'+('0'+t.getDate()).slice(-2);}
+var SHELF_OPEN_KINDS={OPEN:1,DRAINED:1,SLICED:1,WASHED:1};
+function shelfClauses(rule){
+  var t=String(rule||'').replace(/\([^)]*\)/g,' ').toUpperCase();
+  var parts=t.split(/\s*[\/&]\s*/),out=[],carry=null;
+  for(var i=parts.length-1;i>=0;i--){
+    var m=/^\s*([A-Z]+)\s*(?:([+-])\s*(\d+))?\s*$/.exec(parts[i]);
+    if(!m) continue;
+    var kind=m[1]==='THAW'?'THAWED':m[1];
+    if(kind==='SSL') continue;
+    var op=m[2],n=m[3];
+    if(n!==undefined) carry={op:op,n:n};
+    else if(carry){op=carry.op;n=carry.n;}      // 'OPEN & DRAINED + 3' — OPEN shares the number
+    else continue;
+    out.unshift({kind:kind,op:op==='-'?'-':'+',n:parseInt(n,10)});
+  }
+  return out;
+}
+// st = {useBy, openDate, thawedDate}. ok is true/false once the last day can be worked out, null while a date it needs is missing.
+function shelfEval(rule,st){
+  st=st||{};
+  var cl=shelfClauses(rule),needOpen=false,needThaw=false,openKind='',cands=[];
+  cl.forEach(function(c){
+    if(c.kind==='UBD'||c.kind==='BBD'){
+      if(st.useBy) cands.push({d:shelfAddDays(st.useBy,-c.n),b:c.kind+' - '+c.n});
+    } else if(SHELF_OPEN_KINDS[c.kind]){
+      needOpen=true;
+      if(!openKind||c.kind==='WASHED') openKind=c.kind;
+      if(st.openDate) cands.push({d:shelfAddDays(st.openDate,c.n),b:c.kind+' + '+c.n});
+    } else if(c.kind==='THAWED'){
+      needThaw=true;
+      if(st.thawedDate) cands.push({d:shelfAddDays(st.thawedDate,c.n),b:'THAWED + '+c.n});
+    }
+  });
+  var haveOpen=!!st.openDate,haveThaw=!!st.thawedDate;
+  // a rule that covers both opening and thawing (different packs of one product) needs either date
+  var missing=(needOpen&&needThaw)?(!haveOpen&&!haveThaw):((needOpen&&!haveOpen)||(needThaw&&!haveThaw));
+  var best=null;
+  cands.forEach(function(c){if(!best||c.d<best.d) best=c;});
+  var lastDay=(!missing&&best)?best.d:'';
+  return {needOpen:needOpen,needThaw:needThaw,openKind:openKind,missing:missing,lastDay:lastDay,basis:lastDay?best.b:'',
+    ok:lastDay?daysUntil(lastDay)>=0:(missing?null:true)};
+}
+function shelfOpenLabel(ev){return ev.openKind==='WASHED'?'Date washed / opened':ev.openKind==='DRAINED'?'Date opened / drained':'Date opened';}
+function shelfDateOk(v){var y=parseInt(String(v||'').slice(0,4),10);return !!v&&!isNaN(y)&&y>=2000;}
+// A second batch is good only when it has an in-date use-by (and the dates its rule needs).
+function secondBatchOk(ing,sec){
+  if(!sec||!shelfDateOk(sec.useBy)) return false;
+  if(daysUntil(sec.useBy)<getMinDays(ing)) return false;
+  if(ing.type!=='mix'){var rule=shelfRuleFor(ing.code);if(rule&&shelfEval(rule.r,sec).ok!==true) return false;}
+  return true;
+}
+// Re-works an ingredient's pass / fail from everything entered so far.
+function ingRecalc(ing,st){
+  var useByOk=shelfDateOk(st.useBy)?daysUntil(st.useBy)>=getMinDays(ing):null;
+  var lastOk=true;
+  if(ing.type!=='mix'){var rule=shelfRuleFor(ing.code);if(rule) lastOk=shelfEval(rule.r,st).ok;}
+  st.shelfLifeOk=(useByOk===null||lastOk===null)?null:(useByOk&&lastOk);
+  if(st.second) st.second.ok=secondBatchOk(ing,st.second);
+}
+function ingOkFor(ing,st){
+  var base=ing.type==='mix'?st.verified===true&&(st.shelfLifeOk===true||st.overridden)&&!!st.useBy:!!st.useBy&&(st.shelfLifeOk===true||st.overridden);
+  if(!base) return false;
+  if(st.second&&!st.second.ok) return false;      // a second batch that was started must be filled in and in date
+  return true;
+}
+function ingAllOk(recipe){return recipe.ingredients.every(function(ing){return ingOkFor(ing,ingGet(ing.id)||{});});}
+function ingRefresh(id){
+  var job=scheduleData[currentLine][currentJobIdx];var recipe=getJobRecipe(job);
+  var ing=recipe&&recipe.ingredients.find(function(i){return i.id===id;});
+  if(ing){reRenderIng(ing,recipe);updateCompleteBtn(recipe);updateTraceStatus(recipe);}
+}
+function addSecondBatch(id){
+  var k=ingKey(id);if(!ingredientState[k]) ingredientState[k]={};
+  if(!ingredientState[k].second) ingredientState[k].second={batchCode:'',useBy:'',openDate:'',thawedDate:'',ok:false};
+  ingRefresh(id);
+}
+function removeSecondBatch(id){
+  var k=ingKey(id);
+  if(ingredientState[k]) delete ingredientState[k].second;
+  ingRefresh(id);
+}
+// ── Ingredient card pieces ────────────────────────────────────────────────
+function dateFieldHTML(id,field,val,label){
+  return '<div class="field-row"><div class="field-label">'+label+'</div><div style="display:flex;gap:6px;">'+
+    '<input class="field-input" type="date" value="'+(val||'')+'" data-ingid="'+id+'" data-field="'+field+'"/>'+
+    '<button type="button" style="flex-shrink:0;background:#eef6ff;color:#0074d9;border:1.5px solid #0074d9;border-radius:8px;padding:0 10px;font-size:0.72rem;font-weight:700;cursor:pointer;" data-todayid="'+id+'" data-todayfield="'+field+'">Today</button></div></div>';
+}
+function lastDayHTML(rule,ev){
+  if(!rule||!ev) return '';
+  if(ev.missing) return '<div style="margin-top:8px;padding:7px 10px;border-radius:7px;font-size:0.78rem;background:#fff8f0;border:1.5px solid #e67e22;color:#7d4c00;">📅 Enter the date to work out the last day <strong>('+metalEsc(rule.r)+')</strong></div>';
+  if(!ev.lastDay) return '';
+  if(ev.ok) return '<div style="margin-top:8px;padding:7px 10px;border-radius:7px;font-size:0.78rem;background:#f0fdf4;border:1.5px solid #2ecc40;color:#1a7a2a;">📅 Last day: <strong>'+fmtDate(ev.lastDay)+'</strong> · '+metalEsc(ev.basis)+'</div>';
+  return '<div style="margin-top:8px;padding:7px 10px;border-radius:7px;font-size:0.78rem;background:#fff0f0;border:1.5px solid #e74c3c;color:#a93226;">❌ Past its shelf life — the last day was <strong>'+fmtDate(ev.lastDay)+'</strong> ('+metalEsc(ev.basis)+'). Don\'t use this pack.</div>';
+}
+function secondBatchHTML(ing,st,isMix){
+  if(!st.second) return '<button type="button" style="margin-top:8px;background:#fff;color:#0074d9;border:1.5px dashed #0074d9;border-radius:8px;padding:8px 12px;font-size:0.78rem;font-weight:700;cursor:pointer;width:100%;" data-b2add="'+ing.id+'">➕ Add second batch</button>';
+  var s=st.second,rule=!isMix?shelfRuleFor(ing.code):null,ev=rule?shelfEval(rule.r,s):null;
+  var h='<div style="margin-top:10px;border:1.5px dashed #0074d9;border-radius:10px;padding:10px;">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div style="font-size:0.78rem;font-weight:800;color:#0074d9;">2nd batch</div>'+
+    '<button type="button" style="background:none;border:none;color:#e74c3c;font-weight:700;font-size:0.75rem;cursor:pointer;" data-b2rm="'+ing.id+'">✕ Remove</button></div>'+
+    '<div class="field-row"><div class="field-label">Batch / Lot Code</div><input class="field-input" type="text" value="'+metalEsc(s.batchCode||'')+'" placeholder="Enter batch code" data-ingid="'+ing.id+'" data-field="b2_batchCode"/></div>'+
+    '<div class="field-row"><div class="field-label">Use By Date</div><input class="field-input" type="date" value="'+(s.useBy||'')+'" data-ingid="'+ing.id+'" data-field="b2_useBy"/></div>';
+  if(ev&&ev.needOpen) h+=dateFieldHTML(ing.id,'b2_openDate',s.openDate,shelfOpenLabel(ev));
+  if(ev&&ev.needThaw) h+=dateFieldHTML(ing.id,'b2_thawedDate',s.thawedDate,'Date thawed');
+  var msg='';
+  if(s.ok) msg='<div style="margin-top:6px;font-size:0.76rem;color:#1a7a2a;font-weight:700;">✅ In date'+(ev&&ev.lastDay?' · last day '+fmtDate(ev.lastDay):'')+'</div>';
+  else if(!shelfDateOk(s.useBy)) msg='<div style="margin-top:6px;font-size:0.76rem;color:#b9650c;font-weight:700;">Enter this batch\'s use-by date, or remove it.</div>';
+  else if(daysUntil(s.useBy)<getMinDays(ing)) msg='<div style="margin-top:6px;font-size:0.76rem;color:#a93226;font-weight:700;">❌ Needs at least '+getMinDays(ing)+' days left — don\'t use this batch.</div>';
+  else if(ev&&ev.missing) msg='<div style="margin-top:6px;font-size:0.76rem;color:#b9650c;font-weight:700;">Enter the date to work out the last day ('+metalEsc(rule.r)+').</div>';
+  else if(ev&&ev.ok===false) msg='<div style="margin-top:6px;font-size:0.76rem;color:#a93226;font-weight:700;">❌ Past its shelf life — last day was '+fmtDate(ev.lastDay)+'.</div>';
+  return h+msg+'</div>';
+}
+// ── Triples: the line screen lists the components' ingredients ───────────
+// A triple's own recipe is a merged half-portion list (or just the component codes). On the line screen the
+// ingredients to scan are the components' real ingredients (each once), plus the packaging lines the recipe has.
+function expandTripleIngredients(real){
+  var spec=TRIPLE_COMPONENTS[real.sku];
+  if(!spec) return real.ingredients;
+  var seen={},list=[];
+  function primary(x){return String(x.isMix&&x.mixCode?x.mixCode:(x.code||'')).split('/')[0].trim();}
+  spec.forEach(function(c){c.ingredients.forEach(function(il){
+    if(seen[il.code]) return;
+    seen[il.code]=1;
+    var src=(real.ingredients||[]).filter(function(x){return primary(x)===il.code;})[0]||{};
+    var isMix=!!mixLibrary.find(function(m){return m.mixCode===il.code;});
+    var nm=String(src.name||il.name).replace(/\s*\([^)]*half[- ]portions?[^)]*\)/i,'');
+    list.push({name:nm,code:il.code,supplier:src.supplier||'',isMix:isMix,mixCode:isMix?il.code:undefined,scoopLabel:src.scoopLabel||'',allergens:src.allergens||'',targetWeight:String(il.per)});
+  });});
+  (real.ingredients||[]).forEach(function(x){
+    if(/^\s*\d+(?:\.\d+)?\s*(?:units?|labels?)\s*$/i.test(String(x.targetWeight==null?'':x.targetWeight))) list.push(x);
+  });
+  return list;
+}
+// ── What was captured, for the record, the sheet and the report ──────────
+function traceCapKey(code){return String(code||'').split('/')[0].trim().replace(/[^0-9A-Za-z].*$/,'');}
+function traceCaptureFromState(ing,st){
+  st=st||{};
+  var isMix=ing.type==='mix';
+  var rule=shelfRuleFor(ing.code);
+  var ev=(!isMix&&rule)?shelfEval(rule.r,st):null;
+  var sec=null;
+  if(st.second){
+    var e2=(!isMix&&rule)?shelfEval(rule.r,st.second):null;
+    sec={batchCode:st.second.batchCode||'',useBy:st.second.useBy||'',openDate:st.second.openDate||'',thawedDate:st.second.thawedDate||'',
+      lastDay:isMix?(st.second.useBy||''):(e2?e2.lastDay:''),ok:!!st.second.ok};
+  }
+  return {rule:rule?rule.r:'',batchCode:st.batchCode||'',tubNumber:st.tubNumber||'',useBy:st.useBy||'',
+    openDate:st.openDate||'',thawedDate:st.thawedDate||'',
+    lastDay:isMix?(st.useBy||''):(ev?ev.lastDay:''),lastDayBasis:isMix?'Use by':(ev?ev.basis:''),
+    datesMissing:!!(ev&&ev.missing),second:sec};
+}
+// Capture for every ingredient of a scheduled job, keyed by ingredient code: from the saved record once the run is
+// finished, otherwise from the run in progress.
+function traceCaptureMap(line,jobIdx){
+  var map={},job=(scheduleData[line]||[])[jobIdx];
+  if(!job) return map;
+  var rec=job.traceId?traceRecords.filter(function(t){return t.id===job.traceId;})[0]:null;
+  if(rec){rec.ingredients.forEach(function(i){map[traceCapKey(i.code)]=i;});return map;}
+  var recipe=getJobRecipe(job);
+  if(!recipe) return map;
+  recipe.ingredients.forEach(function(ing){
+    var st=ingredientState[line+'__'+jobIdx+'__'+ing.id];
+    if(!st) return;
+    var c=traceCaptureFromState(ing,st);
+    c.verified=st.verified===true;c.shelfLifeOk=st.shelfLifeOk===true;c.overridden=!!st.overridden;c.type=ing.type;
+    map[traceCapKey(ing.code)]=c;
+  });
+  return map;
+}
+function traceCapCells(c){
+  if(!c) return ['','','','',''];
+  var b=[];
+  if(c.batchCode) b.push(c.batchCode);
+  if(c.tubNumber) b.push(c.tubNumber);
+  if(c.useBy) b.push('UBD '+fmtDate(c.useBy));
+  var c1=metalEsc(b.join(' · '))+(c.lastDay?'<br><span style="color:#117a65;">Last day '+fmtDate(c.lastDay)+(c.lastDayBasis?' ('+metalEsc(c.lastDayBasis)+')':'')+'</span>':'');
+  var c4='',c5='',s=c.second;
+  if(s){
+    var b2=[],d2=[];
+    if(s.batchCode) b2.push(s.batchCode);
+    if(s.useBy) b2.push('UBD '+fmtDate(s.useBy));
+    c4=metalEsc(b2.join(' · '))+(s.lastDay?'<br><span style="color:#117a65;">Last day '+fmtDate(s.lastDay)+'</span>':'');
+    if(s.openDate) d2.push('Open '+fmtDate(s.openDate));
+    if(s.thawedDate) d2.push('Thawed '+fmtDate(s.thawedDate));
+    c5=metalEsc(d2.join(' · '));
+  }
+  return [c1,c.openDate?fmtDate(c.openDate):'',c.thawedDate?fmtDate(c.thawedDate):'',c4,c5];
+}
+// The sheet blocks (positions, amounts) for one scheduled job, saved with its record so the legal copy matches what was run.
+function traceSheetSnapshot(line,jobIdx){
+  return buildTraceSheet().filter(function(b){return b.line===line&&b.jobIdx===jobIdx;}).map(function(b){
+    return {label:b.label,pos:b.pos,sku:b.sku,name:b.name,qty:b.qty,comp:!!b.comp,notes:b.notes.slice(),
+      rows:b.rows.map(function(r){return {kind:r.kind,code:r.code,desc:r.desc,per:r.per,total:r.total,unit:r.unit,rule:r.rule||''};})};
+  });
+}
+// One saved record as the FORM064.3 table: position, code, description, amounts, then what was captured.
+function traceRecSheetHTML(rec,pdf){
+  var cap={},used={};
+  (rec.ingredients||[]).forEach(function(i){cap[traceCapKey(i.code)]=i;});
+  function verCell(c){
+    if(!c) return '';
+    if(c.overridden) return pdf&&c.override?'Override — '+metalEsc(c.override.name+': '+c.override.reason):'⚠️';
+    return (c.shelfLifeOk&&(c.type!=='mix'||c.verified))?(pdf?'Yes':'✅'):(pdf?'No':'❌');
+  }
+  function row(label,r,c,st){
+    var cc=traceCapCells(c);
+    return '<tr style="'+st+'"><td style="white-space:nowrap;">'+metalEsc(label)+'</td><td>'+metalEsc(r.code)+'</td><td>'+metalEsc(r.desc)+'</td>'+
+      '<td style="text-align:right;">'+(r.kind==='head'?'0':traceFmt(r.per))+'</td><td style="text-align:right;font-weight:700;">'+traceFmt(r.total)+'</td><td>'+metalEsc(r.unit||'')+'</td>'+
+      '<td>'+cc[0]+'</td><td>'+cc[1]+'</td><td>'+cc[2]+'</td><td>'+cc[3]+'</td><td>'+cc[4]+'</td><td style="white-space:nowrap;">'+metalEsc(r.rule||'')+'</td><td>'+verCell(c)+'</td></tr>';
+  }
+  var body='';
+  rec.sheet.forEach(function(b){
+    b.rows.forEach(function(r){
+      var c=r.kind==='ing'?cap[traceCapKey(r.code)]:null;
+      if(c) used[traceCapKey(r.code)]=1;
+      body+=row(b.label,r,c,r.kind==='head'?'background:#e8e8e8;font-weight:700;':r.kind==='link'?'background:#f6f6f6;font-style:italic;':'');
+    });
+  });
+  // anything recorded that isn't on the sheet (packaging lines, a recipe changed mid-shift) is still kept on the record
+  (rec.ingredients||[]).forEach(function(i){
+    var k=traceCapKey(i.code);
+    if(used[k]||!(i.useBy||i.batchCode||i.tubNumber)) return;
+    body+=row('—',{kind:'ing',code:i.code,desc:i.name,per:null,total:null,unit:'',rule:i.rule||''},i,'');
+  });
+  var th=pdf?'':' style="padding:3px 4px;"';
+  return '<table'+(pdf?' style="font-size:7.5px;"':' style="width:100%;border-collapse:collapse;font-size:0.66rem;"')+'><thead><tr style="text-align:left;'+(pdf?'':'color:#888;')+'">'+
+    '<th'+th+'>Line</th><th>Code</th><th>Description</th><th>/ unit</th><th>Total</th><th>Unit</th><th>Batch / UBD / last day</th><th>Open</th><th>Thawed</th><th>2nd batch / UBD / last day</th><th>2nd open / thawed</th><th>Shelf life</th><th>OK</th></tr></thead><tbody>'+body+'</tbody></table>';
+}
+
 // ── FORM064.3 sheet, generated from the schedule + recipes ───────────────
 // The paper form is produced automatically after the schedule upload: one block per scheduled SKU.
 // Position = the SKU's row in the schedule counted from the first row of Line A (line number A=1 … STAT=6).
@@ -8173,7 +8451,7 @@ function buildTraceSheet(){
       if(used[ji]||isEvent(job.name)||!(job.qty>0)) return;
       var qty=job.qty,real=traceRecipeForJob(job);
       var head={kind:'head',code:(real&&real.sku)||job.sku||'',desc:(real&&real.productName)||job.name,per:0,total:qty,unit:''};
-      var b={line:line,lineNo:lineNo,pos:pos,label:lbl(pos),sku:head.code,name:head.desc,qty:qty,rows:[head],notes:[],comp:false};
+      var b={line:line,lineNo:lineNo,jobIdx:ji,pos:pos,label:lbl(pos),sku:head.code,name:head.desc,qty:qty,rows:[head],notes:[],comp:false};
       blocks.push(b);
       if(!real){b.notes.push("No recipe found for this product — its ingredients can't be listed.");return;}
       var spec=TRIPLE_COMPONENTS[real.sku];
@@ -8182,7 +8460,7 @@ function buildTraceSheet(){
         var allReal=spec.every(function(c,k){return jobs[ji+1+k]&&String(jobs[ji+1+k].sku).trim()===c.code;});
         spec.forEach(function(c,k){
           if(allReal) used[ji+1+k]=true;
-          var cb={line:line,lineNo:lineNo,pos:pos+1+k,label:lbl(pos+1+k),sku:c.code,name:c.name,qty:qty*c.share,
+          var cb={line:line,lineNo:lineNo,jobIdx:ji,pos:pos+1+k,label:lbl(pos+1+k),sku:c.code,name:c.name,qty:qty*c.share,
             rows:[{kind:'head',code:c.code,desc:c.name,per:0,total:qty*c.share,unit:''}],notes:[],comp:true,parentSku:real.sku};
           cb.rows=cb.rows.concat(ingRows(c.ingredients,qty*c.share));
           blocks.push(cb);
@@ -8234,14 +8512,16 @@ function renderTraceSheet(){
     var card=document.createElement('div');
     card.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #16a085;';
     var h='<div style="font-weight:800;font-size:0.95rem;margin-bottom:8px;">'+line+'</div><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.7rem;">'+
-      '<thead><tr style="text-align:left;color:#888;"><th style="padding:3px 4px;">Line</th><th>Code</th><th>Description</th><th style="text-align:right;">/ unit</th><th style="text-align:right;">Total</th><th style="padding-left:8px;">Unit</th><th style="padding-left:8px;">Shelf life</th></tr></thead><tbody>';
+      '<thead><tr style="text-align:left;color:#888;"><th style="padding:3px 4px;">Line</th><th>Code</th><th>Description</th><th style="text-align:right;">/ unit</th><th style="text-align:right;">Total</th><th style="padding-left:8px;">Unit</th><th style="padding-left:8px;">Shelf life</th><th style="padding-left:8px;">Batch / UBD / last day</th><th style="padding-left:8px;">Open</th><th style="padding-left:8px;">Thawed</th><th style="padding-left:8px;">2nd batch / UBD</th><th style="padding-left:8px;">2nd open / thawed</th></tr></thead><tbody>';
     lb.forEach(function(b){
+      var capMap=traceCaptureMap(b.line,b.jobIdx);
       b.rows.forEach(function(r){
+        var cc=traceCapCells(r.kind==='ing'?capMap[traceCapKey(r.code)]:null);
         var st=r.kind==='head'?'background:#e8e8e8;font-weight:800;':r.kind==='link'?'background:#f6f6f6;font-style:italic;':'';
         h+='<tr style="border-top:1px solid #eee;'+st+'"><td style="padding:3px 4px;white-space:nowrap;">'+metalEsc(b.label)+'</td><td>'+metalEsc(r.code)+'</td><td>'+metalEsc(r.desc)+'</td>'+
-          '<td style="text-align:right;">'+(r.kind==='head'?'0':traceFmt(r.per))+'</td><td style="text-align:right;font-weight:700;">'+traceFmt(r.total)+'</td><td style="padding-left:8px;">'+metalEsc(r.unit)+'</td><td style="padding-left:8px;white-space:nowrap;">'+metalEsc(r.rule||'')+'</td></tr>';
+          '<td style="text-align:right;">'+(r.kind==='head'?'0':traceFmt(r.per))+'</td><td style="text-align:right;font-weight:700;">'+traceFmt(r.total)+'</td><td style="padding-left:8px;">'+metalEsc(r.unit)+'</td><td style="padding-left:8px;white-space:nowrap;">'+metalEsc(r.rule||'')+'</td><td style="padding-left:8px;">'+cc[0]+'</td><td style="padding-left:8px;white-space:nowrap;">'+cc[1]+'</td><td style="padding-left:8px;white-space:nowrap;">'+cc[2]+'</td><td style="padding-left:8px;">'+cc[3]+'</td><td style="padding-left:8px;">'+cc[4]+'</td></tr>';
       });
-      b.notes.forEach(function(n){h+='<tr><td></td><td colspan="6" style="padding:2px 4px 6px;color:#c0392b;font-size:0.68rem;">⚠️ '+metalEsc(n)+'</td></tr>';});
+      b.notes.forEach(function(n){h+='<tr><td></td><td colspan="11" style="padding:2px 4px 6px;color:#c0392b;font-size:0.68rem;">⚠️ '+metalEsc(n)+'</td></tr>';});
     });
     h+='</tbody></table></div>';
     card.innerHTML=h;
@@ -8300,16 +8580,16 @@ function renderTraceSign(){
       h+='<div style="border:1.5px solid #f0f0f0;border-radius:10px;margin-bottom:6px;overflow:hidden;">'+
         '<div data-trtoggle="'+t.id+'" style="display:flex;align-items:center;gap:8px;padding:9px 11px;cursor:pointer;">'+
           '<div style="flex:1;min-width:0;"><div style="font-size:0.8rem;font-weight:700;">'+metalEsc(t.jobName)+'</div>'+
-          '<div style="font-size:0.7rem;color:#888;">SKU '+metalEsc(t.sku||'—')+' · Qty '+t.qty+' · '+metalEsc(t.actStart||'—')+' – '+metalEsc(t.actFinish||'—')+' · '+badge+'</div></div>'+
+          '<div style="font-size:0.7rem;color:#888;">'+(t.posLabel?metalEsc(t.posLabel)+' · ':'')+'SKU '+metalEsc(t.sku||'—')+' · Qty '+t.qty+' · '+metalEsc(t.actStart||'—')+' – '+metalEsc(t.actFinish||'—')+' · '+badge+'</div></div>'+
           '<span style="color:#aaa;font-size:0.8rem;">'+(open?'▲':'▼')+'</span></div>';
       if(open){
         h+='<div style="padding:0 11px 11px;font-size:0.72rem;color:#555;">'+
           '<div style="margin-bottom:6px;">Team leader: <strong>'+metalEsc(t.teamLeader||'—')+'</strong> · On line: '+(t.crew.length?metalEsc(t.crew.join(', ')):'—')+'</div>'+
-          (t.ingredients.length?'<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.7rem;"><thead><tr style="text-align:left;color:#888;"><th style="padding:3px 4px;">Ingredient</th><th>Supplier</th><th>Batch</th><th>Tub</th><th>Use by</th><th></th></tr></thead><tbody>'+
+          (t.sheet&&t.sheet.length?'<div style="overflow-x:auto;">'+traceRecSheetHTML(t,false)+'</div>':(t.ingredients.length?'<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.7rem;"><thead><tr style="text-align:left;color:#888;"><th style="padding:3px 4px;">Ingredient</th><th>Supplier</th><th>Batch</th><th>Tub</th><th>Use by</th><th></th></tr></thead><tbody>'+
             t.ingredients.map(function(i){
               return '<tr style="border-top:1px solid #f2f2f2;"><td style="padding:3px 4px;">'+metalEsc(i.name)+'</td><td>'+metalEsc(i.supplier||'—')+'</td><td>'+metalEsc(i.batchCode||'—')+'</td><td>'+metalEsc(i.tubNumber||'—')+'</td><td>'+metalEsc(i.useBy?fmtDate(i.useBy):'—')+'</td><td>'+(i.overridden?'⚠️':(i.shelfLifeOk&&(i.type!=='mix'||i.verified))?'✅':'❌')+'</td></tr>'+
                 (i.override?'<tr><td colspan="6" style="padding:0 4px 4px;color:#e67e22;">Override by '+metalEsc(i.override.name)+' at '+metalEsc(i.override.time)+': '+metalEsc(i.override.reason)+'</td></tr>':'');
-            }).join('')+'</tbody></table></div>':'<div style="color:#c0392b;">No recipe was found for this product — no ingredient traceability was captured.</div>')+
+            }).join('')+'</tbody></table></div>':'<div style="color:#c0392b;">No recipe was found for this product — no ingredient traceability was captured.</div>'))+
         '</div>';
       }
       h+='</div>';
@@ -8373,10 +8653,12 @@ function buildTraceabilityPDFSection(){
     if(!s.recs.length) return;
     html+='<div style="font-weight:700;font-size:11px;margin:10px 0 4px;color:#0074d9;">'+line+' — '+s.recs.length+' run'+(s.recs.length===1?'':'s')+'</div>';
     s.recs.forEach(function(t){
-      html+='<div style="font-size:10px;margin:7px 0 3px;"><strong>'+metalEsc(t.jobName)+'</strong> · SKU '+metalEsc(t.sku||'—')+' · Qty '+t.qty+' · '+metalEsc(t.date)+' '+metalEsc(t.actStart||'—')+' – '+metalEsc(t.actFinish||'—')+
+      html+='<div style="font-size:10px;margin:7px 0 3px;"><strong>'+metalEsc(t.jobName)+'</strong>'+(t.posLabel?' · '+metalEsc(t.posLabel):'')+' · SKU '+metalEsc(t.sku||'—')+' · Qty '+t.qty+' · '+metalEsc(t.date)+' '+metalEsc(t.actStart||'—')+' – '+metalEsc(t.actFinish||'—')+
         ' · TL: '+metalEsc(t.teamLeader||'—')+(t.crew.length?' · On line: '+metalEsc(t.crew.join(', ')):'')+
         (t.complete?'':' · <strong style="color:#c0392b;">INCOMPLETE</strong>')+'</div>';
-      if(t.ingredients.length){
+      if(t.sheet&&t.sheet.length){
+        html+=traceRecSheetHTML(t,true);
+      } else if(t.ingredients.length){
         html+='<table><thead><tr><th>Ingredient</th><th>Code</th><th>Supplier</th><th>Batch / Lot</th><th>Tub</th><th>Use By</th><th>Verified</th></tr></thead><tbody>'+
           t.ingredients.map(function(i){
             var ok=i.overridden?'Override — '+metalEsc(i.override?i.override.name+': '+i.override.reason:''):(i.shelfLifeOk&&(i.type!=='mix'||i.verified))?'Yes':'No';
@@ -11994,6 +12276,7 @@ function lsSave(){
       metalForms: metalForms,
       traceRecords: traceRecords,
       traceSignOffs: traceSignOffs,
+      ingredientState: ingredientState,
       allergenVerifications: allergenVerifications,
       skipReasons: skipReasons,
       formChangesLog: formChangesLog,
@@ -12063,6 +12346,8 @@ function lsLoad(){
     if(snap.metalForms){metalForms=snap.metalForms;syncMetalRunsWithCatalog();}
     if(snap.traceRecords) traceRecords=snap.traceRecords;
     if(snap.traceSignOffs) traceSignOffs=snap.traceSignOffs;
+    // scans for runs still in progress (a finished run's state is cleared once its record is saved)
+    if(snap.ingredientState) ingredientState=snap.ingredientState;
     if(snap.allergenVerifications) allergenVerifications=snap.allergenVerifications;
     if(snap.skipReasons) skipReasons=snap.skipReasons;
     formChangesLog   = snap.formChangesLog   || [];
