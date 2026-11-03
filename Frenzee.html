@@ -415,6 +415,7 @@ if(sessionStorage.getItem(PW_KEY)==='1'){
       <div style="font-weight:700;margin-bottom:6px;">📎 This report includes:</div>
       <div>✅ Shift Summary &amp; Schedule</div>
       <div>✅ Traceability Records</div>
+      <div>✅ FORM065.0 Bread Traceability</div>
       <div>✅ FORM093.0 Label Records</div>
       <div>✅ FORM053.0 Line Clearance</div>
       <div>✅ Schedule Changes &amp; Audit Trail</div>
@@ -1104,6 +1105,7 @@ function canAccess(role){
   var r = currentUser.role;
   if (role==='manager') return r==='manager';
   if (role==='supervisor') return r==='manager'||r==='supervisor';
+  if (role==='endofday') return r==='manager'||r==='supervisor'||r==='qa';
   if (role==='qa') return r==='manager'||r==='supervisor'||r==='qa';
   if (role==='labelprinter') return r==='manager'||r==='supervisor'||r==='labelprinter';
   // Main Dashboard (live line KPIs): Managers (incl. the Operations Manager) and QA.
@@ -6855,7 +6857,7 @@ function updateHeader(){
       (canAccess('qa')?'<button class="hbtn" style="background:#9b59b6;" id="supBtn">🔍 Supervisor</button>':'')+
       (canAccess('dashboard')?'<button class="hbtn" style="background:#0074d9;" id="mgrBtn">📊 Dashboard</button>':'')+
       (canAccess('labelprinter')?'<button class="hbtn" style="background:#8e44ad;" id="labelPrintBtn">🏷️ Labels</button>':'')+
-      (canAccess('supervisor')?'<button class="hbtn" style="background:#e74c3c;" id="newShiftBtn">🌅 New Shift</button>':'')+
+      (canAccess('endofday')?'<button class="hbtn" style="background:#e74c3c;" id="newShiftBtn">🌅 New Shift</button>':'')+
       '<button class="hbtn" style="background:#888;" id="logoutBtn">Log Out</button>'+
     '</div>';
   var menuDrop=document.getElementById('fzMenuDrop');
@@ -6948,7 +6950,7 @@ function updateSidebar(){
   }
   if(canAccess('labelprinter')) html+=fzNavBtn('tag','Label Printing','sb-labels');
   html+='<div class="fz-foot">';
-  if(canAccess('supervisor')) html+=fzNavBtn('sunrise','New Shift','sb-newshift');
+  if(canAccess('endofday')) html+=fzNavBtn('sunrise','New Shift','sb-newshift');
   html+=fzNavBtn('logout','Log Out','sb-logout');
   html+='</div>';
   sb.innerHTML=html;
@@ -8170,6 +8172,13 @@ function breadSignState(f){
   var left=breadToEnter();
   if(left) miss.push(left+' bread'+(left===1?'':'s')+' on today\'s schedule not entered (or mark N/R / N/A)');
   return {ok:!miss.length,miss:miss};
+}
+function breadGaps(){
+  var f=breadToday(),g=[];
+  if(breadHasEntries()){
+    if(!f.signedOff) g.push(BREAD_FORM.no+' Bread Traceability is not signed off by both the Production Supervisor and QA.');
+  } else if(Object.keys(breadNeededToday()).length) g.push(BREAD_FORM.no+' Bread Traceability was not filled in, but today\'s schedule uses bread.');
+  return g;
 }
 function breadFooterHTML(){
   var B=BREAD_FORM,cell='padding:6px 8px;border-right:1px solid #222;';
@@ -12793,8 +12802,8 @@ function openNewShiftConfirm(){
 
 function confirmNewShift(){
   // Traceability is a legal record — make sure nobody clears the shift with it unsigned or missing.
-  var gaps=traceGaps();
-  if(gaps.length&&!confirm('Traceability ('+TRACE_FORM_NO+') is not complete:\n\n'+gaps.slice(0,8).join('\n')+(gaps.length>8?'\n…and '+(gaps.length-8)+' more':'')+'\n\nThe end-of-shift report will record these as outstanding. Start a new shift anyway?')) return;
+  var gaps=traceGaps().concat(breadGaps());
+  if(gaps.length&&!confirm('These records are not complete:\n\n'+gaps.slice(0,8).join('\n')+(gaps.length>8?'\n…and '+(gaps.length-8)+' more':'')+'\n\nThe end-of-shift report will record these as outstanding. Start a new shift anyway?')) return;
   // First generate and download the end-of-shift report, then clear
   lsSave();
   var snap=JSON.parse(localStorage.getItem(LS_KEY)||'{}');
