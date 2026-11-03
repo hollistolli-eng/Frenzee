@@ -416,6 +416,7 @@ if(sessionStorage.getItem(PW_KEY)==='1'){
       <div>✅ Shift Summary &amp; Schedule</div>
       <div>✅ Traceability Records</div>
       <div>✅ FORM065.0 Bread Traceability</div>
+      <div>✅ Line Submissions &amp; Sign-Off (Supervisor + QA)</div>
       <div>✅ FORM093.0 Label Records</div>
       <div>✅ FORM053.0 Line Clearance</div>
       <div>✅ Schedule Changes &amp; Audit Trail</div>
@@ -859,6 +860,24 @@ if(sessionStorage.getItem(PW_KEY)==='1'){
   <div class="mgr-body" id="shelfListBody"></div>
 </div>
 
+<!-- END OF DAY: TEAM LEADER SUBMIT -->
+<div class="mgr-panel" id="submitDayPanel">
+  <div class="mgr-hdr">
+    <div class="mgr-hdr-title"><span style="color:#2ecc40;">FRENZ</span><span style="color:#0074d9;">EE</span> <span style="font-size:0.8rem;color:#888;">Submit my day</span></div>
+    <button class="mgr-close" id="submitDayCloseBtn">✕ Close</button>
+  </div>
+  <div class="mgr-body" id="submitDayBody"></div>
+</div>
+
+<!-- END OF DAY: SUPERVISOR / QA REVIEW -->
+<div class="mgr-panel" id="submissionsPanel">
+  <div class="mgr-hdr">
+    <div class="mgr-hdr-title"><span style="color:#2ecc40;">FRENZ</span><span style="color:#0074d9;">EE</span> <span style="font-size:0.8rem;color:#888;">Line submissions</span></div>
+    <button class="mgr-close" id="submissionsCloseBtn">✕ Close</button>
+  </div>
+  <div class="mgr-body" id="submissionsBody"></div>
+</div>
+
 <!-- FORM065.0 BREAD TRACEABILITY - QLD -->
 <div class="mgr-panel" id="breadFormPanel">
   <div class="mgr-hdr">
@@ -1067,9 +1086,11 @@ if(sessionStorage.getItem(PW_KEY)==='1'){
         <button id="logIssueBtn" style="background:#e67e22;color:#fff;border:none;border-radius:8px;padding:4px 10px;font-size:0.72rem;font-weight:700;cursor:pointer;">⚠️ Issue</button>
         <button id="logWastageBtn" style="background:#e74c3c;color:#fff;border:none;border-radius:8px;padding:4px 10px;font-size:0.72rem;font-weight:700;cursor:pointer;">🗂️ Wastage</button>
         <button id="looseItemsBtn" style="background:#0074d9;color:#fff;border:none;border-radius:8px;padding:4px 10px;font-size:0.72rem;font-weight:700;cursor:pointer;">📋 Loose Items</button>
+        <button id="submitDayBtn" style="background:#16a085;color:#fff;border:none;border-radius:8px;padding:4px 10px;font-size:0.72rem;font-weight:700;cursor:pointer;">📤 Submit day</button>
       </div>
     </div>
   </div>
+  <div id="subChip" style="display:none;"></div>
   <div class="msg-banner" id="lineMsgBanner"></div>
   <div id="issuesBanner" style="display:none;background:#fff8f0;border:1.5px solid #e67e22;border-radius:10px;padding:10px 14px;margin-bottom:12px;"></div>
   <div id="jobList"></div>
@@ -2476,7 +2497,7 @@ var FORM_REGISTRY=[
   {key:'gen-tool',    section:'General',         name:'Daily Tool Usage Form',                       number:'FORM014.2', version:''},
   {key:'gen-toolbox', section:'General',         name:'Toolbox Register',                            number:'REG003.0',  version:''},
   {key:'gen-startup', section:'General',         name:'Start-Up Safety Checks',                      number:'FORM040.0', version:''},
-  {key:'gen-bread',   section:'General',         name:'Daily Bread Traceability',                    number:'FORM065.0', version:''},
+  {key:'gen-bread',   section:'General',         name:'Daily Bread Traceability',                    number:'FORM065.0', version:'025'},
   {key:'gen-label',   section:'General',         name:'Daily Label Requirements',                    number:'FORM068.0', version:''},
   {key:'gen-labelex', section:'General',         name:'Label Sign Off For Extra Labels',             number:'FORM068.1', version:''},
   {key:'gen-postop',  section:'General',         name:'Post Op Checks',                              number:'FORM097.0', version:''},
@@ -2492,7 +2513,6 @@ var FORM_REGISTRY=[
   {key:'line-labeller',section:'Line Forms',     name:"Labeller's Paperwork",                        number:'—',         version:''},
   {key:'line-trace',   section:'Line Forms',     name:'Traceability by SKU',                         number:'FORM064.3', version:''},
   {key:'line-shelf',   section:'Line Forms',     name:'Ingredient & Mix Production Shelf Life',      number:'FORM064.1', version:'089'},
-  {key:'line-bread',   section:'Line Forms',     name:'Bread Traceability - QLD',                    number:'FORM065.0', version:'025'},
   // METAL DETECTOR
   {key:'met-detect',  section:'Metal Detector',  name:'Metal Detection Record',                      number:'FORM005.0', version:''},
   {key:'met-loose',   section:'Metal Detector',  name:'Loose Items Register',                        number:'FORM014.1', version:''},
@@ -6857,6 +6877,7 @@ function updateHeader(){
       (canAccess('qa')?'<button class="hbtn" style="background:#9b59b6;" id="supBtn">🔍 Supervisor</button>':'')+
       (canAccess('dashboard')?'<button class="hbtn" style="background:#0074d9;" id="mgrBtn">📊 Dashboard</button>':'')+
       (canAccess('labelprinter')?'<button class="hbtn" style="background:#8e44ad;" id="labelPrintBtn">🏷️ Labels</button>':'')+
+      (canAccess('endofday')?'<button class="hbtn" style="background:#0074d9;" id="subBtn">📥 Submissions</button>':'')+
       (canAccess('endofday')?'<button class="hbtn" style="background:#e74c3c;" id="newShiftBtn">🌅 New Shift</button>':'')+
       '<button class="hbtn" style="background:#888;" id="logoutBtn">Log Out</button>'+
     '</div>';
@@ -6868,6 +6889,7 @@ function updateHeader(){
   var sb=document.getElementById('supBtn'); if(sb) sb.onclick=function(){closeMenu();openSupervisorDash();};
   var mb=document.getElementById('mgrBtn'); if(mb) mb.onclick=function(){closeMenu();openManager();};
   var lb=document.getElementById('labelPrintBtn'); if(lb) lb.onclick=function(){closeMenu();renderLabelStation();showPanel('labelPanel');};
+  var sbn=document.getElementById('subBtn'); if(sbn) sbn.onclick=function(){closeMenu();openSubmissions();};
   var nsb=document.getElementById('newShiftBtn'); if(nsb) nsb.onclick=function(){closeMenu();openNewShiftConfirm();};
   var lo=document.getElementById('logoutBtn'); if(lo) lo.onclick=function(){closeMenu();doLogout();};
   if(!window._fzMenuOutsideClickBound){
@@ -6950,6 +6972,7 @@ function updateSidebar(){
   }
   if(canAccess('labelprinter')) html+=fzNavBtn('tag','Label Printing','sb-labels');
   html+='<div class="fz-foot">';
+  if(canAccess('endofday')) html+=fzNavBtn('clipboard','Submissions','sb-subs');
   if(canAccess('endofday')) html+=fzNavBtn('sunrise','New Shift','sb-newshift');
   html+=fzNavBtn('logout','Log Out','sb-logout');
   html+='</div>';
@@ -6972,6 +6995,7 @@ function updateSidebar(){
   wire('sb-sup',openSupervisorDash);
   wire('sb-staff',openStaffMgmt);
   wire('sb-labels',function(){renderLabelStation();showPanel('labelPanel');});
+  wire('sb-subs',openSubmissions);
   wire('sb-newshift',openNewShiftConfirm);
   wire('sb-logout',doLogout);
 }
@@ -7028,7 +7052,7 @@ function openImportReport(){
 function showLines(){renderLines();renderMsgBannerAll();showScreen('lineScreen');}
 function showSchedule(line){
   currentLine=line;
-  renderSchedule();renderLineMsgBanner();renderIssuesBanner();showScreen('scheduleScreen');
+  renderSchedule();renderLineMsgBanner();renderIssuesBanner();showScreen('scheduleScreen');renderSubChip();
   if(!lineTeamLeaders[line]) openLineSignIn(line);
 }
 // Generic "who's actually here" login used by both line and prep-position sign-in.
@@ -7563,7 +7587,7 @@ function submitOverride(){
   var _ok2=ingKey(currentOverrideIngId); if(!ingredientState[_ok2]) ingredientState[_ok2]={}; var st=ingredientState[_ok2]; st.overridden=true;st.shelfLifeOk=true;
   var t=nowTime();
   st.overrideInfo={name:name,reason:reason,time:t};
-  overrideLog.push({ingId:currentOverrideIngId,name:name,reason:reason,originalUseBy:st.useBy,time:t});
+  overrideLog.push({line:currentLine,ingId:currentOverrideIngId,name:name,reason:reason,originalUseBy:st.useBy,time:t});
   hideOverlay('overrideOverlay');showToast('⚠️ Override approved by '+name);
   var job=scheduleData[currentLine][currentJobIdx];var recipe=getJobRecipe(job);var ing=recipe&&recipe.ingredients.find(function(i){return i.id===currentOverrideIngId;});
   if(ing){reRenderIng(ing,recipe);updateCompleteBtn(recipe);updateTraceStatus(recipe);}
@@ -8085,6 +8109,418 @@ function renderShelfGaps(){
     g.map(function(x){return '<span style="font-family:monospace;">'+metalEsc(x.code)+'</span> '+metalEsc(x.name)+' <span style="color:#aaa;">('+x.recipes+' recipe'+(x.recipes===1?'':'s')+')</span>';}).join('<br>')+
     '</div></div>';
 }
+
+// ── End of day: each line submits its records, Supervisor and QA review and sign off ──────────────────
+// Every team leader has their own tablet, so a line's records live on that tablet until the team leader submits them.
+// A submission is one Firestore document per line per day ('submissions'). The Supervisor / QA tablet reads them, both
+// sign them off, and the End of Shift report is built from them. A submission can be amended and resubmitted (that
+// clears the sign-off), or sent back by the Supervisor / QA with a note.
+var submissions={},subSynced=false,subNil={},subOpenLine=null;
+var SUB_DEVICE=(function(){try{var d=localStorage.getItem('frenzee_device_id');if(!d){d='D'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);localStorage.setItem('frenzee_device_id',d);}return d;}catch(e){return 'D-unknown';}})();
+var SUB_ITEMS=[
+  {key:'trace',label:'Traceability by SKU',form:'FORM064.3'},
+  {key:'labels',label:'Labels issued to line log',form:'FORM093.0'},
+  {key:'clearance',label:'Line clearance sheet',form:'FORM053.0'},
+  {key:'wastage',label:'Wastage sheet',form:''},
+  {key:'loose',label:'Loose items register',form:'FORM014.1'},
+  {key:'allergen',label:'Allergen clean verifications',form:''},
+  {key:'issues',label:'Issues logged',form:''},
+  {key:'skips',label:'Skipped runs',form:''},
+  {key:'overrides',label:'Supervisor overrides',form:''},
+  {key:'transfers',label:'Transfers to other lines',form:''}
+];
+function subDocId(line,date){return (date||shelfToday())+'__'+line;}
+function subInitials(n){return String(n||'').split(/\s+/).filter(Boolean).map(function(w){return w.charAt(0).toUpperCase();}).join('');}
+function subClone(x){return x===undefined?undefined:JSON.parse(JSON.stringify(x));}
+// Everything this tablet holds for one line.
+function subPayloadFor(line){
+  function mine(arr,f){return subClone((arr||[]).filter(f));}
+  var allergen={};
+  Object.keys(allergenVerifications).forEach(function(k){var v=allergenVerifications[k];if(v&&v.line===line) allergen[k]=subClone(v);});
+  return {
+    schedule:subClone(scheduleData[line]||[]),
+    teamLeader:subClone(lineTeamLeaders[line]||null),
+    trace:mine(traceRecords,function(r){return r.line===line;}),
+    labels:mine(form093Records,function(r){return r.line===line;}),
+    clearance:mine(lcRecords,function(r){return r.line===line;}),
+    wastage:mine(dmgLogs,function(r){return r.line===line;}),
+    issues:mine(issueLog,function(r){return r.line===line;}),
+    skips:mine(skipReasons,function(r){return r.line===line;}),
+    overrides:mine(overrideLog,function(o){return o.line===line;}),
+    transfers:mine(transferLog,function(t){return t.fromLine===line;}),
+    changes:mine(scheduleChanges,function(c){return c.line===line;}),
+    allergen:allergen,
+    loose:subClone(looseItemsData[line]||null)
+  };
+}
+function subCount(p,key){
+  if(key==='allergen') return Object.keys(p.allergen||{}).length;
+  if(key==='loose'){
+    var n=0,it=(p.loose&&p.loose.items)||{};
+    Object.keys(it).forEach(function(id){var x=it[id];if(x&&(x.startPF||x.endPF||x.comment||x.startInitial||x.endInitial)) n++;});
+    return n;
+  }
+  return (p[key]||[]).length;
+}
+function subRunJobs(line){return (scheduleData[line]||[]).filter(function(j){return j&&!isEvent(j.name)&&(j.qty||0)>0&&j.status!=='removed'&&j.status!=='transferred';});}
+function subWarnings(line,p){
+  var w=[];
+  subRunJobs(line).forEach(function(j){if(j.status==='complete'&&!j.traceId) w.push('"'+j.name+'" was completed with no traceability record.');});
+  (p.trace||[]).forEach(function(t){if(!t.complete) w.push('"'+t.jobName+'" traceability has missing ingredient details.');});
+  (scheduleData[line]||[]).forEach(function(j,i){if(j&&isAllergenClean(j.name)&&j.status==='complete'&&!allergenVerifications[line+'-'+i]) w.push('"'+j.name+'" has no Supervisor / QA verification.');});
+  return w;
+}
+function subBlockers(line){
+  return (scheduleData[line]||[]).filter(function(j){return j&&j.status==='in-progress'&&!isEvent(j.name);}).map(function(j){return '"'+j.name+'" is still running — end the run first.';});
+}
+// ── Sending, and listening ───────────────────────────────────────────────
+function subStrip(d){var c=subClone(d);delete c.pending;return c;}
+function subWrite(id,data,merge,cb){
+  if(!window.fbDb){cb&&cb(new Error('offline'));return;}
+  var ref=fbDb.collection('submissions').doc(id);
+  (merge?ref.set(data,{merge:true}):ref.set(data)).then(function(){
+    if(submissions[id]) delete submissions[id].pending;
+    cb&&cb(null);
+  }).catch(function(e){console.error('Firestore submission write failed:',e);cb&&cb(e);});
+}
+function submitLineDay(line,note,cb){
+  var p=subPayloadFor(line),id=subDocId(line),prev=submissions[id];
+  var nil=subNil[line]||{};
+  var counts={},nilOut={};
+  SUB_ITEMS.forEach(function(it){var n=subCount(p,it.key);counts[it.key]=n;if(n===0) nilOut[it.key]=!!nil[it.key];});
+  var v=((prev&&prev.version)||0)+1;
+  var who=currentUser?currentUser.name:(lineTeamLeaders[line]?lineTeamLeaders[line].name:'Unknown');
+  var act=prev?(prev.status==='signed'?'Amended after sign-off':prev.status==='returned'?'Resubmitted after being sent back':'Resubmitted'):'Submitted';
+  var doc={id:id,date:shelfToday(),line:line,unit:line,role:'teamleader',deviceId:SUB_DEVICE,
+    submittedBy:who,submittedAt:nowTime(),submittedIso:new Date().toISOString(),version:v,status:'submitted',
+    note:note||'',nil:nilOut,counts:counts,warnings:subWarnings(line,p),payload:p,signoff:null,returned:null,
+    history:((prev&&prev.history)||[]).concat([{v:v,at:nowTime(),by:who,action:act}])};
+  var clean=subStrip(doc);
+  var size=JSON.stringify(clean).length;
+  if(size>900000){cb&&cb(new Error('This day is too large to submit ('+Math.round(size/1024)+' KB). Tell the Supervisor.'));return;}
+  submissions[id]=Object.assign(subClone(clean),{pending:true});
+  subWrite(id,clean,false,function(e){subRefreshUI();cb&&cb(e);});
+  subRefreshUI();
+}
+function subUpdateDoc(id,fields,cb){
+  var s=submissions[id];if(!s) return;
+  Object.keys(fields).forEach(function(k){s[k]=fields[k];});
+  s.pending=true;
+  subWrite(id,subClone(fields),true,function(e){subRefreshUI();cb&&cb(e);});
+  subRefreshUI();
+}
+var _subSyncStarted=false;
+function initSubmissionSync(){
+  if(_subSyncStarted) return;
+  _subSyncStarted=true;
+  fbReady.then(function(){
+    fbDb.collection('submissions').where('date','==',shelfToday()).onSnapshot(function(snap){
+      subApplyDocs(snap.docs.map(function(d){return d.data();}));
+    },function(err){console.error('Firestore submissions listener failed:',err);});
+  });
+}
+function subApplyDocs(list){
+  var next={};
+  list.forEach(function(d){if(d&&d.id) next[d.id]=d;});
+  // a write of ours that has not come back yet stays visible
+  Object.keys(submissions).forEach(function(id){var l=submissions[id],r=next[id];if(l&&l.pending&&(!r||(r.version||0)<=(l.version||0))) next[id]=l;});
+  submissions=next;subSynced=true;
+  if(canAccess('endofday')) mergeSubmissions();
+  subRefreshUI();
+}
+// The Supervisor / QA tablet takes each line's submitted records in, so the sign-off screens, FORM067 and the End of
+// Shift report see them. A tablet's own submissions are not merged (its local records are the source).
+function mergeSubmissions(){
+  var today=shelfToday();
+  try{if(localStorage.getItem('frenzee_sub_cleared')===today) return;}catch(e){}
+  var changed=false;
+  Object.keys(submissions).forEach(function(id){
+    var s=submissions[id];
+    if(!s||s.date!==today||!s.payload||s.deviceId===SUB_DEVICE) return;
+    var line=s.line,p=s.payload;
+    function rep(list,f,incoming){return (list||[]).filter(function(r){return !f(r);}).concat(subClone(incoming||[]));}
+    traceRecords=rep(traceRecords,function(r){return r.line===line;},p.trace);
+    form093Records=rep(form093Records,function(r){return r.line===line;},p.labels);
+    lcRecords=rep(lcRecords,function(r){return r.line===line;},p.clearance);
+    dmgLogs=rep(dmgLogs,function(r){return r.line===line;},p.wastage);
+    issueLog=rep(issueLog,function(r){return r.line===line;},p.issues);
+    skipReasons=rep(skipReasons,function(r){return r.line===line;},p.skips);
+    overrideLog=rep(overrideLog,function(o){return o.line===line;},p.overrides);
+    transferLog=rep(transferLog,function(t){return t.fromLine===line;},p.transfers);
+    scheduleChanges=rep(scheduleChanges,function(c){return c.line===line;},p.changes);
+    Object.keys(allergenVerifications).forEach(function(k){var v=allergenVerifications[k];if(v&&v.line===line) delete allergenVerifications[k];});
+    Object.keys(p.allergen||{}).forEach(function(k){allergenVerifications[k]=subClone(p.allergen[k]);});
+    if(p.loose) looseItemsData[line]=subClone(p.loose);
+    if(p.teamLeader) lineTeamLeaders[line]=subClone(p.teamLeader);
+    (p.schedule||[]).forEach(function(pj,i){
+      var lj=(scheduleData[line]||[])[i];
+      if(!lj||lj.name!==pj.name) return;
+      ['status','actStart','actFinish','traceId','form093Id','lcRecordId','breadVerified','firstLabelScanned','lastLabelScanned','firstLidVerified','lastLidVerified','lineClearanceDone'].forEach(function(k){if(pj[k]!==undefined) lj[k]=pj[k];});
+    });
+    var so=s.signoff;
+    if(so&&so.prodMgr&&so.qa){
+      traceSignOffs[line]={prodMgrName:so.prodMgr.name,prodMgrSig:so.prodMgr.sig,prodMgrDate:so.prodMgr.date,qaName:so.qa.name,qaSig:so.qa.sig,qaDate:so.qa.date,time:so.time||'',recordIds:(p.trace||[]).map(function(t){return t.id;})};
+      lcRecords.forEach(function(r){if(r.line===line){r.prodMgrName=so.prodMgr.name;r.prodMgrSig=so.prodMgr.sig;r.qaName=so.qa.name;r.qaSig=so.qa.sig;}});
+      form093Records.forEach(function(r){if(r.line===line){r.prodMgrInitials=subInitials(so.prodMgr.name);r.qaQcInitials=subInitials(so.qa.name);if(r.status==='awaiting-signoff') r.status='complete';}});
+    } else delete traceSignOffs[line];
+    changed=true;
+  });
+  if(changed) lsScheduleSave();
+}
+function subExpectedLines(){
+  return LINES.filter(function(l){return subRunJobs(l).length||submissions[subDocId(l)];});
+}
+function subStateOf(line){
+  var s=submissions[subDocId(line)];
+  if(!s) return {key:'none',text:'Not submitted',color:'#e74c3c'};
+  if(s.status==='returned') return {key:'returned',text:'Sent back — waiting for resubmit',color:'#e67e22'};
+  if(s.signoff&&s.signoff.prodMgr&&s.signoff.qa) return {key:'signed',text:'Signed off',color:'#2ecc40'};
+  var half=s.signoff&&(s.signoff.prodMgr||s.signoff.qa);
+  return {key:'submitted',text:half?('Signed by '+(s.signoff.prodMgr?'Production':'QA')+' — needs '+(s.signoff.prodMgr?'QA':'Production')):'Submitted — awaiting sign-off',color:'#0074d9'};
+}
+function subPendingLines(){return subExpectedLines().filter(function(l){return subStateOf(l).key!=='signed';});}
+function subGaps(){
+  var g=[];
+  subExpectedLines().forEach(function(l){
+    var st=subStateOf(l);
+    if(st.key==='none') g.push(l+' has not submitted its day.');
+    else if(st.key==='returned') g.push(l+' was sent back and has not been resubmitted.');
+    else if(st.key!=='signed') g.push(l+' submission is not signed off by both Supervisor and QA.');
+  });
+  return g;
+}
+function subRefreshUI(){
+  var sp=document.getElementById('submissionsPanel');
+  if(sp&&sp.classList.contains('show')&&!(document.activeElement&&sp.contains(document.activeElement)&&/INPUT|TEXTAREA/.test(document.activeElement.tagName))) renderSubmissions();
+  var dp=document.getElementById('submitDayPanel');
+  if(dp&&dp.classList.contains('show')&&!(document.activeElement&&dp.contains(document.activeElement)&&/INPUT|TEXTAREA/.test(document.activeElement.tagName))) renderSubmitDay();
+  renderSubChip();
+  var qp=document.getElementById('qaPanel');
+  if(qp&&qp.classList.contains('show')&&typeof renderQaDash==='function'&&!(document.activeElement&&qp.contains(document.activeElement))) renderQaDash();
+}
+function renderSubChip(){
+  var el=document.getElementById('subChip');
+  if(!el) return;
+  var line=currentLine;
+  if(!line||!document.getElementById('scheduleScreen').classList.contains('active')){el.style.display='none';return;}
+  var s=submissions[subDocId(line)],st=subStateOf(line);
+  if(!subSynced&&!s){el.style.display='none';return;}
+  var bg=st.key==='signed'?'#f0fdf4':st.key==='returned'?'#fff8f0':st.key==='none'?'#fff5f5':'#eef6ff';
+  var txt=st.key==='none'?'📤 Not submitted yet — tap Submit day when you finish':
+    st.key==='returned'?('↩ Sent back by '+metalEsc((s.returned&&s.returned.by)||'Supervisor / QA')+': '+metalEsc((s.returned&&s.returned.note)||'')+' — fix it and resubmit'):
+    ('📤 Submitted '+metalEsc(s.submittedAt||'')+(s.version>1?' (v'+s.version+')':'')+' — '+st.text);
+  el.style.cssText='display:block;margin:0 0 10px;padding:8px 12px;border-radius:10px;font-size:0.78rem;font-weight:700;border:1.5px solid '+st.color+';background:'+bg+';color:#333;';
+  el.textContent='';el.innerHTML=txt;
+}
+// ── Team leader: "Submit my day" ─────────────────────────────────────────
+function openSubmitDay(){
+  var line=currentLine;
+  if(!line) return;
+  var prev=submissions[subDocId(line)];
+  if(!subNil[line]) subNil[line]=Object.assign({},prev&&prev.nil);
+  showPanel('submitDayPanel');renderSubmitDay();
+}
+function renderSubmitDay(){
+  var body=document.getElementById('submitDayBody');if(!body) return;
+  var line=currentLine,scroll=body.scrollTop;
+  var p=subPayloadFor(line),id=subDocId(line),prev=submissions[id],nil=subNil[line]||(subNil[line]={});
+  var blockers=subBlockers(line),warns=subWarnings(line,p),need=0;
+  var h='<div style="background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border:1.5px solid #222;">'+
+    '<div style="font-size:0.7rem;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:0.5px;">End of day</div>'+
+    '<div style="font-size:1rem;font-weight:900;">Submit '+metalEsc(line)+'</div>'+
+    '<div style="font-size:0.78rem;color:#666;margin-top:4px;line-height:1.5;">Everything you entered today on this tablet goes to the Supervisor and QA to review and sign off. Anything with nothing recorded must be confirmed as <strong>nil</strong>.</div></div>';
+  if(prev){
+    var st=subStateOf(line);
+    h+='<div style="padding:9px 12px;border-radius:10px;margin-bottom:10px;font-size:0.8rem;font-weight:700;border:1.5px solid '+st.color+';background:#fff;">'+
+      (st.key==='returned'?'↩ Sent back by '+metalEsc((prev.returned&&prev.returned.by)||'')+': '+metalEsc((prev.returned&&prev.returned.note)||''):'Already submitted at '+metalEsc(prev.submittedAt)+' (v'+prev.version+') — '+metalEsc(st.text))+
+      (prev.status==='signed'?'<div style="font-weight:600;color:#a93226;margin-top:4px;">Changing and resubmitting clears the sign-off — both will need to sign again.</div>':'')+'</div>';
+  }
+  h+='<div style="background:#fff;border-radius:16px;padding:6px 0;box-shadow:0 2px 10px rgba(15,46,28,0.06);">';
+  SUB_ITEMS.forEach(function(it){
+    var n=subCount(p,it.key);
+    if(n===0&&!nil[it.key]) need++;
+    h+='<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #f3f3f3;">'+
+      '<div style="flex:1;min-width:0;"><div style="font-size:0.84rem;font-weight:700;">'+metalEsc(it.label)+'</div>'+(it.form?'<div style="font-size:0.68rem;color:#888;">'+it.form+'</div>':'')+'</div>'+
+      (n>0?'<div style="font-size:0.8rem;font-weight:800;color:#1a7a2a;">✅ '+n+' recorded</div>'
+        :'<label style="display:flex;align-items:center;gap:6px;font-size:0.78rem;font-weight:700;color:'+(nil[it.key]?'#117a65':'#b9650c')+';"><input type="checkbox" data-subnil="'+it.key+'"'+(nil[it.key]?' checked':'')+'/> Nil — nothing today</label>')+
+      '</div>';
+  });
+  h+='</div>';
+  if(need) h+='<button type="button" id="sub-allnil" style="margin-top:8px;background:#fff;color:#117a65;border:1.5px solid #117a65;border-radius:10px;padding:9px;font-size:0.8rem;font-weight:700;cursor:pointer;width:100%;">Confirm all '+need+' empty item'+(need===1?'':'s')+' as nil</button>';
+  if(blockers.length) h+='<div style="margin-top:10px;padding:9px 12px;border-radius:10px;background:#fff0f0;border:1.5px solid #e74c3c;color:#a93226;font-size:0.8rem;font-weight:700;line-height:1.6;">Can\'t submit yet:<br>• '+blockers.map(metalEsc).join('<br>• ')+'</div>';
+  if(warns.length) h+='<div style="margin-top:10px;padding:9px 12px;border-radius:10px;background:#fff8f0;border:1.5px solid #e67e22;color:#7d4c00;font-size:0.78rem;line-height:1.6;">⚠️ The Supervisor and QA will see these:<br>• '+warns.map(metalEsc).join('<br>• ')+'</div>';
+  h+='<div class="field-row" style="margin-top:12px;"><div class="field-label">Note for Supervisor / QA (optional)</div><textarea class="field-input" id="sub-note" rows="2" style="width:100%;">'+metalEsc((prev&&prev.note)||'')+'</textarea></div>';
+  h+='<div id="sub-msg" style="margin-top:6px;font-size:0.78rem;color:#a93226;font-weight:700;"></div>'+
+    '<button type="button" id="sub-go" style="margin-top:8px;background:#0074d9;color:#fff;border:none;border-radius:12px;padding:13px;font-size:0.95rem;font-weight:800;cursor:pointer;width:100%;opacity:'+((need||blockers.length)?'0.45':'1')+';">'+(prev?'📤 Resubmit (amend)':'📤 Submit day')+'</button>';
+  body.innerHTML=h;body.scrollTop=scroll;
+  body.querySelectorAll('[data-subnil]').forEach(function(c){c.addEventListener('change',function(){nil[c.dataset.subnil]=c.checked;renderSubmitDay();});});
+  var an=document.getElementById('sub-allnil');
+  if(an) an.onclick=function(){SUB_ITEMS.forEach(function(it){if(subCount(p,it.key)===0) nil[it.key]=true;});renderSubmitDay();};
+  document.getElementById('sub-go').onclick=function(){
+    var msg=document.getElementById('sub-msg');
+    if(blockers.length){msg.textContent='End the running job first.';return;}
+    if(need){msg.textContent='Confirm the empty items as nil first ('+need+' left).';return;}
+    msg.style.color='#555';msg.textContent='Sending…';
+    this.disabled=true;
+    var btn=this;
+    submitLineDay(line,(document.getElementById('sub-note')||{}).value||'',function(e){
+      btn.disabled=false;
+      if(e){msg.style.color='#a93226';msg.textContent=e.message==='offline'?'No connection — your records are safe on this tablet. Try again when you are back online.':(e.message||'Could not send. Try again.');return;}
+      showToast('✅ '+line+' submitted to Supervisor and QA');
+      hidePanel('submitDayPanel');
+    });
+  };
+}
+// ── Supervisor / QA: review and sign off ─────────────────────────────────
+function openSubmissions(){subOpenLine=null;showPanel('submissionsPanel');if(canAccess('endofday')) mergeSubmissions();renderSubmissions();}
+function subCanSign(slot){
+  if(!currentUser) return false;
+  if(currentUser.id==='16') return true;
+  if(slot==='prodMgr') return canAccess('supervisor');
+  return currentUser.role==='qa'||currentUser.role==='manager';
+}
+function renderSubmissions(){
+  var body=document.getElementById('submissionsBody');if(!body) return;
+  var scroll=body.scrollTop;
+  if(subOpenLine){renderSubDetail(subOpenLine);body.scrollTop=scroll;return;}
+  var lines=subExpectedLines(),signed=lines.filter(function(l){return subStateOf(l).key==='signed';}).length;
+  var h='<div style="background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border:1.5px solid #222;">'+
+    '<div style="font-size:0.7rem;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:0.5px;">End of day</div>'+
+    '<div style="font-size:1rem;font-weight:900;">Line submissions — '+fmtDate(shelfToday())+'</div>'+
+    '<div style="font-size:0.78rem;color:#666;margin-top:4px;">Each team leader submits their day. Open one, review it, and both the Supervisor and QA sign it off.</div></div>'+
+    '<div class="sum-tile" style="margin-bottom:12px;"><div class="sum-val" style="color:'+(signed===lines.length&&lines.length?'#2ecc40':'#e67e22')+';">'+signed+' / '+lines.length+'</div><div class="sum-lbl">Lines signed off</div></div>';
+  if(!subSynced) h+='<div style="font-size:0.78rem;color:#aaa;margin-bottom:8px;">Checking for submissions…</div>';
+  if(!lines.length) h+='<div style="text-align:center;color:#bbb;padding:24px;font-size:0.85rem;">No line has a scheduled run or a submission yet.</div>';
+  lines.forEach(function(l){
+    var s=submissions[subDocId(l)],st=subStateOf(l),tl=(s&&s.payload&&s.payload.teamLeader&&s.payload.teamLeader.name)||(lineTeamLeaders[l]&&lineTeamLeaders[l].name)||'';
+    h+='<div data-subline="'+metalEsc(l)+'" style="background:#fff;border-radius:16px;padding:12px 14px;margin-bottom:8px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid '+st.color+';cursor:'+(s?'pointer':'default')+';">'+
+      '<div style="display:flex;align-items:center;gap:10px;"><div style="flex:1;min-width:0;"><div style="font-weight:800;font-size:0.92rem;">'+metalEsc(l)+(tl?' <span style="font-weight:600;font-size:0.76rem;color:#888;">· '+metalEsc(tl)+'</span>':'')+'</div>'+
+      '<div style="font-size:0.76rem;font-weight:700;color:'+st.color+';margin-top:2px;">'+metalEsc(st.text)+'</div>'+
+      (s?'<div style="font-size:0.7rem;color:#888;margin-top:3px;">Submitted '+metalEsc(s.submittedAt)+' by '+metalEsc(s.submittedBy)+(s.version>1?' · v'+s.version:'')+(s.warnings&&s.warnings.length?' · <span style="color:#e67e22;font-weight:700;">⚠️ '+s.warnings.length+' warning'+(s.warnings.length===1?'':'s')+'</span>':'')+'</div>':'')+
+      '</div>'+(s?'<div style="color:#0074d9;font-size:0.78rem;font-weight:600;">Review →</div>':'')+'</div></div>';
+  });
+  if(canAccess('endofday')) h+='<button type="button" id="sub-finish" style="margin-top:12px;background:#e74c3c;color:#fff;border:none;border-radius:12px;padding:13px;font-size:0.92rem;font-weight:800;cursor:pointer;width:100%;">🌅 Finish — End of Shift report &amp; New Shift</button>'+
+    '<div style="font-size:0.72rem;color:#999;margin-top:6px;line-height:1.5;">This builds the report from what has been submitted and signed off, then clears this tablet for the next day.</div>';
+  body.innerHTML=h;body.scrollTop=scroll;
+  body.querySelectorAll('[data-subline]').forEach(function(c){c.onclick=function(){if(submissions[subDocId(c.dataset.subline)]){subOpenLine=c.dataset.subline;renderSubmissions();}};});
+  var fb=document.getElementById('sub-finish');
+  if(fb) fb.onclick=function(){hidePanel('submissionsPanel');openNewShiftConfirm();};
+}
+function subRecLine(label,parts){return '<div style="padding:7px 0;border-bottom:1px solid #f3f3f3;font-size:0.76rem;line-height:1.5;"><strong>'+label+'</strong>'+(parts?' · '+parts:'')+'</div>';}
+function subDetailBody(s){
+  var p=s.payload||{},h='';
+  function sec(it,inner){
+    var n=subCount(p,it.key);
+    var head='<div style="display:flex;justify-content:space-between;gap:8px;"><div style="font-size:0.82rem;font-weight:800;">'+metalEsc(it.label)+(it.form?' <span style="font-size:0.66rem;color:#888;font-weight:600;">'+it.form+'</span>':'')+'</div>'+
+      (n>0?'<div style="font-size:0.74rem;font-weight:800;color:#1a7a2a;">'+n+' recorded</div>':(s.nil&&s.nil[it.key]?'<div style="font-size:0.74rem;font-weight:800;color:#117a65;">NIL — confirmed</div>':'<div style="font-size:0.74rem;font-weight:800;color:#c0392b;">⚠️ nothing recorded, not confirmed</div>'))+'</div>';
+    return '<div style="background:#fff;border-radius:14px;padding:11px 14px;margin-bottom:8px;box-shadow:0 2px 10px rgba(15,46,28,0.06);">'+head+(n>0?'<div style="margin-top:6px;">'+inner+'</div>':'')+'</div>';
+  }
+  var E=metalEsc;
+  h+=sec(SUB_ITEMS[0],(p.trace||[]).map(function(t){
+    var head=E(t.posLabel||'')+(t.posLabel?' · ':'')+E(t.jobName)+' · SKU '+E(t.sku||'—')+' · Qty '+t.qty+' · '+E(t.actStart||'—')+' – '+E(t.actFinish||'—')+(t.complete?'':' · <span style="color:#c0392b;font-weight:700;">INCOMPLETE</span>');
+    return '<details style="padding:6px 0;border-bottom:1px solid #f3f3f3;"><summary style="font-size:0.76rem;cursor:pointer;">'+head+'</summary>'+((t.sheet&&t.sheet.length)?'<div style="overflow-x:auto;margin-top:6px;">'+traceRecSheetHTML(t,false)+'</div>':'<div style="font-size:0.72rem;color:#888;">No sheet saved with this record.</div>')+'</details>';
+  }).join(''));
+  h+=sec(SUB_ITEMS[1],(p.labels||[]).map(function(r){return subRecLine(E(r.product),E(r.startTime||'')+(r.endTime?' – '+E(r.endTime):'')+' · '+E(r.status||''));}).join(''));
+  h+=sec(SUB_ITEMS[2],(p.clearance||[]).map(function(r){return subRecLine(E(r.product),'TL '+E(r.initials||'')+(r.hasN?' · <span style="color:#b85c00;">'+E(r.nonConf||'non-conformance')+'</span>':' · no non-conformances'));}).join(''));
+  h+=sec(SUB_ITEMS[3],(p.wastage||[]).map(function(r){return subRecLine(E(r.date||'')+' · '+E(r.dept||'')+' · '+E(r.storage||''),(r.rows||[]).length+' row'+((r.rows||[]).length===1?'':'s')+' · signed '+E(r.name||'')+(r.rows&&r.rows.length?'<br>'+r.rows.map(function(x){return E((x.code||'')+' '+(x.description||'')+' — '+(x.why||'')+' ('+(x.ctns||0)+' ctn, '+(x.units||0)+' units)');}).join('<br>'):''));}).join(''));
+  var li=(p.loose&&p.loose.items)||{};
+  h+=sec(SUB_ITEMS[4],Object.keys(li).filter(function(k){var x=li[k];return x&&(x.startPF||x.endPF||x.comment||x.startInitial||x.endInitial);}).map(function(k){var x=li[k];return subRecLine(E(k),'start '+E(x.startPF||'—')+' ('+E(x.startInitial||'')+') · end '+E(x.endPF||'—')+' ('+E(x.endInitial||'')+')'+(x.comment?' · '+E(x.comment):''));}).join(''));
+  h+=sec(SUB_ITEMS[5],Object.keys(p.allergen||{}).map(function(k){var a=p.allergen[k];return subRecLine(E(k),'verified by '+E(a.verifiedBy||'')+' ('+E(a.initials||'')+') at '+E(a.time||''));}).join(''));
+  h+=sec(SUB_ITEMS[6],(p.issues||[]).map(function(r){return subRecLine(E(r.category||'')+' · '+E(r.severity||''),E(r.description||'')+(r.action?' — action: '+E(r.action):'')+' · '+E(r.time||'')+(r.resolved?' · resolved':' · open'));}).join(''));
+  h+=sec(SUB_ITEMS[7],(p.skips||[]).map(function(r){return subRecLine(E(r.skippedJobName||'')+' skipped for '+E(r.startedJobName||''),E(r.reason||'')+(r.notes?' — '+E(r.notes):'')+' · '+E(r.time||''));}).join(''));
+  h+=sec(SUB_ITEMS[8],(p.overrides||[]).map(function(r){return subRecLine(E(r.name||''),E(r.reason||'')+' · original use-by '+E(r.originalUseBy||'—')+' · '+E(r.time||''));}).join(''));
+  h+=sec(SUB_ITEMS[9],(p.transfers||[]).map(function(r){return subRecLine(E(r.product||'')+' → '+E(r.toLine||''),E(r.name||'')+' · '+E(r.reason||'')+' · '+E(r.time||''));}).join(''));
+  return h;
+}
+function renderSubDetail(line){
+  var body=document.getElementById('submissionsBody'),id=subDocId(line),s=submissions[id];
+  if(!s){subOpenLine=null;renderSubmissions();return;}
+  var st=subStateOf(line),E=metalEsc,so=s.signoff||{},locked=st.key==='signed';
+  var h='<button class="back-btn" id="sub-back">← All lines</button>'+
+    '<div style="background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border:1.5px solid #222;">'+
+    '<div style="font-size:1rem;font-weight:900;">'+E(line)+' — '+fmtDate(s.date)+'</div>'+
+    '<div style="font-size:0.78rem;color:#666;margin-top:4px;line-height:1.6;">Submitted by <strong>'+E(s.submittedBy)+'</strong> at '+E(s.submittedAt)+(s.version>1?' (version '+s.version+')':'')+
+    '<br><span style="font-weight:800;color:'+st.color+';">'+E(st.text)+'</span></div>'+
+    (s.note?'<div style="margin-top:8px;font-size:0.78rem;background:#f5f5f5;border-radius:8px;padding:7px 10px;">📝 '+E(s.note)+'</div>':'')+'</div>';
+  if(s.warnings&&s.warnings.length) h+='<div style="margin-bottom:10px;padding:9px 12px;border-radius:10px;background:#fff8f0;border:1.5px solid #e67e22;color:#7d4c00;font-size:0.78rem;line-height:1.6;">⚠️ Flagged when submitted:<br>• '+s.warnings.map(E).join('<br>• ')+'</div>';
+  h+=subDetailBody(s);
+  h+='<div style="background:#fff;border-radius:16px;padding:14px;margin-top:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border:1.5px solid #222;">'+
+    '<div style="font-size:0.78rem;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Sign off</div>'+
+    '<div style="font-size:0.74rem;color:#777;margin-bottom:10px;">Both the Production Supervisor / Manager and the QA Officer / Co-ord must sign.</div>';
+  [['prodMgr','Production Super / Mgr','#0074d9'],['qa','QA Officer / Co-ord','#16a085']].forEach(function(sl){
+    var e=so[sl[0]];
+    h+='<div style="font-size:0.74rem;font-weight:800;color:'+sl[2]+';margin:8px 0 4px;">'+sl[1]+'</div>';
+    if(e) h+='<div style="padding:8px 11px;border-radius:8px;background:#f0fdf4;border:1.5px solid #2ecc40;color:#1a7a2a;font-size:0.8rem;font-weight:700;">✅ '+E(e.name)+' · '+E(e.sig)+' · '+fmtDate(e.date)+' '+E(e.time||'')+'</div>';
+    else if(subCanSign(sl[0])) h+='<div style="display:flex;gap:6px;flex-wrap:wrap;"><input class="field-input" type="text" id="subsn-'+sl[0]+'" placeholder="Name" value="'+E(currentUser?currentUser.name:'')+'" style="flex:1 1 120px;"/><input class="field-input" type="text" id="subsg-'+sl[0]+'" placeholder="Signature" style="flex:1 1 90px;"/><button type="button" data-subsign="'+sl[0]+'" style="background:'+sl[2]+';color:#fff;border:none;border-radius:8px;padding:0 14px;font-size:0.8rem;font-weight:800;cursor:pointer;min-height:38px;">Sign</button></div>';
+    else h+='<div style="font-size:0.78rem;color:#aaa;">Waiting for '+(sl[0]==='prodMgr'?'the Supervisor / Manager':'QA')+' to sign.</div>';
+  });
+  h+='</div>';
+  h+='<div style="background:#fff;border-radius:16px;padding:14px;margin-top:12px;box-shadow:0 2px 10px rgba(15,46,28,0.06);">'+
+    '<div style="font-size:0.78rem;font-weight:800;margin-bottom:6px;">'+(locked?'Re-open for changes':'Send back to the team leader')+'</div>'+
+    '<textarea class="field-input" id="sub-return-note" rows="2" placeholder="What needs fixing?" style="width:100%;"></textarea>'+
+    '<button type="button" id="sub-return" style="margin-top:8px;background:#fff;color:#c0392b;border:1.5px solid #c0392b;border-radius:10px;padding:9px 12px;font-size:0.8rem;font-weight:700;cursor:pointer;width:100%;">↩ '+(locked?'Re-open (clears both sign-offs)':'Send back')+'</button></div>';
+  if(s.history&&s.history.length) h+='<div style="margin-top:12px;font-size:0.7rem;color:#999;line-height:1.6;">History: '+s.history.map(function(x){return E(x.at)+' — '+E(x.action)+' ('+E(x.by)+')';}).join(' · ')+'</div>';
+  body.innerHTML=h;
+  document.getElementById('sub-back').onclick=function(){subOpenLine=null;renderSubmissions();};
+  body.querySelectorAll('[data-subsign]').forEach(function(b){b.onclick=function(){subSign(line,b.dataset.subsign);};});
+  var rb=document.getElementById('sub-return');
+  if(rb) rb.onclick=function(){
+    var note=(document.getElementById('sub-return-note').value||'').trim();
+    if(!note){showToast('Write what needs fixing.');return;}
+    var by=currentUser?currentUser.name:'Supervisor / QA';
+    subUpdateDoc(id,{status:'returned',returned:{note:note,by:by,time:nowTime()},signoff:null,history:(s.history||[]).concat([{v:s.version,at:nowTime(),by:by,action:(locked?'Re-opened':'Sent back')+': '+note}])});
+    if(canAccess('endofday')) mergeSubmissions();
+    showToast('↩ Sent back to the team leader');
+  };
+}
+function subSign(line,slot){
+  var id=subDocId(line),s=submissions[id];if(!s) return;
+  if(!subCanSign(slot)){showToast('You can\'t sign in that box.');return;}
+  var name=((document.getElementById('subsn-'+slot)||{}).value||'').trim(),sig=((document.getElementById('subsg-'+slot)||{}).value||'').trim();
+  if(!name||!sig){showToast('Enter your name and signature.');return;}
+  var entry={name:name,sig:sig,date:shelfToday(),time:nowTime(),by:currentUser?currentUser.name:name};
+  var so=Object.assign({},s.signoff||{});so[slot]=entry;
+  var both=!!(so.prodMgr&&so.qa);
+  if(both) so.time=nowTime();
+  subUpdateDoc(id,{signoff:so,status:both?'signed':'submitted',history:(s.history||[]).concat([{v:s.version,at:nowTime(),by:entry.by,action:(slot==='prodMgr'?'Production':'QA')+' signed'}])});
+  if(canAccess('endofday')) mergeSubmissions();
+  showToast(both?'✅ '+line+' signed off by Production and QA':'✅ Signed — waiting for '+(slot==='prodMgr'?'QA':'Production'));
+}
+// ── End of Shift report section ──────────────────────────────────────────
+function buildSubmissionsPDFSection(){
+  var lines=subExpectedLines();
+  if(!lines.length) return '';
+  var E=metalEsc;
+  var html='<h2 class="teal">Line Submissions &amp; Sign-Off — End of Day</h2>'+
+    '<table><thead><tr><th>Line</th><th>Submitted by</th><th>Submitted</th><th>Records</th><th>Nil confirmed</th><th>Production Super / Mgr</th><th>QA Officer / Co-ord</th><th>Status</th></tr></thead><tbody>';
+  lines.forEach(function(l){
+    var s=submissions[subDocId(l)],st=subStateOf(l);
+    if(!s){html+='<tr><td>'+E(l)+'</td><td colspan="6" style="color:#c0392b;">NOT SUBMITTED</td><td style="color:#c0392b;">'+E(st.text)+'</td></tr>';return;}
+    var so=s.signoff||{},recs=[],nils=[];
+    SUB_ITEMS.forEach(function(it){var n=(s.counts&&s.counts[it.key])||0;if(n>0) recs.push(E(it.label)+' '+n);else if(s.nil&&s.nil[it.key]) nils.push(E(it.label));else nils.push('<span style="color:#c0392b;">'+E(it.label)+' (NOT CONFIRMED)</span>');});
+    html+='<tr><td>'+E(l)+'</td><td>'+E(s.submittedBy)+'</td><td>'+E(s.submittedAt)+(s.version>1?' (v'+s.version+')':'')+'</td><td>'+(recs.join(', ')||'—')+'</td><td>'+(nils.join(', ')||'—')+'</td>'+
+      '<td>'+(so.prodMgr?E(so.prodMgr.name)+' / '+E(so.prodMgr.sig)+'<br>'+fmtDate(so.prodMgr.date):'<span style="color:#c0392b;">not signed</span>')+'</td>'+
+      '<td>'+(so.qa?E(so.qa.name)+' / '+E(so.qa.sig)+'<br>'+fmtDate(so.qa.date):'<span style="color:#c0392b;">not signed</span>')+'</td>'+
+      '<td>'+E(st.text)+'</td></tr>';
+    if(s.warnings&&s.warnings.length) html+='<tr><td></td><td colspan="7" style="font-size:9px;color:#b85c00;">Flagged: '+s.warnings.map(E).join(' · ')+'</td></tr>';
+    if(s.note) html+='<tr><td></td><td colspan="7" style="font-size:9px;">Note: '+E(s.note)+'</td></tr>';
+    if(s.history&&s.history.length>1) html+='<tr><td></td><td colspan="7" style="font-size:9px;color:#666;">History: '+s.history.map(function(x){return E(x.at)+' '+E(x.action)+' ('+E(x.by)+')';}).join(' · ')+'</td></tr>';
+  });
+  return html+'</tbody></table>';
+}
+// A card for the Supervisor dashboard.
+function subDashCard(){
+  var pend=subPendingLines(),n=subExpectedLines().length;
+  var c=document.createElement('div');
+  c.style.cssText='background:#fff;border-radius:18px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 18px rgba(15,46,28,0.07);border-left:5px solid #0074d9;cursor:pointer;display:flex;align-items:center;gap:12px;';
+  c.innerHTML='<div style="font-size:1.5rem;">📥</div><div style="flex:1;"><div style="font-weight:800;font-size:0.92rem;">End of Day — Line Submissions</div>'+
+    '<div style="font-size:0.76rem;color:#888;margin-top:2px;">Review each team leader\'s day and sign it off</div>'+
+    (n?(pend.length?'<div style="font-size:0.72rem;color:#e74c3c;font-weight:700;margin-top:3px;">⏳ '+pend.length+' of '+n+' lines not yet signed off</div>':'<div style="font-size:0.72rem;color:#2ecc40;font-weight:700;margin-top:3px;">✅ All lines signed off</div>'):'<div style="font-size:0.72rem;color:#aaa;margin-top:3px;">No lines scheduled yet</div>')+
+    '</div><div style="color:#0074d9;font-size:0.78rem;font-weight:600;">Open →</div>';
+  c.onclick=function(){clearInterval(supRefreshInterval);openSubmissions();};
+  return c;
+}
+initSubmissionSync();
 
 // ── FORM065.0 — Bread Traceability (QLD) ─────────────────────────────────
 // QA enters each day's bread before production: best before date (BBD), batch no. (sliced bread only) and the date
@@ -9605,6 +10041,7 @@ function renderQaDash(){
     {icon:'📋',title:'FORM067.0 — Production Paperwork Sign Off Sheet',desc:'Daily sign-off for all production forms across all lines',count:0,countLabel:'',color:'#555',action:function(){openForm067();}},
     {icon:'📋',title:'FORM093.0 — Labels Issued Log',desc:'First & last label verification for each production run',count:pending093,countLabel:'awaiting sign-off',color:'#9b59b6',action:function(){renderQaForm093List(body);}},
     {icon:'📋',title:'FORM053.0 — Line Clearance Check Sheet',desc:'Pre-run line clearance checks (Woolworths products)',count:pendingLC,countLabel:'awaiting sign-off',color:'#007dc6',action:function(){renderQaLCList(body);}},
+    {icon:'📥',title:'End of Day — Line Submissions',desc:'Each team leader submits their day; review it and sign it off (Supervisor and QA)',count:subPendingLines().length,countLabel:'line(s) not yet signed off',color:'#0074d9',action:function(){clearInterval(qaRefreshInterval);openSubmissions();}},
     {icon:'🍞',title:BREAD_FORM.no+' — Bread Traceability',desc:'Enter the day\'s bread best before dates, batch numbers and freezer dates before production starts · Supervisor & QA sign off',count:(breadToEnter()||((breadHasEntries()&&!breadToday().signedOff)?1:0)),countLabel:(breadToEnter()?'bread(s) to enter before production':'form awaiting Supervisor & QA sign-off'),color:'#c0763a',action:function(){clearInterval(qaRefreshInterval);openBreadForm();}},
     {icon:'🔎',title:TRACE_FORM_NO+' — Traceability by SKU',desc:'Ingredient traceability for every run — review and sign off by line',count:LINES.filter(function(l){return traceLineStatus(l).unsigned.length>0;}).length,countLabel:'lines awaiting sign-off',color:'#16a085',action:function(){clearInterval(qaRefreshInterval);openTraceSign();}},
     {icon:'📅',title:'End of Day Schedule Sign Off',desc:'Daily production schedule sign-off at end of shift',count:0,countLabel:'coming soon',color:'#27ae60',action:null,comingSoon:true},
@@ -12332,6 +12769,7 @@ function renderSupervisorDash(){
   var sum=document.createElement('div');sum.className='sum-grid';
   sum.innerHTML='<div class="sum-tile"><div class="sum-val" style="color:#e74c3c;">'+pending+'</div><div class="sum-lbl">Awaiting Sign-off</div></div><div class="sum-tile"><div class="sum-val" style="color:#2ecc40;">'+signed+'</div><div class="sum-lbl">Signed Off</div></div><div class="sum-tile"><div class="sum-val" style="color:#0074d9;">'+form093Records.filter(function(r){return r.status==='in-progress';}).length+'</div><div class="sum-lbl">In Progress</div></div>';
   body.appendChild(sum);
+  body.appendChild(subDashCard());
 
   // ── Line Staffing / Live UPLH section ───────────────────────────────
   var lsDiv=document.createElement('div');
@@ -12648,6 +13086,7 @@ function lsSave(){
       traceSignOffs: traceSignOffs,
       ingredientState: ingredientState,
       breadForm: breadForm,
+      subNil: subNil,
       allergenVerifications: allergenVerifications,
       skipReasons: skipReasons,
       formChangesLog: formChangesLog,
@@ -12720,6 +13159,7 @@ function lsLoad(){
     // scans for runs still in progress (a finished run's state is cleared once its record is saved)
     if(snap.ingredientState) ingredientState=snap.ingredientState;
     if(snap.breadForm){breadForm=Object.assign(blankBreadForm(),snap.breadForm);if(!breadForm.rows) breadForm.rows={};}
+    if(snap.subNil) subNil=snap.subNil;
     if(snap.allergenVerifications) allergenVerifications=snap.allergenVerifications;
     if(snap.skipReasons) skipReasons=snap.skipReasons;
     formChangesLog   = snap.formChangesLog   || [];
@@ -12802,7 +13242,8 @@ function openNewShiftConfirm(){
 
 function confirmNewShift(){
   // Traceability is a legal record — make sure nobody clears the shift with it unsigned or missing.
-  var gaps=traceGaps().concat(breadGaps());
+  mergeSubmissions();
+  var gaps=traceGaps().concat(breadGaps()).concat(subGaps());
   if(gaps.length&&!confirm('These records are not complete:\n\n'+gaps.slice(0,8).join('\n')+(gaps.length>8?'\n…and '+(gaps.length-8)+' more':'')+'\n\nThe end-of-shift report will record these as outstanding. Start a new shift anyway?')) return;
   // First generate and download the end-of-shift report, then clear
   lsSave();
@@ -12827,6 +13268,8 @@ function confirmNewShift(){
     issueLog=[];transferLog=[];overrideLog=[];form093Records=[];lcRecords=[];
     dmgLogs=[];messages=[];msgIdCtr=0;ingredientState={};breadForm=blankBreadForm();
     localStorage.removeItem(LS_KEY);
+    try{localStorage.setItem('frenzee_sub_cleared',shelfToday());}catch(e){}
+    subNil={};
     hideOverlay('newShiftOverlay');
     hideOverlay('eosOverlay');
     showToast('✅ New shift started — all data cleared');
@@ -13236,6 +13679,8 @@ function buildEosPDF(){
   if(trPDF) html=html.replace('</body></html>', trPDF+'</body></html>');
   var brPDF=buildBreadPDFSection();
   if(brPDF) html=html.replace('</body></html>', brPDF+'</body></html>');
+  var subPDF=buildSubmissionsPDFSection();
+  if(subPDF) html=html.replace('</body></html>', subPDF+'</body></html>');
   // Inject skip reasons
   if(skipReasons.length){
     var srHTML='<h2 class="orange">⏭️ Skipped Jobs Log</h2>'+
@@ -13521,6 +13966,9 @@ document.getElementById('metalProductsCloseBtn').onclick=closeMetalProducts;
 document.getElementById('traceSignCloseBtn').onclick=function(){hidePanel('traceSignPanel');};
 document.getElementById('traceSheetCloseBtn').onclick=function(){hidePanel('traceSheetPanel');};
 document.getElementById('shelfListCloseBtn').onclick=function(){hidePanel('shelfListPanel');};
+document.getElementById('submitDayBtn').onclick=openSubmitDay;
+document.getElementById('submitDayCloseBtn').onclick=function(){hidePanel('submitDayPanel');};
+document.getElementById('submissionsCloseBtn').onclick=function(){subOpenLine=null;hidePanel('submissionsPanel');var qp=document.getElementById('qaPanel');if(qp&&qp.classList.contains('show')) renderQaDash();};
 document.getElementById('breadFormCloseBtn').onclick=function(){
   hidePanel('breadFormPanel');
   var qp=document.getElementById('qaPanel');
